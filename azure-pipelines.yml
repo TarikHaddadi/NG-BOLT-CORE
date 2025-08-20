@@ -1,178 +1,127 @@
-# ===========================
-# Azure DevOps CI/CD for @cadai/pxs-ng-core
-# - CI: build & test on PRs/commits
-# - CD: optional version bump + publish to Azure Artifacts
-# ===========================
-
 trigger:
   branches:
-    include:
+    include: 
       - main
       - master
       - develop
+
   paths:
     include:
       - projects/core/**
-      - angular.json
-      - package.json
-      - pnpm-lock.yaml
-      - package-lock.json
-      - yarn.lock
 
-pr:
-  branches:
-    include:
-      - main
-      - develop
-  paths:
-    include:
-      - projects/core/**
-      - angular.json
-      - package.json
-      - pnpm-lock.yaml
-      - package-lock.json
-      - yarn.lock
-
-# ---- Parameters so you can run a manual pipeline with a chosen bump type ----
-parameters:
-- name: release
-  displayName: Publish to Azure Artifacts?
-  type: boolean
-  default: false
-- name: versionBump
-  displayName: Version bump (used only if release=true)
-  type: string
-  default: 'patch'
-  values:
-    - 'none'
-    - 'patch'
-    - 'minor'
-    - 'major'
+pool:
+  vmImage: 'ubuntu-latest'
 
 variables:
   NODE_VERSION: '20.x'
   PROJECT_DIR: 'projects/core'
   DIST_DIR: 'dist/core'
 
-
 stages:
-# ========================= CI =========================
-- stage: CI
+# ---------- Build & Test ----------
+- stage: build_test
   displayName: Build & Test
   jobs:
-  - job: build_test
-    displayName: Build & Test
-    pool:
-      vmImage: 'ubuntu-latest'
-
+  - job: build
     steps:
-    - checkout: self
-      persistCredentials: true  # needed if CD pushes tags
-
     - task: NodeTool@0
-      inputs:
-        versionSpec: '$(NODE_VERSION)'
-      displayName: 'Use Node $(NODE_VERSION)'
+      inputs: { versionSpec: '$(NODE_VERSION)' }
+      displayName: 'Use Node.js $(NODE_VERSION)'
 
-    # --- Cache node_modules (works for npm, yarn, or pnpm) ---
-    - task: Cache@2
-      inputs:
-        key: |
-          npm | "$(Agent.OS)" | package-lock.json
-        restoreKeys: |
-          npm | "$(Agent.OS)"
-        path: $(Pipeline.Workspace)/.npm
-      displayName: Cache npm
+    - script: npm ci
+      displayName: 'Install dependencies'
 
-    - script: |
-        npm ci
-      displayName: 'Install root deps'
+    - script: npm test -- --watch=false --browsers=ChromeHeadless
+      displayName: 'Unit tests'
 
-    # Optional: lint/test (uncomment if you have scripts)
-     
-    - script: npm run lint
-      displayName: 'Lint'
-    # - script: npm test -- --watch=false --browsers=ChromeHeadless
-    #   displayName: 'Unit tests'
-
-    # Build only the library entrypoint
-    - script: |
-        npx ng build core --configuration production
-      displayName: 'Build library (ng-packagr)'
+    - script: npm run build:core
+      displayName: 'Build library'
 
     - publish: $(DIST_DIR)
-      artifact: core-dist
-      displayName: 'Publish artifact: dist/core'
+      artifact: pxs-ng-core
+      displayName: 'Publish build artifact'
 
-# ========================= CD (optional) =========================
-- stage: Release
-  displayName: Release to Azure Artifacts
-  dependsOn: CI
-  condition: and(succeeded(), eq('${{ parameters.release }}', 'true'))
+- stage: tag_on_main
+  displayName: "Create git tag from package version"
+  dependsOn: build_test
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
-  - job: publish
-    displayName: Version & Publish
-    pool:
-      vmImage: 'ubuntu-latest'
+    - job: tag_job
+      displayName: "Tag repo with v<version>"
+      steps:
+        - checkout: self
+          persistCredentials: true
 
+        - task: NodeTool@0
+          inputs:
+            versionSpec: '20.x'
+          displayName: 'Use Node.js'
+
+        - script: |
+            set -e
+
+            PKG_PATH="projects/core/package.json"
+            VERSION=$(node -p "require('./' + process.env.PKG_PATH).version")
+            TAG="PXS-NG-CORE@$VERSION"
+
+            echo "Detected version: $VERSION"
+            echo "Proposed tag:    $TAG"
+
+            # fetch tags so we can check existence
+            git fetch --tags --force
+
+            if git rev-parse "$TAG" >/dev/null 2>&1; then
+              echo "Tag $TAG already exists. Nothing to do."
+              exit 0
+            fi
+
+            # Configure Git user (required in CI to push)
+            git config user.email "PXS-NG-CORE@cadai"
+            git config user.name  "Build Bot"
+
+            # Create an annotated tag
+            git tag -a "$TAG" -m "release: $TAG"
+
+            # Push the tag
+            git push origin "$TAG"
+
+            echo "Created and pushed tag $TAG"
+          displayName: 'Create & push tag from package version'
+          env:
+            PKG_PATH: projects/core/package.json
+
+# ---------- Publish to Azure Artifacts ----------
+- stage: publish
+  displayName: Publish
+  dependsOn:
+    - build_test
+    - version
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: publish_job
     steps:
-    - checkout: self
-      persistCredentials: true
+    - download: current
+      artifact: pxs-ng-core
 
     - task: NodeTool@0
-      inputs:
-        versionSpec: '$(NODE_VERSION)'
-      displayName: 'Use Node $(NODE_VERSION)'
+      inputs: { versionSpec: '$(NODE_VERSION)' }
 
-    - download: current
-      artifact: core-dist
-      displayName: 'Download core-dist artifact'
-
-    # ----- (Optional) bump version and tag -----
-    - script: |
-        echo "Requested bump: ${{ parameters.versionBump }}"
-        if [ "${{ parameters.versionBump }}" != "none" ]; then
-          git config user.email "builds@azuredevops"
-          git config user.name  "Azure Pipelines"
-          # Bump version in projects/core/package.json
-          npm version ${{ parameters.versionBump }} --no-git-tag-version --prefix $(PROJECT_DIR)
-
-          # Commit the bump
-          git add $(PROJECT_DIR)/package.json
-          git commit -m "chore(core): version ${{ parameters.versionBump }} (CI)"
-          # Create tag based on updated package.json version
-          PKG_VERSION=$(node -p "require('./$(PROJECT_DIR)/package.json').version")
-          git tag "core-v$PKG_VERSION"
-          git push origin HEAD:$(Build.SourceBranch)
-          git push origin "core-v$PKG_VERSION"
-          echo "Bumped to version $PKG_VERSION"
-        else
-          echo "Skipping version bump (versionBump=none)"
-        fi
-      displayName: 'Bump version & tag (optional)'
-
-    # Rebuild from source (ensures dist uses bumped version),
-    # or repack the downloaded artifact. Rebuild is safer.
-    - script: |
-        npm ci
-        npx ng build core --configuration production
-      displayName: 'Rebuild library for release'
-
-    # Authenticate npm to Azure Artifacts and publish
+    # Auth to Azure Artifacts (injects token into .npmrc)
     - task: NpmAuthenticate@0
-      inputs:
-        workingFile: '$(PROJECT_DIR)/.npmrc'  # optional if you keep one; task will still inject auth
-        customEndpoint: ''                    # leave blank if using built-in Azure Artifacts auth
-        # Alternatively, set 'customEndpoint' to a service connection for external registries
       displayName: 'Authenticate to Azure Artifacts'
+      # If you keep a repo-level .npmrc, point to it; otherwise omit workingFile.
+      # inputs:
+      #   workingFile: '$(PROJECT_DIR)/.npmrc'
 
+    # Optional: stop if this version already exists (prevents 409 CONFLICT)
     - script: |
+        PKG_NAME=$(node -p "require('./$(DIST_DIR)/package.json').name")
+        PKG_VER=$(node -p "require('./$(DIST_DIR)/package.json').version")
+        echo "Publishing $PKG_NAME@$PKG_VER"
+        if npm view "$PKG_NAME@$PKG_VER" version >/dev/null 2>&1; then
+          echo "Version already exists on the feed. Skipping publish."
+          exit 0
+        fi
         cd $(DIST_DIR)
-        # Uses publishConfig.registry in dist/core/package.json
         npm publish --ignore-scripts
       displayName: 'Publish to Azure Artifacts'
-
-    # (Optional) create a pipeline artifact of the final dist for auditing
-    - publish: $(DIST_DIR)
-      artifact: core-release
-      displayName: 'Publish artifact: core-release'
