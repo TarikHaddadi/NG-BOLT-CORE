@@ -95,7 +95,7 @@ stages:
   displayName: Publish
   dependsOn:
     - build_test
-    - version
+    - tag_on_main
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
   - job: publish_job
