@@ -1,10 +1,18 @@
 trigger:
   branches:
-    include: 
-      - main
-      - master
-      - develop
+    include: [main, master, develop]
+  paths:
+    include:
+      - projects/core/**
+      - azure-pipelines.yml
+      - package.json
+      - package-lock.json
+      - tsconfig*.json
+      - projects/**
 
+pr:
+  branches:
+    include: [main, master, develop]
   paths:
     include:
       - projects/core/**
@@ -55,7 +63,13 @@ stages:
           displayName: 'Use Node.js'
 
         - script: |
-            set -e
+            set -euo pipefail
+
+            # Use the System.AccessToken for git HTTPS ops
+            git config --global http.https://dev.azure.com/.extraheader "AUTHORIZATION: bearer $(System.AccessToken)"
+            git config --global user.email "build-bot@ci"
+            git config --global user.name  "Build Bot"
+            git config --global safe.directory $(Build.SourcesDirectory)
 
             PKG_PATH="projects/core/package.json"
             VERSION=$(node -p "require('./' + process.env.PKG_PATH).version")
@@ -64,7 +78,7 @@ stages:
             echo "Detected version: $VERSION"
             echo "Proposed tag:    $TAG"
 
-            # fetch tags so we can check existence
+            # Make sure we have latest tags from origin
             git fetch --tags --force
 
             if git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -72,21 +86,14 @@ stages:
               exit 0
             fi
 
-            # Configure Git user (required in CI to push)
-            git config user.email "PXS-NG-CORE@cadai"
-            git config user.name  "Build Bot"
-
-            # Create an annotated tag
             git tag -a "$TAG" -m "release: $TAG"
-
-            # Push the tag
             git push origin "$TAG"
-
             echo "Created and pushed tag $TAG"
           displayName: 'Create & push tag from package version'
           env:
             PKG_PATH: projects/core/package.json
-
+            SYSTEM_ACCESSTOKEN: $(System.AccessToken)  # exposed to the script
+            
 # ---------- Publish to Azure Artifacts ----------
 - stage: publish
   displayName: Publish
