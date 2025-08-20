@@ -1,0 +1,17 @@
+<form [formGroup]="form" class="grid gap-2">
+  <ng-container *ngFor="let field of config">
+    <ng-container *ngIf="!field.hidden">
+      <ng-container *ngIf="controlOf(field.name) as ctl; else pending">
+        <app-field-host
+          [field]="field"
+          [control]="ctl">
+        </app-field-host>
+      </ng-container>
+      <ng-template #pending>
+        <!-- optional: skeleton/placeholder -->
+        <div style="min-height: 48px"></div>
+      </ng-template>
+    </ng-container>
+  </ng-container>
+</form>
+
