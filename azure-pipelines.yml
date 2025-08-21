@@ -129,4 +129,3 @@ stages:
         cd $(DIST_DIR)
         npm publish --ignore-scripts
       displayName: 'Publish to Azure Artifacts'
-      displayName: 'Publish to Azure Artifacts'
