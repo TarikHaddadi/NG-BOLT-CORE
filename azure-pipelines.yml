@@ -55,7 +55,7 @@ stages:
   dependsOn: build_test
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   variables:
-    FEED_URL: "https://pkgs.dev.azure.com/<ORG>/<PROJECT>/_packaging/<FEED>/npm/registry/"
+    FEED_URL: "https://pkgs.dev.azure.com/cadai/Socle/_packaging/PXS-NG-CORE/npm/registry/"
     # If your package is scoped like @cadai/core, set the scope to "cadai"
     NPM_SCOPE: "cadai"
   jobs:
