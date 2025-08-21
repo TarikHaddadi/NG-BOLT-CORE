@@ -114,8 +114,8 @@ stages:
     - task: NpmAuthenticate@0
       displayName: 'Authenticate to Azure Artifacts'
       # If you keep a repo-level .npmrc, point to it; otherwise omit workingFile.
-      # inputs:
-      #   workingFile: '$(PROJECT_DIR)/.npmrc'
+      #inputs:
+      #  workingFile: '$(PROJECT_DIR)/.npmrc'
 
     # Optional: stop if this version already exists (prevents 409 CONFLICT)
     - script: |
@@ -128,4 +128,5 @@ stages:
         fi
         cd $(DIST_DIR)
         npm publish --ignore-scripts
+      displayName: 'Publish to Azure Artifacts'
       displayName: 'Publish to Azure Artifacts'

@@ -1,6 +1,6 @@
 # Authentication & Security – Current SPA Setup (Angular 19 + Keycloak + NgRx)
 
->_Last updated: 2025-08-13_
+>_Last updated: 2025-08-21_
 
 This README documents **how authentication works today**, the **benefits** of the current setup, and the main **residual risks** with non-breaking **hardening suggestions**. It reflects the *current* SPA architecture (no BFF).
 

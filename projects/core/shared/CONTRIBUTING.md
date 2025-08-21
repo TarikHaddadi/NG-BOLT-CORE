@@ -1,4 +1,5 @@
 # PXS NG Core — Contributing & Dynamic Form Guide
+>_Last updated: 2025-08-21_
 
 > This document explains:  
 > 1) How to contribute safely (structure, exports, barrels, and common pitfalls).  
@@ -303,3 +304,11 @@ Fix: Check `dist/core/package.json` `"exports"`. In consumer app, **remove** dev
 - [ ] No circular deps (verified by build).
 - [ ] `shared/public-api.ts` exports the new component.
 - [ ] Documentation updated (this file).
+
+
+
+
+## 🧑‍💻 Author
+
+**Angular Product Skeleton**  
+Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).

@@ -1,5 +1,5 @@
 # 🎯 Project Roadmap – Ordered Checklist (Angular 19 + NgRx + Keycloak)
->_Last updated: 2025-08-20_
+>_Last updated: 2025-08-21_
 
 Legend: **✅ Done** · **🟡 In progress** · **❌ To do**  
 Severity: **P0 Critical**, **P1 High**, **P2 Medium**, **P3 Low**  
@@ -20,3 +20,26 @@ Workload (est.): **S ≤1d**, **M 2–3d**, **L 4–7d**, **XL >1wk**
 | Core | Versionning | ❌ | P1 | S | Auto upgrade version by bumping a Tag and pushing it when commiting a new release + creating a release note | --- | TO BE IMPLEMENTED | FE |
 | Core | Env Vars | ❌ | P1 | XL | Adapt the ENV configuration multitenant and multi feature | see all files `REAMD-ENV-*` | TO BE IMPLEMENTED | FE |
 | Core | Docs | ❌ | P1 | M | Update all documentations | --- | TO BE IMPLEMENTED | FE |
+
+
+## 📃 Documentation Index
+Legend: **✅ Done** · **🟡 Ongoing** · **❌ To do**  
+
+- [[✅] - Global Readme](./README.md)
+- [[✅] - Core Overview](./README-OVERVIEW.md)
+- [[✅] - Authentication and state management](./README-AUTH-NGRX.md)
+- [[✅] - Theming, Assets and translattions](./README-ASSETS-TRANSLATIONS.md)
+- [[✅] - Contribution Guide](./CONTRIBUTING.md)
+- [[✅] - Contributing on forms](projects/core/shared/CONTRIBUTING.md)
+- [[✅] - Custom Form Builder and custom fields](projects/core/shared/README-FORMS.md)
+- [[✅] - Authentication Flow](README-CURRENT-AUTH.md)
+- [[✅] - Environment Config as is](README-ENV-CONFIG-ASIS.md)
+- [[🟡] - Content Security Policw CSP](./README-CSP.md)
+- [[❌] - Environment Config Upgrade Custom  Config – V1](README-ENV-CONFIG-UPGRADE-V1.md)
+- [[❌] - Environment Config – Upgrade BFF V2](README-ENV-CONFIG-UPGRADE-V2-BBF.md)
+- [[❌] - Authentication Flow Upgrade BFF](README-AUTH-UPGRADE-V2-BFF.md)
+
+## 🧑‍💻 Author
+
+**Angular Product Skeleton**  
+Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).

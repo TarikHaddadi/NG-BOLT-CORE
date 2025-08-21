@@ -1,4 +1,5 @@
 # 📝 Contributing Guide – `@cadai/pxs-ng-core`
+>_Last updated: 2025-08-21_
 
 Welcome! This document explains how to work with the **PXS-NG-CORE** library: setup, development, versioning, and publishing to our private Azure Artifacts feed.
 
@@ -90,18 +91,6 @@ This will:
 
 ---
 
-## 6. 📥 Consuming the Library in Apps
-
-In any Angular app:
-
-```bash
-npm install @cadai/pxs-ng-core
-```
-
-Since `.npmrc` is already configured, npm resolves it via the Azure feed.
-
----
-
 ## 7. ⚡ package.json Scripts
 
 Available at the repo root:
@@ -126,3 +115,10 @@ Available at the repo root:
 - [ ] Update version with `npm run version:patch|minor|major`  
 - [ ] Run `npm run publish:core`  
 - [ ] Verify package is available on [Azure Artifacts feed](https://dev.azure.com/cadai/Socle/_packaging?_a=feed&feed=PXS-NG-CORE)  
+
+
+
+## 🧑‍💻 Author
+
+**Angular Product Skeleton**  
+Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).

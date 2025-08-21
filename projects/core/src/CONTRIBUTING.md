@@ -1,6 +1,6 @@
 # Contributing Guide – Core, Shared, Features & Store
 
-_Last updated: 2025-08-13
+>_Last updated: 2025-08-21_
 
 This document is the **source of truth** for how to work in this repository. It explains the folder structure, barrel usage, contribution workflow, and a pre‑push checklist to keep everything aligned.
 

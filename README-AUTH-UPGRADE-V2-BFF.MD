@@ -1,5 +1,5 @@
 # Security Posture & Migration Plan – SPA → BFF
->_Last updated: 2025-08-13_
+>_Last updated: 2025-08-21_
 
 **Stack:** Angular 19 SPA + Keycloak (Broker, PKCE) + NgRx + Nginx (Docker)  
 **Decision:** Keep the SPA for UI, **implement a BFF (Backend‑for‑Frontend)** to hold tokens server‑side.
@@ -170,8 +170,6 @@ A: The BFF session cookie covers tabs. Server token refresh is centralized.
 - **BFF owner:** …  
 - **Frontend owner:** …  
 - **API owner:** …
-
-**Last updated:** 2025-08-12
 
 
 ## 🧑‍💻 Author

@@ -1,5 +1,5 @@
 # ⚒️ Serve Config from the BFF – Implementation Process
-_Last updated: 2025-08-13_
+>_Last updated: 2025-08-21_
 
 
 This document explains **how to move runtime configuration out of the SPA** and **serve it from the BFF**. The BFF becomes the **source of truth** for per-tenant, per-role, per-environment features and menus.
