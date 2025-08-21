@@ -52,9 +52,12 @@ stages:
 # ---------- Publish to Azure Artifacts ----------
 - stage: publish
   displayName: Publish
-  dependsOn:
-    - build_test
+  dependsOn: build_test
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+    FEED_URL: "https://pkgs.dev.azure.com/<ORG>/<PROJECT>/_packaging/<FEED>/npm/registry/"
+    # If your package is scoped like @cadai/core, set the scope to "cadai"
+    NPM_SCOPE: "cadai"
   jobs:
     - job: publish_job
       displayName: Publish package to Azure Artifacts
@@ -67,35 +70,55 @@ stages:
             versionSpec: '$(NODE_VERSION)'
           displayName: 'Use Node.js $(NODE_VERSION)'
 
-        - task: NpmAuthenticate@0
-          displayName: 'Authenticate to Azure Artifacts'
+        # Create an .npmrc in the artifact directory and authenticate it
+        - script: |
+            set -euo pipefail
+            PKG_DIR="$(Pipeline.Workspace)/pxs-ng-core"
+            echo "@$(NPM_SCOPE):registry=$(FEED_URL)" > "$PKG_DIR/.npmrc"
+            echo "always-auth=true" >> "$PKG_DIR/.npmrc"
+          displayName: 'Create .npmrc in artifact directory'
 
-        - script: cat ~/.npmrc
-          displayName: 'Show generated .npmrc (for debug only)'
+        - task: NpmAuthenticate@0
+          displayName: 'Authenticate .npmrc for Azure Artifacts'
+          inputs:
+            # IMPORTANT: point to the file you just created (a file, not a folder)
+            workingFile: '$(Pipeline.Workspace)/pxs-ng-core/.npmrc'
+
+        # (Optional) Remove this; printing tokens is risky
+        # - script: cat $(Pipeline.Workspace)/pxs-ng-core/.npmrc
+        #   displayName: 'Show .npmrc (debug)'
 
         - script: |
             set -euo pipefail
-
             PKG_DIR="$(Pipeline.Workspace)/pxs-ng-core"
             PKG_JSON="$PKG_DIR/package.json"
-            echo "Package directory: $PKG_DIR"
             test -f "$PKG_JSON" || { echo "package.json not found in $PKG_DIR"; exit 1; }
+
+            export PKG_JSON
 
             PKG_NAME=$(node -e "console.log(require(process.env.PKG_JSON).name)")
             PKG_VER=$(node -e "console.log(require(process.env.PKG_JSON).version)")
+
             echo "Publishing ${PKG_NAME}@${PKG_VER}"
 
-            if npm view "${PKG_NAME}@${PKG_VER}" version >/dev/null 2>&1; then
+            cd "$PKG_DIR"
+
+            # ensure npm commands use the authenticated .npmrc
+            npm whoami || echo "Authenticated (whoami may not print user on Azure Artifacts)."
+
+            # Check if version already exists on the Azure Artifacts feed (use the feed registry!)
+            if npm view "${PKG_NAME}@${PKG_VER}" version --registry "$(FEED_URL)" >/dev/null 2>&1; then
               echo "Version already exists on the feed. Skipping publish."
               exit 0
             fi
 
+            # Safer to ignore lifecycle scripts in CI publishing
             npm config set ignore-scripts true
-            cd "$PKG_DIR"
-            npm publish --ignore-scripts
+            npm publish --ignore-scripts --registry "$(FEED_URL)"
           displayName: 'Publish to Azure Artifacts'
           env:
-            PKG_JSON: $(Pipeline.Workspace)/pxs-ng-core/package.json
+            FEED_URL: $(FEED_URL)
+
 
 # ---------- Tag on Main ----------
 - stage: tag_on_main
