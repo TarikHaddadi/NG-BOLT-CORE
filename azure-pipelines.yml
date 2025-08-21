@@ -98,40 +98,47 @@ stages:
             SYSTEM_ACCESSTOKEN: $(System.AccessToken)  # exposed to the script
             
 # ---------- Publish to Azure Artifacts ----------
-- job: publish_job
-  displayName: Publish package to Azure Artifacts
-  steps:
-    - download: current
-      artifact: pxs-ng-core
+- stage: publish
+  displayName: Publish
+  dependsOn:
+    - build_test
+    - tag_on_main
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+    - job: publish_job
+      displayName: Publish package to Azure Artifacts
+      steps:
+        - download: current
+          artifact: pxs-ng-core
 
-    - task: NodeTool@0
-      inputs:
-        versionSpec: '$(NODE_VERSION)'
-      displayName: 'Use Node.js $(NODE_VERSION)'
+        - task: NodeTool@0
+          inputs:
+            versionSpec: '$(NODE_VERSION)'
+          displayName: 'Use Node.js $(NODE_VERSION)'
 
-    - task: NpmAuthenticate@0
-      displayName: 'Authenticate to Azure Artifacts'
+        - task: NpmAuthenticate@0
+          displayName: 'Authenticate to Azure Artifacts'
 
-    - script: |
-        set -euo pipefail
+        - script: |
+            set -euo pipefail
 
-        PKG_DIR="$(Pipeline.Workspace)/pxs-ng-core"
-        PKG_JSON="$PKG_DIR/package.json"
-        echo "Package directory: $PKG_DIR"
-        test -f "$PKG_JSON" || { echo "package.json not found in $PKG_DIR"; exit 1; }
+            PKG_DIR="$(Pipeline.Workspace)/pxs-ng-core"
+            PKG_JSON="$PKG_DIR/package.json"
+            echo "Package directory: $PKG_DIR"
+            test -f "$PKG_JSON" || { echo "package.json not found in $PKG_DIR"; exit 1; }
 
-        PKG_NAME=$(node -e "console.log(require(process.env.PKG_JSON).name)")
-        PKG_VER=$(node -e "console.log(require(process.env.PKG_JSON).version)")
-        echo "Publishing ${PKG_NAME}@${PKG_VER}"
+            PKG_NAME=$(node -e "console.log(require(process.env.PKG_JSON).name)")
+            PKG_VER=$(node -e "console.log(require(process.env.PKG_JSON).version)")
+            echo "Publishing ${PKG_NAME}@${PKG_VER}"
 
-        if npm view "${PKG_NAME}@${PKG_VER}" version >/dev/null 2>&1; then
-          echo "Version already exists on the feed. Skipping publish."
-          exit 0
-        fi
+            if npm view "${PKG_NAME}@${PKG_VER}" version >/dev/null 2>&1; then
+              echo "Version already exists on the feed. Skipping publish."
+              exit 0
+            fi
 
-        npm config set ignore-scripts true
-        cd "$PKG_DIR"
-        npm publish --ignore-scripts
-      displayName: 'Publish to Azure Artifacts'
-      env:
-        PKG_JSON: $(Pipeline.Workspace)/pxs-ng-core/package.json
+            npm config set ignore-scripts true
+            cd "$PKG_DIR"
+            npm publish --ignore-scripts
+          displayName: 'Publish to Azure Artifacts'
+          env:
+            PKG_JSON: $(Pipeline.Workspace)/pxs-ng-core/package.json
