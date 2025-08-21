@@ -105,31 +105,49 @@ stages:
     - tag_on_main
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
-  - job: publish_job
-    steps:
-    - download: current
-      artifact: pxs-ng-core
+    - job: publish_job
+      displayName: Publish package to Azure Artifacts
+      steps:
+        - download: current
+          artifact: pxs-ng-core   # lands in $(Pipeline.Workspace)/pxs-ng-core
 
-    - task: NodeTool@0
-      inputs: { versionSpec: '$(NODE_VERSION)' }
+        - task: NodeTool@0
+          inputs:
+            versionSpec: '$(NODE_VERSION)'
+          displayName: 'Use Node.js $(NODE_VERSION)'
 
-    # Auth to Azure Artifacts (injects token into .npmrc)
-    - task: NpmAuthenticate@0
-      displayName: 'Authenticate to Azure Artifacts'
-      # If you keep a repo-level .npmrc, point to it; otherwise omit workingFile.
-      inputs:
-          workingFile: '.npmrc'
+        # Auth to Azure Artifacts (injects token into npm for this job)
+        - task: NpmAuthenticate@0
+          displayName: 'Authenticate to Azure Artifacts'
+          # Omit workingFile unless you must update a specific .npmrc
+          # inputs:
+          #   workingFile: '.npmrc'
 
+        - script: |
+            set -euo pipefail
 
-    # Optional: stop if this version already exists (prevents 409 CONFLICT)
-    - script: |
-        PKG_NAME=$(node -p "require('$(DIST_DIR)/package.json').name")
-        PKG_VER=$(node -p "require('$(DIST_DIR)/package.json').version")
-        echo "Publishing $PKG_NAME@$PKG_VER"
-        if npm view "$PKG_NAME@$PKG_VER" version >/dev/null 2>&1; then
-          echo "Version already exists on the feed. Skipping publish."
-          exit 0
-        fi
-        cd $(DIST_DIR)
-        npm publish --ignore-scripts
-      displayName: 'Publish to Azure Artifacts'
+            PKG_DIR="$(Pipeline.Workspace)/pxs-ng-core"
+            PKG_JSON="$PKG_DIR/package.json"
+
+            echo "Package directory: $PKG_DIR"
+            test -f "$PKG_JSON" || { echo "package.json not found in $PKG_DIR"; exit 1; }
+
+            # Read name/version from the built artifact
+            PKG_NAME=$(node -e "console.log(require(process.env.PKG_JSON).name)")
+            PKG_VER=$(node -e "console.log(require(process.env.PKG_JSON).version)")
+            echo "Publishing ${PKG_NAME}@${PKG_VER}"
+
+            # Optional: skip if this version already exists to prevent 409
+            if npm view "${PKG_NAME}@${PKG_VER}" version >/dev/null 2>&1; then
+              echo "Version already exists on the feed. Skipping publish."
+              exit 0
+            fi
+
+            # Extra safety: disable lifecycle scripts
+            npm config set ignore-scripts true
+
+            cd "$PKG_DIR"
+            npm publish --ignore-scripts
+          displayName: 'Publish to Azure Artifacts'
+          env:
+            PKG_JSON: $(Pipeline.Workspace)/pxs-ng-core/package.json
