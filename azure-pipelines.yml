@@ -120,8 +120,8 @@ stages:
         - task: NpmAuthenticate@0
           displayName: 'Authenticate to Azure Artifacts'
           # Omit workingFile unless you must update a specific .npmrc
-          # inputs:
-          #   workingFile: '.npmrc'
+          inputs:
+            workingFile: '.npmrc'
 
         - script: |
             set -euo pipefail
