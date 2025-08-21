@@ -20,5 +20,5 @@ export interface CoreOptions {
   appVersion?: string;
   /** Optional: disable animations if host doesn’t use @angular/animations */
   animations?: boolean; // default: true
-  environments: AppEnvConfig;
+  environments?: AppEnvConfig;
 }

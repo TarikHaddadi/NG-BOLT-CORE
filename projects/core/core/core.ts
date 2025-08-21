@@ -43,6 +43,7 @@ function normalize(opts: CoreOptions): Required<CoreOptions> {
     interceptors: opts.interceptors ?? [],
     animations: opts.animations ?? true,
     appVersion: opts.appVersion ?? '0.0.0', // keep if you use version injection
+    environments: opts.environments ?? {},
   } as Required<CoreOptions>;
 }
 
