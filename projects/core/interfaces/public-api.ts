@@ -1,4 +1,4 @@
-export { type AppEnvConfig,type AppState } from './app.model';
+export { type AppEnvConfig, type AppState } from './app.model';
 export { type AuthState, initialAuthState } from './auth.model';
 export { type CoreOptions } from './core.interface';
 export { type FieldComponent, type FieldConfig, type FieldType } from './field-config.model';
