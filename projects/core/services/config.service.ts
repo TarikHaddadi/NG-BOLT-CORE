@@ -1,38 +1,30 @@
 import { Inject, Injectable } from '@angular/core';
 
-import { AuthRuntimeConfig, CoreOptions } from '@cadai/pxs-ng-core/interfaces';
+import { AppEnvConfig, CoreOptions } from '@cadai/pxs-ng-core/interfaces';
 import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
-
-export interface AppConfig {
-  name: string;
-  production: boolean;
-  apiUrl: string;
-  version: string;
-  auth: AuthRuntimeConfig;
-}
 
 @Injectable({ providedIn: 'root' })
 export class ConfigService {
-  private config!: AppConfig;
+  private config!: AppEnvConfig;
 
   constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {}
 
   async loadConfig(): Promise<void> {
-    const res = await fetch('/assets/config.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error(`Failed to load config: ${res.status} ${res.statusText}`);
-    const json = await res.json();
+    const appEnvVars = this.coreOpts.environments;
+
+    if (!appEnvVars) throw new Error('Failed to load config: No environment variables found');
 
     this.config = {
-      ...json,
+      ...appEnvVars, // ✅ app env variables comes from host app, not library
       version: this.coreOpts.appVersion, // ✅ app version comes from host app, not library
     };
   }
 
-  get<K extends keyof AppConfig>(key: K): AppConfig[K] {
+  get<K extends keyof AppEnvConfig>(key: K): AppEnvConfig[K] {
     return this.config[key];
   }
 
-  getAll(): AppConfig {
+  getAll(): AppEnvConfig {
     return this.config;
   }
 }

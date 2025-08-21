@@ -1,5 +1,7 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 
+import { AppEnvConfig } from './app.model';
+
 export type CoreTheme = 'light' | 'dark';
 
 export interface CoreI18nOptions {
@@ -18,4 +20,5 @@ export interface CoreOptions {
   appVersion?: string;
   /** Optional: disable animations if host doesn’t use @angular/animations */
   animations?: boolean; // default: true
+  environments: AppEnvConfig;
 }
