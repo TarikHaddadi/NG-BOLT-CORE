@@ -1,4 +1,5 @@
 import { createAction, props } from '@ngrx/store';
+
 import { User } from '@cadai/pxs-ng-core/interfaces';
 
 // Get one user
@@ -17,7 +18,10 @@ export const createUserSuccess = createAction('[User] Create Success', props<{ u
 export const createUserFailure = createAction('[User] Create Failure', props<{ error: string }>());
 
 // Update user
-export const updateUser = createAction('[User] Update', props<{ id: string, user: Partial<User> }>());
+export const updateUser = createAction(
+  '[User] Update',
+  props<{ id: string; user: Partial<User> }>(),
+);
 export const updateUserSuccess = createAction('[User] Update Success', props<{ user: User }>());
 export const updateUserFailure = createAction('[User] Update Failure', props<{ error: string }>());
 

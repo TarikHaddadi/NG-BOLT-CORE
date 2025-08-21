@@ -1,8 +1,9 @@
-import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input } from '@angular/core';
 import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatSliderModule } from '@angular/material/slider';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
 @Component({
@@ -14,12 +15,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       <span class="mat-label" [id]="labelId">{{ field.label | translate }}</span>
 
       <!-- Always-visible value -->
-      <output
-        class="range-value"
-        [id]="valueId"
-        aria-live="polite"
-        [attr.aria-atomic]="true"
-      >
+      <output class="range-value" [id]="valueId" aria-live="polite" [attr.aria-atomic]="true">
         {{ valueText }}
       </output>
     </div>
@@ -54,7 +50,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       {{ errorMessage }}
     </div>
   `,
-  styleUrls: ['./range.component.scss']
+  styleUrls: ['./range.component.scss'],
 })
 export class RangeComponent {
   @Input({ required: true }) field!: FieldConfig;
@@ -68,10 +64,18 @@ export class RangeComponent {
     return !!(this.control?.touched && this.control?.invalid);
   }
 
-  get labelId() { return `${this.field.name}-label`; }
-  get hintId()  { return `${this.field.name}-hint`; }
-  get errorId() { return `${this.field.name}-error`; }
-  get valueId() { return `${this.field.name}-value`; }
+  get labelId() {
+    return `${this.field.name}-label`;
+  }
+  get hintId() {
+    return `${this.field.name}-hint`;
+  }
+  get errorId() {
+    return `${this.field.name}-error`;
+  }
+  get valueId() {
+    return `${this.field.name}-value`;
+  }
 
   /** Merge the normal described-by with the always-visible value label for SRs */
   get ariaDescribedByWithValue(): string {
@@ -92,17 +96,20 @@ export class RangeComponent {
     const errs = this.control?.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
     const order = ['required', 'min', 'max'];
-    const key = order.find(k => k in errs) || Object.keys(errs)[0];
+    const key = order.find((k) => k in errs) || Object.keys(errs)[0];
     const i18nKey = this.field.errorMessages?.[key] ?? `form.errors.${this.field.name}.${key}`;
     const params = this.paramsFor(key, errs[key]);
     return this.t.instant(i18nKey, params);
   }
 
-  private paramsFor(key: string, val: ValidationErrors[keyof ValidationErrors]):ValidationErrors {
+  private paramsFor(key: string, val: ValidationErrors[keyof ValidationErrors]): ValidationErrors {
     switch (key) {
-      case 'min': return { min: val?.min, actual: val?.actual };
-      case 'max': return { max: val?.max, actual: val?.actual };
-      default:    return {};
+      case 'min':
+        return { min: val?.min, actual: val?.actual };
+      case 'max':
+        return { max: val?.max, actual: val?.actual };
+      default:
+        return {};
     }
   }
 }

@@ -1,18 +1,27 @@
-import { Component, Input, Inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, ElementRef, Inject, Input, ViewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatIconModule } from '@angular/material/icon';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { DateAdapter, MAT_DATE_FORMATS, MatDateFormats } from '@angular/material/core';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
 @Component({
   selector: 'app-datepicker',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatDatepickerModule, MatIconModule, TranslateModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatDatepickerModule,
+    MatIconModule,
+    TranslateModule,
+  ],
   template: `
     <mat-form-field appearance="outline" class="w-full" floatLabel="always">
       <mat-label>{{ field.label | translate }}</mat-label>
@@ -23,10 +32,10 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         [matDatepicker]="picker"
         [formControl]="control"
         [placeholder]="field.placeholder || ''"
-        [attr.pattern]="field.pattern"    
+        [attr.pattern]="field.pattern"
         inputmode="numeric"
         maxlength="10"
-        (input)="onRawInput(raw.value)"     
+        (input)="onRawInput(raw.value)"
         (blur)="control.markAsTouched()"
         [attr.aria-describedby]="hintId"
         [attr.aria-invalid]="control.invalid || null"
@@ -45,7 +54,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       </mat-error>
     </mat-form-field>
   `,
-  styleUrls:["./datepicker.component.scss"]
+  styleUrls: ['./datepicker.component.scss'],
 })
 export class DatepickerComponent {
   @Input({ required: true }) field!: FieldConfig;
@@ -57,11 +66,15 @@ export class DatepickerComponent {
   constructor(
     private t: TranslateService,
     private dateAdapter: DateAdapter<Date>,
-    @Inject(MAT_DATE_FORMATS) private dateFormats: MatDateFormats
+    @Inject(MAT_DATE_FORMATS) private dateFormats: MatDateFormats,
   ) {}
 
-  get showError() { return !!(this.control?.touched && this.control?.invalid); }
-  get hintId() { return `${this.field.name}-hint`; }
+  get showError() {
+    return !!(this.control?.touched && this.control?.invalid);
+  }
+  get hintId() {
+    return `${this.field.name}-hint`;
+  }
 
   /** Capture raw text and set/clear a 'format' error based on placeholder pattern */
   onRawInput(text: string) {
@@ -77,9 +90,9 @@ export class DatepickerComponent {
     // Strict format check from provided regex pattern (derived from placeholder)
     const pattern = this.field.pattern ? new RegExp(this.field.pattern) : null;
     if (pattern && !pattern.test(this.lastText)) {
-      this.mergeErrors({ format: { text: this.lastText } });  // <-- adds 'format'
+      this.mergeErrors({ format: { text: this.lastText } }); // <-- adds 'format'
     } else {
-      this.mergeErrors({ format: null });                      // <-- removes 'format'
+      this.mergeErrors({ format: null }); // <-- removes 'format'
     }
   }
 
@@ -88,7 +101,7 @@ export class DatepickerComponent {
     const existing = this.control.errors ?? {};
     const next: ValidationErrors = { ...existing };
 
-    Object.keys(patch).forEach(k => {
+    Object.keys(patch).forEach((k) => {
       if (patch[k] == null) {
         delete next[k];
       } else {
@@ -105,8 +118,15 @@ export class DatepickerComponent {
     const errors = this.control.errors ?? {};
 
     // Priority order
-    const order = ['format', 'matDatepickerParse', 'matDatepickerMin', 'matDatepickerMax', 'matDatepickerFilter', 'required'];
-    const key = order.find(k => k in errors) || Object.keys(errors)[0];
+    const order = [
+      'format',
+      'matDatepickerParse',
+      'matDatepickerMin',
+      'matDatepickerMax',
+      'matDatepickerFilter',
+      'required',
+    ];
+    const key = order.find((k) => k in errors) || Object.keys(errors)[0];
 
     const map: Record<string, string> = {
       format: 'format',
@@ -114,20 +134,22 @@ export class DatepickerComponent {
       matDatepickerMin: 'minDate',
       matDatepickerMax: 'maxDate',
       matDatepickerFilter: 'dateNotAllowed',
-      required: 'required'
+      required: 'required',
     };
 
     const mapped = map[key] ?? key;
 
     const i18nKey =
-      this.field.errorMessages?.[mapped] ??
-      `form.errors.${this.field.name}.${mapped}`;
+      this.field.errorMessages?.[mapped] ?? `form.errors.${this.field.name}.${mapped}`;
 
     const params = this.buildParams(key, errors[key]);
     return this.t.instant(i18nKey, params);
   }
 
-  private buildParams(errorKey: string, errorVal: ValidationErrors[keyof ValidationErrors]): ValidationErrors {
+  private buildParams(
+    errorKey: string,
+    errorVal: ValidationErrors[keyof ValidationErrors],
+  ): ValidationErrors {
     switch (errorKey) {
       case 'format':
       case 'matDatepickerParse':

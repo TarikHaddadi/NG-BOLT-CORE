@@ -1,5 +1,5 @@
-import { Component, Input, OnChanges, SimpleChanges, Type } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, OnChanges, SimpleChanges, Type } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 
 import { FieldComponent, FieldConfig, FieldType } from '@cadai/pxs-ng-core/interfaces';

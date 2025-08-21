@@ -1,19 +1,22 @@
 # Dynamic Forms & Field Components Guide
+
 _Last updated: 2025-08-13_
 
 This document explains how to **instantiate forms** and **reuse custom field components** under `shared/forms/fields`. It covers the `DynamicFormComponent`, the `FieldHostComponent`, and the `FieldConfigService` helpers your teammates will use every day.
 
-
 ## TL;DR – Quick Start
 
 ### 1) Create a form and field config in your feature component
+
 ```ts
 // my-feature.component.ts
 import { Component, inject } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { FieldConfigService } from '@/app/shared/shared'; // re-export path in your project
 
-@Component({ /* ... */ })
+@Component({
+  /* ... */
+})
 export class MyFeatureComponent {
   private fb = inject(FormBuilder);
   private fields = inject(FieldConfigService);
@@ -36,13 +39,16 @@ export class MyFeatureComponent {
 ```
 
 ### 2) Render the dynamic form
+
 - **Option A (recommended):** Use the self-contained `DynamicFormComponent` (it renders the `<form>` for you).
+
 ```html
 <!-- my-feature.component.html -->
 <app-dynamic-form [form]="form" [config]="fieldConfig"></app-dynamic-form>
 ```
 
 - **Option B (custom layout):** Use `FieldHostComponent` yourself and place fields anywhere in your grid/layout.
+
 ```html
 <form [formGroup]="form" class="grid gap-2">
   <ng-container *ngFor="let field of fieldConfig">
@@ -54,6 +60,7 @@ export class MyFeatureComponent {
 ```
 
 ### 3) Handle submit/validation
+
 ```ts
 submit() {
   this.form.markAllAsTouched();
@@ -67,18 +74,18 @@ submit() {
 
 ## Architecture Overview
 
-- **`FieldConfigService`** → factory methods that return typed `FieldConfig` objects (text, email, password, phone, toggle, dropdown, range, datepicker, chips, autocomplete, textarea).  
-- **`DynamicFormComponent`** → takes `[form]` + `[config]`, creates controls, and renders each field via `FieldHostComponent`.  
+- **`FieldConfigService`** → factory methods that return typed `FieldConfig` objects (text, email, password, phone, toggle, dropdown, range, datepicker, chips, autocomplete, textarea).
+- **`DynamicFormComponent`** → takes `[form]` + `[config]`, creates controls, and renders each field via `FieldHostComponent`.
 - **`FieldHostComponent`** → maps each `FieldConfig.type` to a concrete field UI component (TextInput, Datepicker, Chips, etc.).
 
 ```
 MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Concrete Field Component
 ```
 
-
 ## FieldConfig – What devs need to know
 
 **Required basics**
+
 - `type`: one of
   - `text`, `email`, `phone`, `password`, `textarea`
   - `datepicker`
@@ -92,6 +99,7 @@ MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Conc
 - `placeholder`: i18n key or plain text
 
 **Common options**
+
 - `required`, `minLength`, `maxLength`, `pattern`, `validators`
 - `errorMessages`: map of error keys → i18n keys (see example list below)
 - `layoutClass`: CSS/grid class (`'col-12'`, `'col-md-6'`, …)
@@ -101,6 +109,7 @@ MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Conc
 - `options`: for `dropdown` (`{label, value}`) and helpers like `autocompleteOptions`
 
 **UI mapping (FieldHost)**
+
 - `textarea` → `TextFieldComponent`
 - `text|email|phone|password` → `TextInputComponent`
 - `datepicker` → `DatepickerComponent`
@@ -110,10 +119,10 @@ MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Conc
 - `dropdown` → `SelectComponent`
 - `range` → `RangeComponent`
 
-
 ## Validators & Error Keys (conventions)
 
 Built‑in and custom validators used in `FieldConfigService`:
+
 - `Validators.required`, `minLength`, `maxLength`, `pattern`
 - `allowedCharsValidator(disallowedRegex)` → sets `invalidChars` with `{ char }`
 - `emailTldValidator(min)` → sets `emailTld`
@@ -124,6 +133,7 @@ Built‑in and custom validators used in `FieldConfigService`:
 - `datePatternFromPlaceholder('YYYY-MM-DD')` → input mask for parsing in `DatepickerComponent` (do **not** use `Validators.pattern` for datepicker; the control value is `Date | null`).
 
 **Common error message keys (add to i18n):**
+
 ```
 form.errors.input.required
 form.errors.input.minlength
@@ -168,59 +178,74 @@ form.errors.country.notAllowed
 ## Patterns & Examples
 
 ### Login/Profile form (minimal)
+
 ```ts
 form = this.fb.group({});
 fields = [
   this.fields.getEmailField('form.labels.email', 'form.placeholders.email'),
   this.fields.getPasswordField('form.labels.password', 'form.placeholders.password'),
-  this.fields.getToggleField('form.labels.notify')
+  this.fields.getToggleField('form.labels.notify'),
 ];
 ```
 
 ### Address as a nested group
+
 ```ts
 fields = [
   {
-    type: 'group', name: 'address', label: 'form.labels.address',
+    type: 'group',
+    name: 'address',
+    label: 'form.labels.address',
     children: [
       this.fields.getTextField('form.labels.street', 'form.placeholders.street'),
       this.fields.getTextField('form.labels.city', 'form.placeholders.city'),
-      this.fields.getTextField('form.labels.zip', 'form.placeholders.zip')
-    ]
-  }
+      this.fields.getTextField('form.labels.zip', 'form.placeholders.zip'),
+    ],
+  },
 ];
 // Access: form.get('address.street')?.value
 ```
 
 ### Dropdown with custom options (single or multiple)
+
 ```ts
 fields = [
-  this.fields.getDropdownField('form.labels.role', [
-    { label: 'Admin', value: 'admin' },
-    { label: 'User', value: 'user' },
-    { label: 'Manager', value: 'manager' }
-  ], /* multiple? */ false)
+  this.fields.getDropdownField(
+    'form.labels.role',
+    [
+      { label: 'Admin', value: 'admin' },
+      { label: 'User', value: 'user' },
+      { label: 'Manager', value: 'manager' },
+    ],
+    /* multiple? */ false,
+  ),
 ];
 ```
 
 ### Chips with predefined options
+
 ```ts
-fields = [ this.fields.getChipsField('form.labels.tags', ['Angular', 'React', 'Vue'], true) ];
+fields = [this.fields.getChipsField('form.labels.tags', ['Angular', 'React', 'Vue'], true)];
 ```
 
 ### Autocomplete restricted to a list
+
 ```ts
-fields = [ this.fields.getAutocompleteField('form.labels.country', ['Luxembourg','Germany','France']) ];
+fields = [
+  this.fields.getAutocompleteField('form.labels.country', ['Luxembourg', 'Germany', 'France']),
+];
 ```
 
 ### Datepicker with strict placeholder pattern
+
 ```ts
-fields = [ this.fields.getDatepickerField('form.labels.dob') ];
+fields = [this.fields.getDatepickerField('form.labels.dob')];
 ```
 
 ### Range slider with min/max/step + default
+
 ```ts
-fields = [ this.fields.getRangeField('form.labels.price', 0, 200, 5) ];
+fields = [this.fields.getRangeField('form.labels.price', 0, 200, 5)];
 ```
 
 ---
@@ -251,17 +276,17 @@ fields = [ this.fields.getRangeField('form.labels.price', 0, 200, 5) ];
 
 ## Accessibility & i18n Tips
 
-- Always provide a `label` (i18n key).  
-- `placeholder` should be informative; avoid duplicating the label.  
-- Ensure error messages map to actual validator keys.  
-- Components set ARIA attributes (e.g., `aria-invalid`) based on control state.  
+- Always provide a `label` (i18n key).
+- `placeholder` should be informative; avoid duplicating the label.
+- Ensure error messages map to actual validator keys.
+- Components set ARIA attributes (e.g., `aria-invalid`) based on control state.
 - Use `TranslateService` pipes in templates for labels/help/errors.
 
 ## Testing Guidelines
 
-- **Reducers/validators**: unit test pure functions.  
-- **Field components**: render with a `FormControl`, assert error messages & aria attributes.  
-- **DynamicForm**: pass a small `FieldConfig[]` and assert controls exist; test group creation and default values.  
+- **Reducers/validators**: unit test pure functions.
+- **Field components**: render with a `FormControl`, assert error messages & aria attributes.
+- **DynamicForm**: pass a small `FieldConfig[]` and assert controls exist; test group creation and default values.
 - **Integration**: simulate user input and ensure validators trigger expected errors.
 
 ## Common Pitfalls
@@ -274,15 +299,14 @@ fields = [ this.fields.getRangeField('form.labels.price', 0, 200, 5) ];
 
 ## Where Things Live
 
-| Path                                               | Purpose                                 |
-|----------------------------------------------------|-----------------------------------------|
-| `shared/forms/field-config.model.ts`               | `FieldConfig` type (shape of a field)   |
-| `shared/forms/dynamic-form.component.*`            | Builds the form & renders field host    |
-| `shared/forms/field-host/field-host.component.*`   | Maps `type` → concrete field component  |
-| `shared/forms/fields/*`                            | Concrete field components               |
-| `core/services/field-config.service.ts`            | Field builder helpers (this file)       |
-| `shared/shared` (barrel)                           | Re-exports common symbols               |
-
+| Path                                             | Purpose                                |
+| ------------------------------------------------ | -------------------------------------- |
+| `shared/forms/field-config.model.ts`             | `FieldConfig` type (shape of a field)  |
+| `shared/forms/dynamic-form.component.*`          | Builds the form & renders field host   |
+| `shared/forms/field-host/field-host.component.*` | Maps `type` → concrete field component |
+| `shared/forms/fields/*`                          | Concrete field components              |
+| `core/services/field-config.service.ts`          | Field builder helpers (this file)      |
+| `shared/shared` (barrel)                         | Re-exports common symbols              |
 
 ## FAQ
 

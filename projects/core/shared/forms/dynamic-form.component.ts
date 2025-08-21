@@ -1,16 +1,18 @@
-import { Component, Input, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 import {
   AbstractControl,
   FormArray,
   FormBuilder,
   FormControl,
   FormGroup,
-  ReactiveFormsModule
+  ReactiveFormsModule,
 } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 import { buildValidators } from '@cadai/pxs-ng-core/utils';
+
 import { FieldHostComponent } from './field-host/field-host.component';
 
 type SelValue = string | number;
@@ -20,7 +22,7 @@ type SelValue = string | number;
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, TranslateModule, FieldHostComponent],
   templateUrl: './dynamic-form.component.html',
-  styleUrls: ['./dynamic-form.component.scss']
+  styleUrls: ['./dynamic-form.component.scss'],
 })
 export class DynamicFormComponent implements OnInit, OnChanges {
   @Input() config: FieldConfig[] = [];
@@ -48,7 +50,7 @@ export class DynamicFormComponent implements OnInit, OnChanges {
 
       if (field.type === 'group') {
         const group = this.fb.group({});
-        (field.children ?? []).forEach(ch => group.addControl(ch.name, this.createControl(ch)));
+        (field.children ?? []).forEach((ch) => group.addControl(ch.name, this.createControl(ch)));
         this.form.addControl(field.name, group);
         continue;
       }
@@ -59,7 +61,7 @@ export class DynamicFormComponent implements OnInit, OnChanges {
         // Optional: seed with one child group using the provided children schema
         if (field.children?.length) {
           const g = this.fb.group({});
-          field.children.forEach(ch => g.addControl(ch.name, this.createControl(ch)));
+          field.children.forEach((ch) => g.addControl(ch.name, this.createControl(ch)));
           arr.push(g);
         }
         this.form.addControl(field.name, arr);
@@ -78,39 +80,45 @@ export class DynamicFormComponent implements OnInit, OnChanges {
       case 'toggle':
         return new FormControl<boolean>(
           { value: field.defaultValue ? !!field.defaultValue : false, disabled: !!field.disabled },
-          { nonNullable: true, validators }
+          { nonNullable: true, validators },
         );
 
       case 'range':
         return new FormControl<number | null>(
           {
-            value:
-              field.defaultValue != null
-                ? Number(field.defaultValue)
-                : (field.min ?? 0),
-            disabled: !!field.disabled
+            value: field.defaultValue != null ? Number(field.defaultValue) : (field.min ?? 0),
+            disabled: !!field.disabled,
           },
-          { validators }
+          { validators },
         );
 
       case 'datepicker':
-        return new FormControl<Date | null>({ value: null, disabled: !!field.disabled }, { validators });
+        return new FormControl<Date | null>(
+          { value: null, disabled: !!field.disabled },
+          { validators },
+        );
 
       case 'chips':
       case 'dropdown': {
         const multiple = field.multiple === true;
         if (multiple) {
-          return new FormControl<SelValue[]>({ value: [], disabled: !!field.disabled }, { validators });
+          return new FormControl<SelValue[]>(
+            { value: [], disabled: !!field.disabled },
+            { validators },
+          );
         }
         // single-select starts at null so "required" works
-        return new FormControl<SelValue | null>({ value: null, disabled: !!field.disabled }, { validators });
+        return new FormControl<SelValue | null>(
+          { value: null, disabled: !!field.disabled },
+          { validators },
+        );
       }
 
       // text / email / phone / password / autocomplete / textarea / etc.
       default:
         return new FormControl<string>(
           { value: field.defaultValue?.toString() ?? '', disabled: !!field.disabled },
-          { nonNullable: true, validators }
+          { nonNullable: true, validators },
         );
     }
   }

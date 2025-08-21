@@ -1,6 +1,6 @@
 # Contributing Guide – Core, Shared, Features & Store
 
->_Last updated: 2025-08-21_
+> _Last updated: 2025-08-21_
 
 This document is the **source of truth** for how to work in this repository. It explains the folder structure, barrel usage, contribution workflow, and a pre‑push checklist to keep everything aligned.
 
@@ -51,6 +51,7 @@ src/
 ```
 
 ### Path Aliases (tsconfig)
+
 Make sure these exist so barrel imports work:
 
 ```jsonc
@@ -73,6 +74,7 @@ Make sure these exist so barrel imports work:
 ```
 
 ### ESLint (Flat Config) Barrel Policy
+
 - **Allowed deep alias imports**: `@core/**`, `@shared/**`
 - **Disallowed deep alias imports**: `@features/**`, `@store/**` (use their barrels)
 - **Disallowed relative deep paths** into `core/shared/features/store` from outside
@@ -80,6 +82,7 @@ Make sure these exist so barrel imports work:
 (See `eslint.config.cjs` in repo for exact rules.)
 
 ### Example Imports
+
 ```ts
 // Good
 import {{ provideCore, FieldConfigService, ToastService }} from '@core';
@@ -98,17 +101,19 @@ import {{ AppLayoutComponent }} from '@shared/layout';
 **Purpose:** framework-agnostic services, models, guards, interceptors, and the **single init point**.
 
 ### Key Files
+
 - `core.ts` – registers HttpClient (interceptors), i18n, date providers, loads runtime config, initializes Keycloak, hydrates store.
 - `services/keycloak.service.ts` – PKCE, `login-required` (no auto-login in refresh loop), `ensureFreshToken`.
 - `interceptors/auth.interceptor.ts` – injects token, skips KC endpoints, only redirects to login on API `401`.
 - `guards/auth.guard.ts` – waits for Keycloak readiness and authorizes; with `login-required`, it does not call `login()`.
 
 ### Contributing to Core
+
 1. **Add service/interface/enum/util** under the correct subfolder.
 2. Export it from the sub‑barrel in `index.ts`.
 3. If it’s app-wide (e.g., new interceptor/guard), wire it in `core.ts`.
 4. If the feature needs to be available in the whole app, its **mandatory** to use/create its corresponding store see [_**(5) Store (NgRx)**_].
-4. Add unit tests if applicable.
+5. Add unit tests if applicable.
 
 ---
 
@@ -117,11 +122,13 @@ import {{ AppLayoutComponent }} from '@shared/layout';
 **Purpose:** reusable UI primitives and headless components (dialog, layout, form fields, SEO).
 
 ### Conventions
+
 - Components are **standalone**.
 - Provide a minimal API and i18n keys.
 - Re-export public components via `shared/index.ts` (or sub‑barrels like `shared/layout.ts`).
 
 ### Contributing to Shared
+
 1. Place new component in the right domain folder.
 2. Keep inputs/outputs generic (no feature-specific logic).
 3. Export via `shared/index.ts`.
@@ -133,10 +140,12 @@ import {{ AppLayoutComponent }} from '@shared/layout';
 **Purpose:** business features (lazy-loaded, standalone).
 
 ### Conventions
+
 - Feature routes are added in `app.routes.ts` with `loadComponent` (standalone) or `loadChildren` (module).
 - Side-effectful logic goes to the **store feature** (effects), not the component.
 
 ### Adding a Feature
+
 1. Create `src/app/features/<name>/` with component(s).
 2. Add route in `app.routes.ts` (guarded if needed).
 3. If stateful, create a matching store feature (see next section).
@@ -146,7 +155,6 @@ import {{ AppLayoutComponent }} from '@shared/layout';
 ## 5) Store (NgRx)
 
 **Purpose:** state management for app and features.
-
 
 ### A) Folder Structure
 
@@ -165,6 +173,7 @@ src/app/store/
 ```
 
 **In `@core/index.ts`** we re-export the two root objects so components can import from `@core` only:
+
 ```ts
 // src/app/core/index.ts
 export * from '@store/app.actions';
@@ -177,6 +186,7 @@ export { provideCore } from './core'; // unrelated to NgRx but lives here
 ### B) Root Wiring
 
 #### `store/index.ts`
+
 Provides the root store and effects, and applies persistence to specific slices.
 
 ```ts
@@ -205,13 +215,14 @@ export const provideAppStore = () => [
 ];
 ```
 
-> **Note:** `AppReducers` and `AppEffects` are maintained in their respective files (***DO NOT TOUCH***); this guide focuses on **actions** and **selectors** aggregation.
+> **Note:** `AppReducers` and `AppEffects` are maintained in their respective files (**_DO NOT TOUCH_**); this guide focuses on **actions** and **selectors** aggregation.
 
 ---
 
 ### C) Aggregation (Root Objects)
 
 #### `store/app.actions.ts`
+
 Aggregate feature action namespaces into a single `AppActions` object:
 
 ```ts
@@ -228,6 +239,7 @@ export const AppActions = {
 ```
 
 #### `store/app.selectors.ts`
+
 Aggregate feature selectors into a single `AppSelectors` object:
 
 ```ts
@@ -244,6 +256,7 @@ export const AppSelectors = {
 ```
 
 These are re-exported by `@core/index.ts`, so components use:
+
 ```ts
 import { AppActions, AppSelectors } from '@core';
 ```
@@ -255,38 +268,42 @@ import { AppActions, AppSelectors } from '@core';
 Below is the **canonical** pattern your features follow. Example: **User**.
 
 #### 4.1 Actions (`user.actions.ts`)
+
 ```ts
 import { createAction, props } from '@ngrx/store';
 import { User } from '../../../core/interfaces/user.model';
 
 // Get one user
-export const loadUser         = createAction('[User] Load');
-export const loadUserSuccess  = createAction('[User] Load Success', props<{ user: User }>());
-export const loadUserFailure  = createAction('[User] Load Failure', props<{ error: string }>());
+export const loadUser = createAction('[User] Load');
+export const loadUserSuccess = createAction('[User] Load Success', props<{ user: User }>());
+export const loadUserFailure = createAction('[User] Load Failure', props<{ error: string }>());
 
 // Get all users
-export const loadUsers        = createAction('[User] Load All');
+export const loadUsers = createAction('[User] Load All');
 export const loadUsersSuccess = createAction('[User] Load All Success', props<{ users: User[] }>());
 export const loadUsersFailure = createAction('[User] Load All Failure', props<{ error: string }>());
 
 // Create
-export const createUser       = createAction('[User] Create', props<{ user: Partial<User> }>());
-export const createUserSuccess= createAction('[User] Create Success', props<{ user: User }>());
-export const createUserFailure= createAction('[User] Create Failure', props<{ error: string }>());
+export const createUser = createAction('[User] Create', props<{ user: Partial<User> }>());
+export const createUserSuccess = createAction('[User] Create Success', props<{ user: User }>());
+export const createUserFailure = createAction('[User] Create Failure', props<{ error: string }>());
 
 // Update
-export const updateUser       = createAction('[User] Update', props<{ id: string, user: Partial<User> }>());
-export const updateUserSuccess= createAction('[User] Update Success', props<{ user: User }>());
-export const updateUserFailure= createAction('[User] Update Failure', props<{ error: string }>());
+export const updateUser = createAction(
+  '[User] Update',
+  props<{ id: string; user: Partial<User> }>(),
+);
+export const updateUserSuccess = createAction('[User] Update Success', props<{ user: User }>());
+export const updateUserFailure = createAction('[User] Update Failure', props<{ error: string }>());
 
 // Delete
-export const deleteUser       = createAction('[User] Delete', props<{ id: string }>());
-export const deleteUserSuccess= createAction('[User] Delete Success', props<{ id: string }>());
-export const deleteUserFailure= createAction('[User] Delete Failure', props<{ error: string }>());
-
+export const deleteUser = createAction('[User] Delete', props<{ id: string }>());
+export const deleteUserSuccess = createAction('[User] Delete Success', props<{ id: string }>());
+export const deleteUserFailure = createAction('[User] Delete Failure', props<{ error: string }>());
 ```
 
 #### 4.2 Effects (`user.effects.ts`)
+
 Functional effects that inject dependencies inside the effect factory:
 
 ```ts
@@ -296,22 +313,28 @@ import * as UserActions from './user.actions';
 import { catchError, map, mergeMap, of } from 'rxjs';
 import { UserService } from '../../../core/services/user.service';
 
-export const loadUser = createEffect(() => {
-  const actions$ = inject(Actions);
-  const userService = inject(UserService);
-  return actions$.pipe(
-    ofType(UserActions.loadUser),
-    mergeMap(() => userService.getCurrentUser().pipe(
-      map(user => UserActions.loadUserSuccess({ user })),
-      catchError(error => of(UserActions.loadUserFailure({ error: error.message })))
-    ))
-  );
-}, { functional: true });
+export const loadUser = createEffect(
+  () => {
+    const actions$ = inject(Actions);
+    const userService = inject(UserService);
+    return actions$.pipe(
+      ofType(UserActions.loadUser),
+      mergeMap(() =>
+        userService.getCurrentUser().pipe(
+          map((user) => UserActions.loadUserSuccess({ user })),
+          catchError((error) => of(UserActions.loadUserFailure({ error: error.message }))),
+        ),
+      ),
+    );
+  },
+  { functional: true },
+);
 
 // Similar for loadUsers, createUser, updateUser, deleteUser ...
 ```
 
 #### 4.3 Reducer (`user.reducer.ts`)
+
 ```ts
 import { createReducer, on } from '@ngrx/store';
 import * as UserActions from './user.actions';
@@ -326,39 +349,52 @@ const initialState: UserState = {
 
 export const userReducer = createReducer(
   initialState,
-  on(UserActions.loadUser,               s => ({ ...s, loading: true,  error: null })),
-  on(UserActions.loadUserSuccess, (s,{ user }) => ({ ...s, loading: false, user })),
-  on(UserActions.loadUserFailure, (s,{ error }) => ({ ...s, loading: false, error })),
+  on(UserActions.loadUser, (s) => ({ ...s, loading: true, error: null })),
+  on(UserActions.loadUserSuccess, (s, { user }) => ({ ...s, loading: false, user })),
+  on(UserActions.loadUserFailure, (s, { error }) => ({ ...s, loading: false, error })),
 
-  on(UserActions.loadUsers,              s => ({ ...s, loading: true,  error: null })),
-  on(UserActions.loadUsersSuccess,(s,{ users }) => ({ ...s, loading: false, users })),
-  on(UserActions.loadUsersFailure,(s,{ error }) => ({ ...s, loading: false, error })),
+  on(UserActions.loadUsers, (s) => ({ ...s, loading: true, error: null })),
+  on(UserActions.loadUsersSuccess, (s, { users }) => ({ ...s, loading: false, users })),
+  on(UserActions.loadUsersFailure, (s, { error }) => ({ ...s, loading: false, error })),
 
-  on(UserActions.createUser,             s => ({ ...s, loading: true,  error: null })),
-  on(UserActions.createUserSuccess,(s,{ user }) => ({ ...s, loading: false, users: [...s.users, user] })),
-  on(UserActions.createUserFailure,(s,{ error }) => ({ ...s, loading: false, error })),
+  on(UserActions.createUser, (s) => ({ ...s, loading: true, error: null })),
+  on(UserActions.createUserSuccess, (s, { user }) => ({
+    ...s,
+    loading: false,
+    users: [...s.users, user],
+  })),
+  on(UserActions.createUserFailure, (s, { error }) => ({ ...s, loading: false, error })),
 
-  on(UserActions.updateUser,             s => ({ ...s, loading: true,  error: null })),
-  on(UserActions.updateUserSuccess,(s,{ user }) => ({ ...s, loading: false, users: s.users.map(u => u.id === user.id ? user : u) })),
-  on(UserActions.updateUserFailure,(s,{ error }) => ({ ...s, loading: false, error })),
+  on(UserActions.updateUser, (s) => ({ ...s, loading: true, error: null })),
+  on(UserActions.updateUserSuccess, (s, { user }) => ({
+    ...s,
+    loading: false,
+    users: s.users.map((u) => (u.id === user.id ? user : u)),
+  })),
+  on(UserActions.updateUserFailure, (s, { error }) => ({ ...s, loading: false, error })),
 
-  on(UserActions.deleteUser,             s => ({ ...s, loading: true,  error: null })),
-  on(UserActions.deleteUserSuccess,(s,{ id }) => ({ ...s, loading: false, users: s.users.filter(u => u.id !== id) })),
-  on(UserActions.deleteUserFailure,(s,{ error }) => ({ ...s, loading: false, error })),
+  on(UserActions.deleteUser, (s) => ({ ...s, loading: true, error: null })),
+  on(UserActions.deleteUserSuccess, (s, { id }) => ({
+    ...s,
+    loading: false,
+    users: s.users.filter((u) => u.id !== id),
+  })),
+  on(UserActions.deleteUserFailure, (s, { error }) => ({ ...s, loading: false, error })),
 );
 ```
 
 #### 4.4 Selectors (`user.selectors.ts`)
+
 ```ts
 import { createFeatureSelector, createSelector } from '@ngrx/store';
 import { UserState } from '../../../core/interfaces/user.model';
 
-export const selectUserState   = createFeatureSelector<UserState>('user');
-export const selectUser        = createSelector(selectUserState, s => s.user);
-export const selectUserRole    = createSelector(selectUser, u => u?.role ?? null);
-export const selectUserLoading = createSelector(selectUserState, s => s.loading);
-export const selectUsers       = createSelector(selectUserState, s => s.users);
-export const selectUserError   = createSelector(selectUserState, s => s.error);
+export const selectUserState = createFeatureSelector<UserState>('user');
+export const selectUser = createSelector(selectUserState, (s) => s.user);
+export const selectUserRole = createSelector(selectUser, (u) => u?.role ?? null);
+export const selectUserLoading = createSelector(selectUserState, (s) => s.loading);
+export const selectUsers = createSelector(selectUserState, (s) => s.users);
+export const selectUserError = createSelector(selectUserState, (s) => s.error);
 ```
 
 ---
@@ -372,7 +408,7 @@ import { AppActions, AppSelectors } from '@core';
 import { Store } from '@ngrx/store';
 
 // Select
-this.user$        = this.store.select(AppSelectors.UserSelectors.selectUser);
+this.user$ = this.store.select(AppSelectors.UserSelectors.selectUser);
 this.userLoading$ = this.store.select(AppSelectors.UserSelectors.selectUserLoading);
 
 // Dispatch
@@ -487,8 +523,8 @@ export const routes: Routes = [
 ## 10) Rationale: Barrel Usage
 
 - Barrels allow consistent imports and future refactors without touching consumers.
-- We **allow deep `@core/**` and `@shared/**`** to unlock granular imports for framework/util layers.
-- We **disallow deep `@features/**` and `@store/**`** to keep feature contracts stable and reduce coupling.
+- We **allow deep `@core/**`and`@shared/**`** to unlock granular imports for framework/util layers.
+- We **disallow deep `@features/**`and`@store/**`** to keep feature contracts stable and reduce coupling.
 
 **Example**
 
@@ -506,7 +542,6 @@ import { ConfirmDialogComponent } from '@shared/dialog';
 ## 11) Questions
 
 Open a PR with the `docs/` label or start a thread in the repository discussions. This guide is living documentation; keep it small, precise, and practical.
-
 
 ## 🧑‍💻 Author
 

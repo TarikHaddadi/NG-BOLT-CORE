@@ -1,17 +1,28 @@
-import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, OnInit } from '@angular/core';
 import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
+import {
+  MatAutocompleteModule,
+  MatAutocompleteSelectedEvent,
+} from '@angular/material/autocomplete';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Observable, map, startWith } from 'rxjs';
+import { map, Observable, startWith } from 'rxjs';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
 @Component({
   selector: 'app-autocomplete',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatAutocompleteModule, TranslateModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatAutocompleteModule,
+    TranslateModule,
+  ],
   template: `
     <mat-form-field appearance="outline" class="w-full" floatLabel="always">
       <mat-label>{{ field.label | translate }}</mat-label>
@@ -22,13 +33,12 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         [id]="field.name"
         [formControl]="control"
         [matAutocomplete]="auto"
-        [attr.placeholder]="(field.placeholder ?? '') | translate"
+        [attr.placeholder]="field.placeholder ?? '' | translate"
         [attr.pattern]="field.pattern || null"
         [attr.minlength]="field.minLength || null"
         [attr.maxlength]="field.maxLength || null"
         autocomplete="off"
         (blur)="control.markAsTouched()"
-
         [attr.aria-label]="field.label | translate"
         [attr.aria-describedby]="ariaDescribedBy"
         [attr.aria-invalid]="control.invalid || null"
@@ -58,7 +68,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       </mat-error>
     </mat-form-field>
   `,
-  styleUrls:["./autocomplete.component.scss"]
+  styleUrls: ['./autocomplete.component.scss'],
 })
 export class AutocompleteComponent implements OnInit {
   @Input({ required: true }) field!: FieldConfig;
@@ -73,7 +83,7 @@ export class AutocompleteComponent implements OnInit {
     // live filter
     this.filteredOptions$ = this.control.valueChanges.pipe(
       startWith(this.control.value ?? ''),
-      map(v => this.filter(all, v ?? ''))
+      map((v) => this.filter(all, v ?? '')),
     );
   }
 
@@ -81,7 +91,7 @@ export class AutocompleteComponent implements OnInit {
   private filter(options: string[], value: string): string[] {
     const v = (value ?? '').toLowerCase();
     if (!v) return options;
-    return options.filter(o => o.toLowerCase().includes(v));
+    return options.filter((o) => o.toLowerCase().includes(v));
   }
   displayWith = (val: string | null) => val ?? '';
 
@@ -94,9 +104,15 @@ export class AutocompleteComponent implements OnInit {
   trackByIndex = (i: number) => i;
 
   // --- ARIA helpers ---
-  get showError(): boolean { return !!(this.control?.touched && this.control?.invalid); }
-  get hintId()  { return `${this.field.name}-hint`; }
-  get errorId() { return `${this.field.name}-error`; }
+  get showError(): boolean {
+    return !!(this.control?.touched && this.control?.invalid);
+  }
+  get hintId() {
+    return `${this.field.name}-hint`;
+  }
+  get errorId() {
+    return `${this.field.name}-error`;
+  }
   get ariaDescribedBy(): string | null {
     if (this.showError) return this.errorId;
     if (this.field.helperText) return this.hintId;
@@ -110,7 +126,7 @@ export class AutocompleteComponent implements OnInit {
 
     // prioritize common autocomplete errors
     const order = ['required', 'minlength', 'maxlength', 'optionNotAllowed', 'pattern'];
-    const key = order.find(k => k in errs) || Object.keys(errs)[0];
+    const key = order.find((k) => k in errs) || Object.keys(errs)[0];
 
     const override = this.field.errorMessages?.[key];
     const fallback = `form.errors.${this.field.name}.${key}`;

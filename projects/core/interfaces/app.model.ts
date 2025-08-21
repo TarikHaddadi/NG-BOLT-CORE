@@ -1,7 +1,7 @@
-import { UserState, TeamManagementState, AuthState } from "./public-api";
+import { AuthState, TeamManagementState, UserState } from './public-api';
 
 export interface AppState {
   user: UserState;
-  teamManagement: TeamManagementState,
-  auth: AuthState
+  teamManagement: TeamManagementState;
+  auth: AuthState;
 }

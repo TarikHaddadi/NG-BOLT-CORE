@@ -1,12 +1,12 @@
-import { HttpInterceptorFn } from "@angular/common/http";
+import { HttpInterceptorFn } from '@angular/common/http';
 
 export type CoreTheme = 'light' | 'dark';
 
 export interface CoreI18nOptions {
-  prefix?: string;        // e.g. '/assets/i18n/'
-  suffix?: string;        // e.g. '.json'
-  fallbackLang?: string;  // e.g. 'en'
-  lang?: string;          // e.g. 'en' | 'fr'
+  prefix?: string; // e.g. '/assets/i18n/'
+  suffix?: string; // e.g. '.json'
+  fallbackLang?: string; // e.g. 'en'
+  lang?: string; // e.g. 'en' | 'fr'
 }
 
 export interface CoreOptions {

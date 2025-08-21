@@ -1,5 +1,10 @@
 import { Injectable } from '@angular/core';
-import { MatDateFormats, DateAdapter, MAT_DATE_FORMATS, NativeDateAdapter } from '@angular/material/core';
+import {
+  DateAdapter,
+  MAT_DATE_FORMATS,
+  MatDateFormats,
+  NativeDateAdapter,
+} from '@angular/material/core';
 
 @Injectable()
 export class AppDateAdapter extends NativeDateAdapter {
@@ -16,17 +21,17 @@ export class AppDateAdapter extends NativeDateAdapter {
 
 /** Use 'input' so our adapter formats as yyyy-MM-dd */
 export const APP_DATE_FORMATS: MatDateFormats = {
-  parse:   { dateInput: 'yyyy-MM-dd' },
+  parse: { dateInput: 'yyyy-MM-dd' },
   display: {
     dateInput: 'input',
     monthYearLabel: 'MMM yyyy',
     dateA11yLabel: 'yyyy-MM-dd',
-    monthYearA11yLabel: 'MMMM yyyy'
-  }
+    monthYearA11yLabel: 'MMMM yyyy',
+  },
 };
 
 /** Convenience providers you can spread where needed */
 export const APP_DATE_PROVIDERS = [
   { provide: DateAdapter, useClass: AppDateAdapter },
-  { provide: MAT_DATE_FORMATS, useValue: APP_DATE_FORMATS }
+  { provide: MAT_DATE_FORMATS, useValue: APP_DATE_FORMATS },
 ];

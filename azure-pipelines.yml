@@ -39,6 +39,9 @@ stages:
     - script: npm ci
       displayName: 'Install dependencies'
 
+    - script: npm run lint:ci
+      displayName: 'Run ESLint (CI)'
+      
     - script: npm run build:core
       displayName: 'Build library'
 

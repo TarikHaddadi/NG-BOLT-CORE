@@ -1,6 +1,7 @@
 {
   "name": "pxs-ng-core",
   "version": "0.0.0",
+  "type": "module",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -12,10 +13,11 @@
     "version:minor": "npm version minor --prefix projects/core",
     "version:major": "npm version major --prefix projects/core",
     "publish:core": "ng build core && copy .npmrc dist\\core\\.npmrc && cd dist/core && npm publish",
-    "lint": "eslint . --ext .ts,.html --cache",
-    "lint:fix": "eslint . --ext .ts,.html --fix --cache",
-    "format": "prettier . --write",
-    "format:check": "prettier . --check",
+    "lint": "eslint projects/. --ext .ts,.html --cache",
+    "lint:fix": "eslint projects/. --ext .ts,.html --fix --cache",
+    "lint:ci": "eslint projects/. --ext .ts,.html --max-warnings=0",
+    "format": "prettier projects/. --write",
+    "format:check": "prettier projects/. --check",
     "prepare": "husky install"
   },
   "prettier": {
@@ -34,7 +36,7 @@
     "*.{ts,html}": [
       "eslint --fix --cache"
     ],
-    "*.{json,md,scss,css}": [
+    "*.{ts,json,md,scss,css}": [
       "prettier --write"
     ]
   },

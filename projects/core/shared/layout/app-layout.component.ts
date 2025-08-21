@@ -1,23 +1,32 @@
-import { AfterViewInit, ChangeDetectorRef, Component, effect, Injector, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import {
+  AfterViewInit,
+  ChangeDetectorRef,
+  Component,
+  effect,
+  Injector,
+  OnInit,
+} from '@angular/core';
+import { FormControl } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatIconModule } from '@angular/material/icon';
+import { MatListModule } from '@angular/material/list';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { RouterModule, RouterOutlet } from '@angular/router';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatListModule } from '@angular/material/list';
-import { map, Observable } from 'rxjs';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { FormControl } from '@angular/forms';
+import { RouterModule, RouterOutlet } from '@angular/router';
 import { Store } from '@ngrx/store';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatMenuModule } from '@angular/material/menu';
-import { SelectComponent } from '../forms/fields/select/select.component';
-import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { map, Observable } from 'rxjs';
+
 import { AuthProfile, FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 import { ConfigService, LayoutService, ThemeService } from '@cadai/pxs-ng-core/services';
-import { AppSelectors, AppActions } from '@cadai/pxs-ng-core/store';
+import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
+
+import { SelectComponent } from '../forms/fields/select/select.component';
+import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
 
 @Component({
   selector: 'app-layout',
@@ -59,8 +68,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     toggleIcons: {
       on: 'dark_mode',
       off: 'light_mode',
-      position: 'start'
-    }
+      position: 'start',
+    },
   };
   public themeControl!: FormControl<boolean>;
 
@@ -71,8 +80,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     type: 'dropdown',
     options: [
       { label: 'English', value: 'en' },
-      { label: 'Français', value: 'fr' }
-    ]
+      { label: 'Français', value: 'fr' },
+    ],
   };
   public langControl!: FormControl<string>;
 
@@ -86,9 +95,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     public translate: TranslateService,
     public theme: ThemeService,
     private injector: Injector,
-    private store: Store
-  ) { }
-
+    private store: Store,
+  ) {}
 
   public ngAfterViewInit(): void {
     this.cdr.detectChanges();
@@ -101,7 +109,9 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
     // IMPORTANT: nonNullable so the type is FormControl<boolean>, not boolean | null
     this.themeControl = new FormControl<boolean>(this.theme.isDark(), { nonNullable: true });
-    this.langControl = new FormControl<string>(this.translate.getCurrentLang(), { nonNullable: true });
+    this.langControl = new FormControl<string>(this.translate.getCurrentLang(), {
+      nonNullable: true,
+    });
 
     // 1) UI -> Service: when user toggles the control, call toggleTheme if different
     this.themeControl.valueChanges.subscribe((wantDark) => {
@@ -110,13 +120,16 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     });
 
     // 2) Service -> UI: keep control in sync if something else toggles the theme
-    effect(() => {
-      const isDark = this.theme.isDark();
-      // avoid feedback loop
-      if (this.themeControl.value !== isDark) {
-        this.themeControl.setValue(isDark, { emitEvent: false });
-      }
-    }, { injector: this.injector });
+    effect(
+      () => {
+        const isDark = this.theme.isDark();
+        // avoid feedback loop
+        if (this.themeControl.value !== isDark) {
+          this.themeControl.setValue(isDark, { emitEvent: false });
+        }
+      },
+      { injector: this.injector },
+    );
 
     // Language control (optional)
     this.langControl.valueChanges.subscribe((lang) => {
@@ -125,12 +138,17 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
     // User informations
     this.profile$ = this.store.select(AppSelectors.AuthSelectors.selectProfile);
-    this.roles$ = this.profile$.pipe(map(p => p?.authorization ?? []))
+    this.roles$ = this.profile$.pipe(map((p) => p?.authorization ?? []));
   }
 
   displayName(p: AuthProfile | null): string {
     if (!p) return '';
-    return p.name || [p.given_name, p.family_name].filter(Boolean).join(' ') || p.preferred_username || '';
+    return (
+      p.name ||
+      [p.given_name, p.family_name].filter(Boolean).join(' ') ||
+      p.preferred_username ||
+      ''
+    );
   }
 
   logout(): void {

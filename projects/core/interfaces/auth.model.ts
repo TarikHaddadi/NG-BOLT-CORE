@@ -1,5 +1,4 @@
-import { AuthProfile } from "./keycloack.model";
-
+import { AuthProfile } from './keycloack.model';
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -10,5 +9,5 @@ export interface AuthState {
 export const initialAuthState: AuthState = {
   isAuthenticated: false,
   profile: null,
-  expiresAt: null
+  expiresAt: null,
 };

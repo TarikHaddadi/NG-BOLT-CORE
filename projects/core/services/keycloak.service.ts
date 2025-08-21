@@ -1,14 +1,16 @@
-import { Injectable, inject } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import Keycloak, {
   KeycloakConfig,
   KeycloakInitOptions,
   KeycloakLoginOptions,
-  KeycloakLogoutOptions
+  KeycloakLogoutOptions,
 } from 'keycloak-js';
-import { BehaviorSubject, Observable, Subscription, interval } from 'rxjs';
+import { BehaviorSubject, interval, Observable, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
-import { ConfigService } from './public-api';
+
 import { AuthRuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
+
+import { ConfigService } from './public-api';
 
 @Injectable({ providedIn: 'root' })
 export class KeycloakService {

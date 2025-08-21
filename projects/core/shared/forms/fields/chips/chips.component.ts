@@ -1,18 +1,26 @@
 // fields/chips/chips.component.ts
-import { ChangeDetectionStrategy, Component, Input, OnChanges, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  Input,
+  OnChanges,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatChipListbox, MatChipsModule } from '@angular/material/chips';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
 @Component({
   selector: 'app-chips',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatChipsModule, TranslateModule,],
+  imports: [CommonModule, ReactiveFormsModule, MatChipsModule, TranslateModule],
   template: `
     <div class="chips-field">
-      <span   
+      <span
         class="chips-label"
         [id]="labelId"
         role="button"
@@ -20,7 +28,8 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         [attr.aria-controls]="listboxId"
         (click)="focusListbox()"
         (keydown.enter)="focusListbox()"
-        (keydown.space)="focusListbox()">
+        (keydown.space)="focusListbox()"
+      >
         {{ field.label | translate }}
       </span>
       <mat-chip-listbox
@@ -65,7 +74,7 @@ export class ChipsComponent implements OnInit, OnChanges {
   @Input() multiple = false;
   @ViewChild('listbox') listbox!: MatChipListbox;
 
-  constructor(private t: TranslateService) { }
+  constructor(private t: TranslateService) {}
 
   ngOnInit(): void {
     const v = this.control.value;
@@ -87,10 +96,18 @@ export class ChipsComponent implements OnInit, OnChanges {
   }
 
   // IDs / ARIA wiring
-  get labelId() { return `${this.field.name}-label`; }
-  get listboxId() { return `${this.field.name}-listbox`; }
-  get hintId() { return `${this.field.name}-hint`; }
-  get errorId() { return `${this.field.name}-error`; }
+  get labelId() {
+    return `${this.field.name}-label`;
+  }
+  get listboxId() {
+    return `${this.field.name}-listbox`;
+  }
+  get hintId() {
+    return `${this.field.name}-hint`;
+  }
+  get errorId() {
+    return `${this.field.name}-error`;
+  }
 
   get showError(): boolean {
     return !!(this.control?.touched && this.control?.invalid);
@@ -102,7 +119,9 @@ export class ChipsComponent implements OnInit, OnChanges {
     return null;
   }
 
-  markTouched() { this.control?.markAsTouched(); }
+  markTouched() {
+    this.control?.markAsTouched();
+  }
 
   trackByIndex = (index: number) => index;
 
@@ -112,11 +131,10 @@ export class ChipsComponent implements OnInit, OnChanges {
 
     // Priority for list selections
     const order = ['minlengthArray', 'required', 'maxlengthArray', 'optionNotAllowed'];
-    const key = order.find(k => this.control.hasError(k)) || Object.keys(this.control.errors ?? {})[0];
+    const key =
+      order.find((k) => this.control.hasError(k)) || Object.keys(this.control.errors ?? {})[0];
 
-    const i18nKey =
-      this.field.errorMessages?.[key] ??
-      `form.errors.${this.field.name}.${key}`;
+    const i18nKey = this.field.errorMessages?.[key] ?? `form.errors.${this.field.name}.${key}`;
 
     const params = this.paramsFor(key, errs[key]);
     return this.t.instant(i18nKey, params);
@@ -126,7 +144,10 @@ export class ChipsComponent implements OnInit, OnChanges {
     switch (key) {
       case 'minlengthArray':
       case 'maxlengthArray':
-        return { requiredLength: val?.requiredLength, actualLength: this.length(this.control.value) };
+        return {
+          requiredLength: val?.requiredLength,
+          actualLength: this.length(this.control.value),
+        };
       default:
         return {};
     }

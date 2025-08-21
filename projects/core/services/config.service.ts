@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@angular/core';
+
 import { AuthRuntimeConfig, CoreOptions } from '@cadai/pxs-ng-core/interfaces';
 import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
@@ -14,7 +15,7 @@ export interface AppConfig {
 export class ConfigService {
   private config!: AppConfig;
 
-  constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) { }
+  constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {}
 
   async loadConfig(): Promise<void> {
     const res = await fetch('/assets/config.json', { cache: 'no-store' });

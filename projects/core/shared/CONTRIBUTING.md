@@ -1,9 +1,11 @@
 # PXS NG Core — Contributing & Dynamic Form Guide
->_Last updated: 2025-08-21_
 
-> This document explains:  
-> 1) How to contribute safely (structure, exports, barrels, and common pitfalls).  
-> 2) How to add **custom Dynamic Form fields** end‑to‑end.  
+> _Last updated: 2025-08-21_
+
+> This document explains:
+>
+> 1. How to contribute safely (structure, exports, barrels, and common pitfalls).
+> 2. How to add **custom Dynamic Form fields** end‑to‑end.
 
 ---
 
@@ -28,28 +30,30 @@ projects/core/
 ```
 
 Each subfolder (e.g., `interfaces`, `services`, …) is an **entry point** with **its own**:
-- `public-api.ts` (explicit exports)  
-- `index.ts` (re-exports from `public-api.ts`)  
+
+- `public-api.ts` (explicit exports)
+- `index.ts` (re-exports from `public-api.ts`)
 - `ng-package.json` (local entry point config)
 
 The root `dist/core/package.json` will expose them through `"exports"` — e.g.:
-- `@cadai/pxs-ng-core` (root)  
-- `@cadai/pxs-ng-core/interfaces`  
+
+- `@cadai/pxs-ng-core` (root)
+- `@cadai/pxs-ng-core/interfaces`
 - `@cadai/pxs-ng-core/shared`  
-… etc.
+  … etc.
 
 ### Golden rules (to prevent crashes & “ɵcmp/undefined” issues)
 
 1. **Always use explicit barrels**
-   - Export only from `public-api.ts` (per entry).  
+   - Export only from `public-api.ts` (per entry).
    - Make `index.ts` **only** re-export from `public-api.ts`.
    - Never deep-import internal files across entries (e.g., avoid `@cadai/pxs-ng-core/shared/forms/field-host/…`).
 
 2. **No cross-entry default imports**  
    Use **named exports** everywhere and **never** `export default`. Angular tooling + ng-packagr expect named symbols.
 
-3. **Avoid circular deps**  
-   - Don’t import `shared/public-api` **from inside** `shared/` components — use **relative** imports there.  
+3. **Avoid circular deps**
+   - Don’t import `shared/public-api` **from inside** `shared/` components — use **relative** imports there.
    - Cross-area rules:
      - `interfaces` → can be imported by anyone.
      - `utils` → can import `interfaces`, but **not** `shared` or `store`.
@@ -58,34 +62,35 @@ The root `dist/core/package.json` will expose them through `"exports"` — e.g.:
      - `core` (root providers) → can import from `services`, `tokens`, `interfaces`, `interceptors` (via barrels).
      - `store` → can import `interfaces` but keep it independent of `shared` and `core`.
 
-4. **Standalone components**  
-   - Every Angular component in `shared/` is **standalone** and must declare its own `imports:`.  
+4. **Standalone components**
+   - Every Angular component in `shared/` is **standalone** and must declare its own `imports:`.
    - Consumers can lazy‑load or import them directly. Missing `imports` causes runtime `ɵcmp`/def errors.
 
-5. **Material & CDK**  
-   - Each field component must import its own Material modules (`MatInputModule`, `MatSelectModule`, …).  
+5. **Material & CDK**
+   - Each field component must import its own Material modules (`MatInputModule`, `MatSelectModule`, …).
    - Do **not** rely on a global material module.
 
-6. **Form field inputs contract**  
-   - Each field component must declare `@Input() field: FieldConfig` and `@Input() control: FormControl<…>`.  
+6. **Form field inputs contract**
+   - Each field component must declare `@Input() field: FieldConfig` and `@Input() control: FormControl<…>`.
    - Do **not** pass a `form` input into field components — `FieldHostComponent` passes **only** `{ field, control }`.
 
-7. **`FIELD_MAP` lives in `FieldHostComponent`**  
-   - `FieldHostComponent` resolves `field.type → Component`.  
+7. **`FIELD_MAP` lives in `FieldHostComponent`**
+   - `FieldHostComponent` resolves `field.type → Component`.
    - Use **relative imports** within `shared/fields/*` to avoid library self‑imports.
 
-8. **I18n keys & error messages**  
-   - Prefer runtime i18n keys like `form.errors.${field.name}.required`.  
+8. **I18n keys & error messages**
+   - Prefer runtime i18n keys like `form.errors.${field.name}.required`.
    - Allow per-field overrides via `field.errorMessages?.[key]`.
 
-9. **Build hygiene**  
-   - Root `tsconfig.json` should not declare per-entry `paths` that point into source subfolders.  
-   - Let **ng-packagr** write your `exports` in `dist`.  
+9. **Build hygiene**
+   - Root `tsconfig.json` should not declare per-entry `paths` that point into source subfolders.
+   - Let **ng-packagr** write your `exports` in `dist`.
    - If you see **“File is not under rootDir”** or **“circular dependency on itself”**, you are probably deep‑importing across entries or re‑exporting barrels that re-import their own entry.
 
-10. **Version compatibility**  
-   - Keep peerDependencies wide enough for Angular 19/20 but consistent across app and lib.  
-   - Don’t ship Angular packages in `dependencies` — keep them in `peerDependencies`.
+10. **Version compatibility**
+
+- Keep peerDependencies wide enough for Angular 19/20 but consistent across app and lib.
+- Don’t ship Angular packages in `dependencies` — keep them in `peerDependencies`.
 
 ---
 
@@ -99,9 +104,17 @@ This section shows how to add a brand-new field type end‑to‑end.
 
 ```ts
 export type FieldType =
-  | 'text' | 'email' | 'password' | 'phone'
+  | 'text'
+  | 'email'
+  | 'password'
+  | 'phone'
   | 'textarea'
-  | 'autocomplete' | 'chips' | 'dropdown' | 'select' | 'toggle' | 'range'
+  | 'autocomplete'
+  | 'chips'
+  | 'dropdown'
+  | 'select'
+  | 'toggle'
+  | 'range'
   | 'datepicker'
   | 'myCustom'; // <-- add your new type
 
@@ -141,11 +154,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
     <!-- your control -->
     <div class="my-custom">
       <label [attr.for]="field.name">{{ field.label }}</label>
-      <input
-        [id]="field.name"
-        [formControl]="control"
-        (blur)="control.markAsTouched()"
-      />
+      <input [id]="field.name" [formControl]="control" (blur)="control.markAsTouched()" />
       <div class="hint" *ngIf="field.helperText && !showError">{{ field.helperText }}</div>
       <div class="error" *ngIf="showError">{{ errorText }}</div>
     </div>
@@ -155,8 +164,12 @@ export class MyCustomComponent {
   @Input({ required: true }) field!: FieldConfig;
   @Input({ required: true }) control!: FormControl<string | null>;
 
-  get showError() { return !!(this.control?.touched && this.control?.invalid); }
-  get errorText() { return 'Invalid'; /* or i18n like in other fields */ }
+  get showError() {
+    return !!(this.control?.touched && this.control?.invalid);
+  }
+  get errorText() {
+    return 'Invalid'; /* or i18n like in other fields */
+  }
 }
 ```
 
@@ -236,7 +249,7 @@ Add keys to your translation files (e.g., `assets/i18n/en.json`):
 ```ts
 const config: FieldConfig[] = [
   // ...
-  { name: 'custom', type: 'myCustom', label: 'form.labels.custom', required: true }
+  { name: 'custom', type: 'myCustom', label: 'form.labels.custom', required: true },
 ];
 ```
 
@@ -304,9 +317,6 @@ Fix: Check `dist/core/package.json` `"exports"`. In consumer app, **remove** dev
 - [ ] No circular deps (verified by build).
 - [ ] `shared/public-api.ts` exports the new component.
 - [ ] Documentation updated (this file).
-
-
-
 
 ## 🧑‍💻 Author
 

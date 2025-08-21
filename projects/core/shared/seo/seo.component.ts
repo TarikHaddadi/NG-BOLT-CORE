@@ -1,6 +1,13 @@
-import { Component, Input, inject, OnChanges, SimpleChanges, Output, EventEmitter } from '@angular/core';
-import { Title } from '@angular/platform-browser';
-import { Meta } from '@angular/platform-browser';
+import {
+  Component,
+  EventEmitter,
+  inject,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
+import { Meta, Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-seo',
@@ -18,7 +25,7 @@ export class SeoComponent implements OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['pageTitle'] && this.pageTitle) {
-      Promise.resolve().then(() => {
+      void Promise.resolve().then(() => {
         this.titleService.setTitle(this.pageTitle);
         this.titleChange.emit(this.pageTitle);
       });

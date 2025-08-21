@@ -1,9 +1,10 @@
-import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input } from '@angular/core';
 import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
 @Component({
@@ -19,14 +20,13 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         [id]="field.name"
         [type]="inputType"
         [formControl]="control"
-        [placeholder]="(field.placeholder ?? '') | translate"
+        [placeholder]="field.placeholder ?? '' | translate"
         [attr.pattern]="patternAttr"
         [attr.minlength]="field.minLength || null"
         [attr.maxlength]="field.maxLength || null"
         [attr.inputmode]="inputMode"
         [attr.autocomplete]="autoComplete"
         (blur)="control.markAsTouched()"
-
         [attr.aria-label]="field.label | translate"
         [attr.aria-describedby]="ariaDescribedBy"
         [attr.aria-invalid]="control.invalid || null"
@@ -42,36 +42,47 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       </mat-error>
     </mat-form-field>
   `,
-  styleUrls:["./text-input.component.scss"]
+  styleUrls: ['./text-input.component.scss'],
 })
 export class TextInputComponent {
   @Input({ required: true }) field!: FieldConfig;
   @Input({ required: true }) control!: FormControl<string>;
 
-  constructor(private t: TranslateService) { }
+  constructor(private t: TranslateService) {}
 
   // --- UI helpers ---
   get inputType(): string {
     switch (this.field.type) {
-      case 'email': return 'email';
-      case 'password': return 'password';
-      case 'phone': return 'tel';
-      default: return 'text';
+      case 'email':
+        return 'email';
+      case 'password':
+        return 'password';
+      case 'phone':
+        return 'tel';
+      default:
+        return 'text';
     }
   }
   get inputMode(): string | null {
     switch (this.field.type) {
-      case 'email': return 'email';
-      case 'phone': return 'numeric';
-      default: return null;
+      case 'email':
+        return 'email';
+      case 'phone':
+        return 'numeric';
+      default:
+        return null;
     }
   }
   get autoComplete(): string | null {
     switch (this.field.type) {
-      case 'email': return 'email';
-      case 'password': return 'new-password';
-      case 'phone': return 'tel';
-      default: return 'on';
+      case 'email':
+        return 'email';
+      case 'password':
+        return 'new-password';
+      case 'phone':
+        return 'tel';
+      default:
+        return 'on';
     }
   }
 
@@ -80,8 +91,12 @@ export class TextInputComponent {
     return types.includes(this.field.type) ? (this.field.pattern ?? null) : null;
   }
   // --- ARIA ids ---
-  get hintId() { return `${this.field.name}-hint`; }
-  get errorId() { return `${this.field.name}-error`; }
+  get hintId() {
+    return `${this.field.name}-hint`;
+  }
+  get errorId() {
+    return `${this.field.name}-error`;
+  }
 
   get showError(): boolean {
     return !!(this.control?.touched && this.control?.invalid);
@@ -99,8 +114,16 @@ export class TextInputComponent {
     if (!errs || !Object.keys(errs).length) return '';
 
     // Common text-input priorities
-    const order = ['required', 'emailDomain', 'emailTld', 'email', 'minlength', 'maxlength', 'pattern'];
-    const key = order.find(k => k in errs) || Object.keys(errs)[0];
+    const order = [
+      'required',
+      'emailDomain',
+      'emailTld',
+      'email',
+      'minlength',
+      'maxlength',
+      'pattern',
+    ];
+    const key = order.find((k) => k in errs) || Object.keys(errs)[0];
 
     // Allow per-field overrides (your configs already use full keys like "form.errors.input.required")
     const overrideKey = this.field.errorMessages?.[key];

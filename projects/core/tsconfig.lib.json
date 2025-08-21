@@ -6,12 +6,8 @@
     "declarationMap": true,
     "inlineSources": true,
     "sourceMap": true,
-    "types": [],
+    "types": []
   },
-  "include": [
-    "**/*.ts"
-  ],
-  "exclude": [
-    "**/*.spec.ts"
-  ]
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.spec.ts"]
 }

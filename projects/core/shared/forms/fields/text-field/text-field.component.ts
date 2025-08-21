@@ -1,16 +1,24 @@
-import { Component, Input } from '@angular/core';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { CommonModule } from '@angular/common';
+import { Component, Input } from '@angular/core';
 import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { TextFieldModule } from '@angular/cdk/text-field';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
 @Component({
   standalone: true,
   selector: 'app-text-field',
-  imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, TextFieldModule, TranslateModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    TextFieldModule,
+    TranslateModule,
+  ],
   template: `
     <mat-form-field appearance="outline" class="w-full" floatLabel="always">
       <mat-label>{{ field.label | translate }}</mat-label>
@@ -21,7 +29,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         matInput
         [id]="field.name"
         [formControl]="control"
-        [placeholder]="(field.placeholder || '') | translate"
+        [placeholder]="field.placeholder || '' | translate"
         [attr.minlength]="field.minLength || null"
         [attr.maxlength]="field.maxLength || null"
         [attr.aria-label]="field.label | translate"
@@ -38,13 +46,13 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
       <!-- Input mode -->
       <ng-template #singleLine>
-        <textarea 
+        <textarea
           matInput
           [id]="field.name"
           [type]="inputType"
           [formControl]="control"
           [maxlength]="field.maxLength || null"
-          [placeholder]="(field.placeholder || '') | translate"
+          [placeholder]="field.placeholder || '' | translate"
           [attr.pattern]="patternAttr"
           [attr.minlength]="field.minLength || null"
           [attr.maxlength]="field.maxLength || null"
@@ -61,7 +69,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
       <!-- Hint (left) -->
       <mat-hint *ngIf="field.helperText && !showError" [id]="hintId">
-        {{ field.helperText | translate:{ max: field.maxLength } }}
+        {{ field.helperText | translate: { max: field.maxLength } }}
       </mat-hint>
 
       <!-- Counter (right) -->
@@ -74,42 +82,59 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       </mat-error>
     </mat-form-field>
   `,
-  styleUrls:["./text-field.component.scss"]
+  styleUrls: ['./text-field.component.scss'],
 })
 export class TextFieldComponent {
   @Input({ required: true }) field!: FieldConfig;
   @Input({ required: true }) control!: FormControl<string>;
 
-  constructor(private t: TranslateService) { }
+  constructor(private t: TranslateService) {}
 
-  get isTextarea() { return this.field.type === 'textarea'; }
+  get isTextarea() {
+    return this.field.type === 'textarea';
+  }
 
   // textarea sizing
-  get minRows() { return this.field.rows ?? 3; }
-  get maxRows() { return this.field.maxRows ?? (this.field.autoResize ? 8 : this.minRows); }
+  get minRows() {
+    return this.field.rows ?? 3;
+  }
+  get maxRows() {
+    return this.field.maxRows ?? (this.field.autoResize ? 8 : this.minRows);
+  }
 
   // ---- input attributes (single line only) ----
   get inputType(): string {
     switch (this.field.type) {
-      case 'email': return 'email';
-      case 'password': return 'password';
-      case 'phone': return 'tel';
-      default: return 'text';
+      case 'email':
+        return 'email';
+      case 'password':
+        return 'password';
+      case 'phone':
+        return 'tel';
+      default:
+        return 'text';
     }
   }
   get inputMode(): string | null {
     switch (this.field.type) {
-      case 'email': return 'email';
-      case 'phone': return 'numeric';
-      default: return null;
+      case 'email':
+        return 'email';
+      case 'phone':
+        return 'numeric';
+      default:
+        return null;
     }
   }
   get autoComplete(): string | null {
     switch (this.field.type) {
-      case 'email': return 'email';
-      case 'password': return 'new-password';
-      case 'phone': return 'tel';
-      default: return 'on';
+      case 'email':
+        return 'email';
+      case 'password':
+        return 'new-password';
+      case 'phone':
+        return 'tel';
+      default:
+        return 'on';
     }
   }
   get patternAttr(): string | null {
@@ -118,15 +143,20 @@ export class TextFieldComponent {
   }
 
   // ---- ARIA helpers ----
-  get showError(): boolean { return !!(this.control?.touched && this.control?.invalid); }
-  get hintId() { return `${this.field.name}-hint`; }
-  get errorId() { return `${this.field.name}-error`; }
+  get showError(): boolean {
+    return !!(this.control?.touched && this.control?.invalid);
+  }
+  get hintId() {
+    return `${this.field.name}-hint`;
+  }
+  get errorId() {
+    return `${this.field.name}-error`;
+  }
   get ariaDescribedBy(): string | null {
     if (this.showError) return this.errorId;
     if (this.field.helperText) return this.hintId;
     return null;
   }
-
 
   get charCount(): number {
     const v = this.control?.value as unknown;
@@ -139,7 +169,7 @@ export class TextFieldComponent {
     if (!errs || !Object.keys(errs).length) return '';
 
     const order = ['required', 'minlength', 'maxlength', 'invalidChars', 'pattern'];
-    const key = order.find(k => k in errs) || Object.keys(errs)[0];
+    const key = order.find((k) => k in errs) || Object.keys(errs)[0];
 
     const override = this.field.errorMessages?.[key];
     const fallback = `form.errors.${this.field.name}.${key}`;

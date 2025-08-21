@@ -1,7 +1,15 @@
-import { Validators, ValidatorFn, AbstractControl, ValidationErrors } from '@angular/forms';
+import { AbstractControl, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
-const textTypes: FieldConfig['type'][] = ['text', 'email', 'phone', 'password', 'chips', 'autocomplete'];
+const textTypes: FieldConfig['type'][] = [
+  'text',
+  'email',
+  'phone',
+  'password',
+  'chips',
+  'autocomplete',
+];
 
 export function buildValidators(field: FieldConfig): ValidatorFn[] {
   const v: ValidatorFn[] = [];
@@ -10,8 +18,10 @@ export function buildValidators(field: FieldConfig): ValidatorFn[] {
     v.push(field.type === 'toggle' ? Validators.requiredTrue : Validators.required);
   }
 
-  if (field.minLength && textTypes.includes(field.type)) v.push(Validators.minLength(field.minLength));
-  if (field.maxLength && textTypes.includes(field.type)) v.push(Validators.maxLength(field.maxLength));
+  if (field.minLength && textTypes.includes(field.type))
+    v.push(Validators.minLength(field.minLength));
+  if (field.maxLength && textTypes.includes(field.type))
+    v.push(Validators.maxLength(field.maxLength));
 
   // ✅ Only apply regex to text-like fields (NOT datepicker)
   if (field.pattern && textTypes.includes(field.type)) v.push(Validators.pattern(field.pattern));
@@ -22,7 +32,6 @@ export function buildValidators(field: FieldConfig): ValidatorFn[] {
   if (field.validators?.length) v.push(...field.validators);
   return v;
 }
-
 
 /** Fail on the first disallowed character. Example: /[^\p{L}0-9_.\- ]/u */
 export function allowedCharsValidator(disallowed: RegExp): ValidatorFn {
@@ -35,9 +44,14 @@ export function allowedCharsValidator(disallowed: RegExp): ValidatorFn {
 }
 
 /** Password rules → separate errors for each missing requirement */
-export function passwordStrengthValidator(opts: {
-  minLength?: number; minUpper?: number; minDigits?: number; minSpecial?: number;
-} = { minLength: 8, minUpper: 1, minDigits: 1, minSpecial: 0 }): ValidatorFn {
+export function passwordStrengthValidator(
+  opts: {
+    minLength?: number;
+    minUpper?: number;
+    minDigits?: number;
+    minSpecial?: number;
+  } = { minLength: 8, minUpper: 1, minDigits: 1, minSpecial: 0 },
+): ValidatorFn {
   const { minLength = 8, minUpper = 1, minDigits = 1, minSpecial = 0 } = opts;
   const upperRe = /[A-Z]/g;
   const digitRe = /\d/g;
@@ -47,7 +61,8 @@ export function passwordStrengthValidator(opts: {
     const v = c.value ?? '';
     const errs: ValidationErrors = {};
 
-    if (v.length < minLength) errs['minlength'] = { requiredLength: minLength, actualLength: v.length };
+    if (v.length < minLength)
+      errs['minlength'] = { requiredLength: minLength, actualLength: v.length };
     if ((v.match(upperRe)?.length ?? 0) < minUpper) errs['uppercase'] = true;
     if ((v.match(digitRe)?.length ?? 0) < minDigits) errs['digit'] = true;
     if (minSpecial > 0 && (v.match(specialRe)?.length ?? 0) < minSpecial) errs['special'] = true;
@@ -81,13 +96,13 @@ export function phoneDigitCount(min = 8, max = 15): ValidatorFn {
 /** Validates that at least one value (string) is in the list */
 export function optionInListValidator(list: string[]): ValidatorFn {
   return (c: AbstractControl) => (list.includes(c.value) ? null : { optionNotAllowed: true });
-};
+}
 
 /** Validates that a table contains at least one item */
 export function minArrayLength(min: number): ValidatorFn {
   return (c: AbstractControl) => {
     const v = c.value;
-    const length = Array.isArray(v) ? v.length : (v == null || v === '' ? 0 : 1);
+    const length = Array.isArray(v) ? v.length : v == null || v === '' ? 0 : 1;
     return length >= min ? null : { minlengthArray: { requiredLength: min, actualLength: length } };
   };
 }
@@ -95,9 +110,12 @@ export function minArrayLength(min: number): ValidatorFn {
 export function datePatternFromPlaceholder(ph: string): string {
   // Accept both YYYY and yyyy tokens
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return '^' + esc(ph)
-    .replace(/(YYYY|yyyy)/g, '\\d{4}')
-    .replace(/MM/g, '(0[1-9]|1[0-2])')
-    .replace(/(DD|dd)/g, '(0[1-9]|[12]\\d|3[01])')
-    + '$';
+  return (
+    '^' +
+    esc(ph)
+      .replace(/(YYYY|yyyy)/g, '\\d{4}')
+      .replace(/MM/g, '(0[1-9]|1[0-2])')
+      .replace(/(DD|dd)/g, '(0[1-9]|[12]\\d|3[01])') +
+    '$'
+  );
 }

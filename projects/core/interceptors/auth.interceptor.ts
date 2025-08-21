@@ -2,6 +2,7 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { from, throwError } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
+
 import { ConfigService, KeycloakService } from '@cadai/pxs-ng-core/services';
 
 function isAbsoluteHttp(url: string): boolean {
@@ -15,8 +16,9 @@ function toAbsolute(url: string): string {
 function isPublicUrl(url: string): boolean {
   const abs = toAbsolute(url);
   // match /assets/* (same-origin) and any “…/public/…” paths
-  return abs.startsWith(new URL('/assets/', window.location.origin).href)
-    || /\/public(\/|$)/i.test(abs);
+  return (
+    abs.startsWith(new URL('/assets/', window.location.origin).href) || /\/public(\/|$)/i.test(abs)
+  );
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
@@ -45,19 +47,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   // 4) Ensure token is fresh then attach
   return from(kc.ensureFreshToken(60)).pipe(
-    switchMap(token => {
-      const authReq = token
-        ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
-        : req;
+    switchMap((token) => {
+      const authReq = token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
       return next(authReq);
     }),
-    catchError(err => {
+    catchError((err) => {
       // Only force login on *API* 401s; avoid loops on KC/CORS/etc.
       if (isApiUrl && (err?.status === 401 || err?.status === 403)) {
         // fire and forget; keep error flowing to caller
-        kc.login({ redirectUri: window.location.href });
+        void kc.login({ redirectUri: window.location.href });
       }
       return throwError(() => err);
-    })
+    }),
   );
 };

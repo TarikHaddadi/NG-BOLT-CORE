@@ -1,11 +1,12 @@
 import { createAction, props } from '@ngrx/store';
+
 import { AuthProfile } from '@cadai/pxs-ng-core/interfaces';
 
 export const hydrateFromKc = createAction('[Auth] Hydrate From Keycloak');
 
 export const loginRedirect = createAction(
   '[Auth] Login Redirect',
-  props<{ idpHint?: string }>() // broker IdP alias
+  props<{ idpHint?: string }>(), // broker IdP alias
 );
 
 export const loginSuccess = createAction(
@@ -13,12 +14,12 @@ export const loginSuccess = createAction(
   props<{
     profile: AuthProfile | null;
     expiresAt: number;
-  }>()
+  }>(),
 );
 
 export const tokenRefreshed = createAction(
   '[Auth] Token Refreshed',
-  props<{ expiresAt: number }>()
+  props<{ expiresAt: number }>(),
 );
 
 export const logout = createAction('[Auth] Logout');

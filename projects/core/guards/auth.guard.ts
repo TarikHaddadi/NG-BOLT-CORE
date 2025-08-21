@@ -1,6 +1,7 @@
-import { CanActivateFn } from '@angular/router';
 import { inject } from '@angular/core';
+import { CanActivateFn } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+
 import { KeycloakService } from '@cadai/pxs-ng-core/services';
 
 export const authGuard: CanActivateFn = async () => {

@@ -1,22 +1,22 @@
-import {
-  EnvironmentProviders,
-  makeEnvironmentProviders,
-  inject,
-  EnvironmentInjector,
-} from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  EnvironmentInjector,
+  EnvironmentProviders,
+  inject,
+  makeEnvironmentProviders,
+} from '@angular/core';
 import { provideAppInitializer } from '@angular/core';
-import { provideAnimations } from '@angular/platform-browser/animations';
 import { MatNativeDateModule } from '@angular/material/core';
+import { provideAnimations } from '@angular/platform-browser/animations';
+import { Store } from '@ngrx/store';
 import { provideTranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
-import { Store } from '@ngrx/store';
 
-import { AppActions } from '@cadai/pxs-ng-core/store';
-import { KeycloakService, ConfigService, APP_DATE_PROVIDERS } from '@cadai/pxs-ng-core/services';
-import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
-import { CoreOptions } from '@cadai/pxs-ng-core/interfaces';
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
+import { CoreOptions } from '@cadai/pxs-ng-core/interfaces';
+import { APP_DATE_PROVIDERS, ConfigService, KeycloakService } from '@cadai/pxs-ng-core/services';
+import { AppActions } from '@cadai/pxs-ng-core/store';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 function loadTheme(theme: 'light' | 'dark' = 'light') {
   const href = `assets/theme/${theme}.css`;
@@ -62,7 +62,9 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     ...APP_DATE_PROVIDERS,
 
     // HttpClient with curated interceptor order: auth -> (extras) -> error
-    provideHttpClient(withInterceptors([authInterceptor, ...normalized.interceptors, httpErrorInterceptor])),
+    provideHttpClient(
+      withInterceptors([authInterceptor, ...normalized.interceptors, httpErrorInterceptor]),
+    ),
 
     // i18n
     provideTranslateService({
@@ -87,7 +89,9 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       const kc = env.get(KeycloakService);
 
       let store: Store | undefined;
-      try { store = env.get(Store); } catch { }
+      try {
+        store = env.get(Store);
+      } catch {}
 
       return (async () => {
         await config.loadConfig();

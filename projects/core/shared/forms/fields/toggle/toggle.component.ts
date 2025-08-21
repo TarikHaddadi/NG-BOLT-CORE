@@ -1,15 +1,22 @@
-import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
 @Component({
   selector: 'app-toggle',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatSlideToggleModule, MatIconModule, TranslateModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatSlideToggleModule,
+    MatIconModule,
+    TranslateModule,
+  ],
   template: `
     <div class="toggle-field">
       <mat-slide-toggle
@@ -26,7 +33,9 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       >
         <ng-container *ngIf="field.toggleIcons?.position !== 'end'">
           <mat-icon class="toggle-icon" aria-hidden="true">
-            {{ control.value ? (field.toggleIcons?.on || 'check') : (field.toggleIcons?.off || 'close') }}
+            {{
+              control.value ? field.toggleIcons?.on || 'check' : field.toggleIcons?.off || 'close'
+            }}
           </mat-icon>
         </ng-container>
 
@@ -34,7 +43,9 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
         <ng-container *ngIf="field.toggleIcons?.position === 'end'">
           <mat-icon class="toggle-icon" aria-hidden="true">
-            {{ control.value ? (field.toggleIcons?.on || 'check') : (field.toggleIcons?.off || 'close') }}
+            {{
+              control.value ? field.toggleIcons?.on || 'check' : field.toggleIcons?.off || 'close'
+            }}
           </mat-icon>
         </ng-container>
       </mat-slide-toggle>
@@ -48,7 +59,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       </div>
     </div>
   `,
-  styleUrls: ['./toggle.component.scss']
+  styleUrls: ['./toggle.component.scss'],
 })
 export class ToggleComponent {
   @Input({ required: true }) field!: FieldConfig & {
@@ -59,9 +70,15 @@ export class ToggleComponent {
 
   constructor(private t: TranslateService) {}
 
-  get showError() { return !!(this.control?.touched && this.control?.invalid); }
-  get hintId()  { return `${this.field.name}-hint`; }
-  get errorId() { return `${this.field.name}-error`; }
+  get showError() {
+    return !!(this.control?.touched && this.control?.invalid);
+  }
+  get hintId() {
+    return `${this.field.name}-hint`;
+  }
+  get errorId() {
+    return `${this.field.name}-error`;
+  }
 
   get ariaDescribedBy(): string | null {
     if (this.showError) return this.errorId;
@@ -69,7 +86,9 @@ export class ToggleComponent {
     return null;
   }
 
-  markTouched() { this.control?.markAsTouched(); }
+  markTouched() {
+    this.control?.markAsTouched();
+  }
 
   get errorText(): string {
     const errs = this.control?.errors ?? {};
@@ -77,14 +96,13 @@ export class ToggleComponent {
 
     // prioritize boolean-toggle errors
     const order = ['requiredTrue', 'required'];
-    const rawKey = order.find(k => k in errs) || Object.keys(errs)[0];
+    const rawKey = order.find((k) => k in errs) || Object.keys(errs)[0];
 
     // normalize requiredTrue -> required for i18n reuse
     const mapped = rawKey === 'requiredTrue' ? 'required' : rawKey;
 
     const i18nKey =
-      this.field.errorMessages?.[mapped] ??
-      `form.errors.${this.field.name}.${mapped}`;
+      this.field.errorMessages?.[mapped] ?? `form.errors.${this.field.name}.${mapped}`;
 
     return this.t.instant(i18nKey);
   }

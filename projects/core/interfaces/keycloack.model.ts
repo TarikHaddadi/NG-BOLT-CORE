@@ -14,4 +14,4 @@ export interface AuthProfile {
   family_name?: string;
   email?: string;
   authorization?: string[];
-};
+}
