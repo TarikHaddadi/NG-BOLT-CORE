@@ -114,8 +114,9 @@ stages:
     - task: NpmAuthenticate@0
       displayName: 'Authenticate to Azure Artifacts'
       # If you keep a repo-level .npmrc, point to it; otherwise omit workingFile.
-      #inputs:
-      #  workingFile: '$(PROJECT_DIR)/.npmrc'
+      inputs:
+          workingFile: '.npmrc'
+
 
     # Optional: stop if this version already exists (prevents 409 CONFLICT)
     - script: |
