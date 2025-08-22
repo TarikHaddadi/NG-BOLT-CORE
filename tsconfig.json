@@ -5,42 +5,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@cadai/pxs-ng-core": [
-        "projects/core/src/public-api.ts"
-      ],
-      "@cadai/pxs-ng-core/*": [
-        "projects/core/*/public-api.ts"
-      ]
-      /* "@cadai/pxs-ng-core/interfaces": [
-      "projects/core/interfaces/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/services": [
-      "projects/core/services/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/store": [
-      "projects/core/store/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/interceptors": [
-      "projects/core/interceptors/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/tokens": [
-      "projects/core/tokens/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/utils": [
-      "projects/core/utils/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/guards": [
-      "projects/core/guards/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/enums": [
-      "projects/core/enums/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/shared": [
-      "projects/core/shared/public-api.ts"
-    ],
-    "@cadai/pxs-ng-core/core": [
-      "projects/core/core/public-api.ts"
-    ] */
+      "@cadai/pxs-ng-core": ["projects/core/src/public-api.ts"],
+      "@cadai/pxs-ng-core/*": ["projects/core/*/public-api.ts"]
     },
     "strict": true,
     "noImplicitOverride": true,

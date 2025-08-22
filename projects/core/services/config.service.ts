@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@angular/core';
 
-import { AppEnvConfig, CoreOptions } from '@cadai/pxs-ng-core/interfaces';
+import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
 import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 @Injectable({ providedIn: 'root' })
 export class ConfigService {
-  private config!: AppEnvConfig;
+  private config!: RuntimeConfig;
 
   constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {}
 
@@ -20,11 +20,11 @@ export class ConfigService {
     };
   }
 
-  get<K extends keyof AppEnvConfig>(key: K): AppEnvConfig[K] {
+  get<K extends keyof RuntimeConfig>(key: K): RuntimeConfig[K] {
     return this.config[key];
   }
 
-  getAll(): AppEnvConfig {
+  getAll(): RuntimeConfig {
     return this.config;
   }
 }

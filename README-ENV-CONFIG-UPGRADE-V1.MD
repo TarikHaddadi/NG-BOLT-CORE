@@ -45,7 +45,7 @@ Place this in `public/assets/config.*.json`, then CI copies/merges into `/assets
   "name": "dev",
   "production": false,
   "apiUrl": "https://api.example.com",
-   "realtime": {
+  "realtime": {
     "enabled": true,
 
     // Preferred order; app picks the first enabled & supported one
@@ -580,7 +580,7 @@ merge_config:
 
 ---
 
-### Optional: JSON Schema Validation in CI
+### JSON Schema Validation in CI
 
 You can use **ajv-cli** to validate `config.json` against a JSON Schema:
 

@@ -1,14 +1,15 @@
 # ⚙️ Runtime Environment Config
 
->_Last updated: 2025-08-21_
+> _Last updated: 2025-08-21_
 
-Instead of Angular's build-time `environment.ts`, this project loads configuration **at runtime** via:
+On the Host application Instead of Angular's build-time `environment.ts`, this project loads configuration **at runtime** via:
 
 ```ts
-fetch('assets/config.json')
+fetch('assets/config.json');
 ```
 
 ## As Is Configs
+
 ```text
 public/assets/config.dev.json
 public/assets/config.uat.json
@@ -17,8 +18,8 @@ public/assets/config.prod.json
 
 Keep deploy-time environment in `public/assets/config.json` (copied to `/assets/config.json` at build). Example:
 
-
 **Example (`public/assets/config.dev.json`)**
+
 ```json
 {
   "name": "dev",
@@ -72,11 +73,11 @@ await cfg.load();
 // provide it in DI or attach to app initializer before bootstrap
 ```
 
-**Why this setup?**  
+**Why this setup?**
+
 - Change envs by swapping `config.json` on the server/CDN—**no rebuild**.
 - Keep assets versioned and cacheable under `/assets`.
 - Keep global styles & themes outside the bundle when needed.
-
 
 ## 🧑‍💻 Author
 

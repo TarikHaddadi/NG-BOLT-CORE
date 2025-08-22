@@ -2,21 +2,27 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   EnvironmentInjector,
   EnvironmentProviders,
+  importProvidersFrom,
   inject,
   makeEnvironmentProviders,
 } from '@angular/core';
 import { provideAppInitializer } from '@angular/core';
 import { MatNativeDateModule } from '@angular/material/core';
-import { provideAnimations } from '@angular/platform-browser/animations';
+import { provideAnimations, provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Store } from '@ngrx/store';
 import { provideTranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
 import { CoreOptions } from '@cadai/pxs-ng-core/interfaces';
-import { APP_DATE_PROVIDERS, ConfigService, KeycloakService } from '@cadai/pxs-ng-core/services';
+import {
+  APP_DATE_PROVIDERS,
+  ConfigService,
+  FeatureService,
+  KeycloakService,
+} from '@cadai/pxs-ng-core/services';
 import { AppActions } from '@cadai/pxs-ng-core/store';
-import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
+import { CORE_GET_USER_CTX, CORE_OPTIONS, GetUserCtx } from '@cadai/pxs-ng-core/tokens';
 
 function loadTheme(theme: 'light' | 'dark' = 'light') {
   const href = `assets/theme/${theme}.css`;
@@ -42,8 +48,9 @@ function normalize(opts: CoreOptions): Required<CoreOptions> {
     },
     interceptors: opts.interceptors ?? [],
     animations: opts.animations ?? true,
-    appVersion: opts.appVersion ?? '0.0.0', // keep if you use version injection
-    environments: opts.environments ?? {},
+    appVersion: opts.appVersion ?? '0.0.0',
+    // If environments is optional in CoreOptions, prefer: environments: opts.environments as any
+    environments: (opts.environments as any) ?? ({} as any),
   } as Required<CoreOptions>;
 }
 
@@ -51,15 +58,23 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
   const normalized = normalize(opts);
 
   return makeEnvironmentProviders([
-    // Make options injectable
+    // Options
     { provide: CORE_OPTIONS, useValue: normalized },
 
     // Singletons
     ConfigService,
     KeycloakService,
 
-    // Angular Material date providers
-    MatNativeDateModule,
+    {
+      provide: CORE_GET_USER_CTX,
+      deps: [KeycloakService],
+      useFactory:
+        (kc: KeycloakService): GetUserCtx =>
+        () =>
+          kc.getUserCtx(),
+    },
+    // Angular Material date providers (NgModule via importProvidersFrom)
+    importProvidersFrom(MatNativeDateModule), // ✅
     ...APP_DATE_PROVIDERS,
 
     // HttpClient with curated interceptor order: auth -> (extras) -> error
@@ -80,14 +95,15 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     // Theme init
     provideAppInitializer(() => loadTheme(normalized.theme)),
 
-    // Optional animations (default ON)
-    ...(normalized.animations === false ? [] : [provideAnimations()]),
+    // Animations (ON/OFF)
+    ...(normalized.animations === false ? [provideNoopAnimations()] : [provideAnimations()]), // ✅
 
-    // Async boot: config -> keycloak -> hydrate store (if present)
+    // Async boot: config -> keycloak -> hydrate store (if present) -> feature user
     provideAppInitializer(() => {
       const env = inject(EnvironmentInjector);
       const config = env.get(ConfigService);
       const kc = env.get(KeycloakService);
+      const features = env.get(FeatureService);
 
       let store: Store | undefined;
       try {
@@ -98,6 +114,10 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         await config.loadConfig();
         await kc.init();
         if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
+
+        // ✅ No casts — use KC helpers
+        const { isAuthenticated, roles, tenant } = kc.getUserCtx();
+        features.setUser({ isAuthenticated, roles, tenant });
       })();
     }),
   ]);

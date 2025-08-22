@@ -4,6 +4,7 @@ import Keycloak, {
   KeycloakInitOptions,
   KeycloakLoginOptions,
   KeycloakLogoutOptions,
+  KeycloakTokenParsed,
 } from 'keycloak-js';
 import { BehaviorSubject, interval, Observable, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -135,5 +136,50 @@ export class KeycloakService {
     if (!this.kc) {
       throw new Error(`[KeycloakService.${method}] Service not initialized yet`);
     }
+  }
+
+  /** Parsed JWT payload (or null if not available). */
+  get tokenParsed(): KeycloakTokenParsed | null {
+    this.assertReady('tokenParsed');
+    return this.kc?.tokenParsed ?? null;
+  }
+
+  /** Realm roles from token (`realm_access.roles`). */
+  getRealmRoles(): string[] {
+    return (this.tokenParsed as any)?.realm_access?.roles ?? [];
+  }
+
+  /**
+   * Client roles from token (`resource_access[clientId].roles`).
+   * If `clientId` is omitted, returns a flat list of all client roles.
+   */
+  getClientRoles(clientId?: string): string[] {
+    const ra = (this.tokenParsed as any)?.resource_access ?? {};
+    if (!ra) return [];
+    if (clientId) return ra[clientId]?.roles ?? [];
+    // flatten all client roles
+    return Object.values(ra).flatMap((v: any) => v?.roles ?? []);
+  }
+
+  /** Union of realm + all client roles (deduped). */
+  getAllRoles(): string[] {
+    const all = [...this.getRealmRoles(), ...this.getClientRoles()];
+    return Array.from(new Set(all));
+  }
+
+  /** Tenant claim (defaults to 'tenant'; change claimName if your mapper differs). */
+  getTenant(claimName: string = 'tenant'): string | null {
+    const tp = this.tokenParsed as any;
+    const t = tp?.[claimName];
+    return typeof t === 'string' && t.length ? t : null;
+  }
+
+  /** Convenient snapshot for feature system / guards. */
+  getUserCtx(): { isAuthenticated: boolean; roles: string[]; tenant: string | null } {
+    return {
+      isAuthenticated: this.isAuthenticated,
+      roles: this.getAllRoles(),
+      tenant: this.getTenant(),
+    };
   }
 }
