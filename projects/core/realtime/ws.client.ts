@@ -16,11 +16,13 @@ export class WebSocketClient<M extends RealtimeEventMap = RealtimeEventMap>
   async connect(): Promise<void> {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
     this.ws = this.factory(this.url);
+
     await new Promise<void>((res, rej) => {
       if (!this.ws) return rej(new Error('WS init failed'));
       this.ws.onopen = () => res();
       this.ws.onerror = () => rej(new Error('WS error'));
     });
+
     this.ws.onmessage = (e) => {
       const msg = safeParse(e.data) as Envelope<keyof M & string, M[keyof M & string]> | null;
       if (!msg?.channel) return;
@@ -47,9 +49,9 @@ export class WebSocketClient<M extends RealtimeEventMap = RealtimeEventMap>
   }
 }
 
-function safeParse(s: string): unknown {
+function safeParse(s: any): unknown {
   try {
-    return JSON.parse(s);
+    return typeof s === 'string' ? JSON.parse(s) : s;
   } catch {
     return s;
   }

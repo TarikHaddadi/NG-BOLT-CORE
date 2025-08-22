@@ -10,8 +10,9 @@ export interface RealtimeClient<M extends RealtimeEventMap = RealtimeEventMap> {
   publish?<K extends keyof M & string>(channel: K, payload: M[K]): Promise<void>;
 }
 
-export interface AppEvents {
+export interface AppEvents extends RealtimeEventMap {
   alerts: { id: string; level: 'info' | 'warn' | 'error'; text: string };
   'jobs:progress': { jobId: number; percent: number };
   'chat:message': { room: string; from: string; text: string; at: string };
+  __default__: unknown; // if your SSE sends unnamed messages
 }
