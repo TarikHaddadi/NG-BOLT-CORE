@@ -1,5 +1,7 @@
 import { KeycloakInitOptions } from 'keycloak-js';
 
+import { UserRole } from '@cadai/pxs-ng-core/enums';
+
 export interface AuthRuntimeConfig {
   url: string;
   realm: string;
@@ -13,5 +15,6 @@ export interface AuthProfile {
   given_name?: string;
   family_name?: string;
   email?: string;
-  authorization?: string[];
+  authorization?: UserRole[];
+  tenant?: string | null;
 }

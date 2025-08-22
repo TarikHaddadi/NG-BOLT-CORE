@@ -76,3 +76,10 @@ export interface CoreOptions {
   animations?: boolean; // default: true
   environments?: RuntimeConfig;
 }
+
+export interface FeatureNavItem {
+  key: string;
+  label: string;
+  icon?: string;
+  route?: string;
+}

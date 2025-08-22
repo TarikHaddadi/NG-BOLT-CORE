@@ -1,15 +1,8 @@
 import { Injectable, signal } from '@angular/core';
 
-import { AppFeature, RuntimeConfig, UserCtx } from '@cadai/pxs-ng-core/interfaces';
+import { AppFeature, FeatureNavItem, RuntimeConfig, UserCtx } from '@cadai/pxs-ng-core/interfaces';
 
 import { ConfigService } from './config.service';
-
-export interface FeatureNavItem {
-  key: string;
-  label: string;
-  icon?: string;
-  route?: string;
-}
 
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
@@ -17,7 +10,7 @@ export class FeatureService {
   private userSig = signal<UserCtx | null>(null);
 
   constructor(private readonly config: ConfigService) {
-    // Expect ConfigService to expose .all(): RuntimeConfig (as in your docs).
+    // Expect ConfigService to expose .getAll(): RuntimeConfig (as in your docs).
     // If your API differs, replace the next line with your accessor.
     this.cfg = this.config.getAll() as RuntimeConfig;
   }
@@ -36,11 +29,13 @@ export class FeatureService {
   visibleFeatures(user?: UserCtx): FeatureNavItem[] {
     const u = user ?? this.userSig() ?? undefined;
     const out: FeatureNavItem[] = [];
+
     for (const [key, f] of Object.entries(this.cfg.features ?? {})) {
       if (!this.passes(f, u)) continue;
       if (!f.label) continue;
       out.push({ key, label: f.label, icon: f.icon, route: f.route });
     }
+
     return out;
   }
 

@@ -9,6 +9,7 @@ import Keycloak, {
 import { BehaviorSubject, interval, Observable, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
+import { UserRole } from '@cadai/pxs-ng-core/enums';
 import { AuthRuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
 
 import { ConfigService } from './public-api';
@@ -133,9 +134,7 @@ export class KeycloakService {
   // ———————————————————————————
   // Utilities
   private assertReady(method: string) {
-    if (!this.kc) {
-      throw new Error(`[KeycloakService.${method}] Service not initialized yet`);
-    }
+    if (!this.kc) throw new Error(`[KeycloakService.${method}] Service not initialized yet`);
   }
 
   /** Parsed JWT payload (or null if not available). */
@@ -144,9 +143,19 @@ export class KeycloakService {
     return this.kc?.tokenParsed ?? null;
   }
 
+  /** Roles from custom claim (default: 'authorization') */
+  getAuthorizationRoles(claimName: string = 'authorization'): UserRole[] {
+    const tp = this.tokenParsed as any;
+    const raw = tp?.[claimName];
+    if (!Array.isArray(raw)) return [];
+    // keep only known enum values
+    const allowed = new Set<UserRole>(Object.values(UserRole));
+    return (raw as unknown[]).filter((r): r is UserRole => allowed.has(r as UserRole));
+  }
+
   /** Realm roles from token (`realm_access.roles`). */
   getRealmRoles(): string[] {
-    return (this.tokenParsed as any)?.realm_access?.roles ?? [];
+    return (this.tokenParsed as KeycloakTokenParsed)?.realm_access?.roles ?? [];
   }
 
   /**
@@ -163,8 +172,21 @@ export class KeycloakService {
 
   /** Union of realm + all client roles (deduped). */
   getAllRoles(): string[] {
+    const custom = this.getAuthorizationRoles();
+    if (custom.length) return custom as unknown as string[]; // keep type as string[] for downstream
     const all = [...this.getRealmRoles(), ...this.getClientRoles()];
     return Array.from(new Set(all));
+  }
+
+  /** Tenant claim (defaults to 'tenant'; change claimName if your mapper differs). */
+  getUserCtx(): { isAuthenticated: boolean; roles: string[]; tenant: string | null } {
+    // Prefer your custom claim; still populate tenant from token if you use it elsewhere
+    const roles = this.getAuthorizationRoles();
+    return {
+      isAuthenticated: this.isAuthenticated,
+      roles: (roles.length ? roles : this.getAllRoles()) as unknown as string[],
+      tenant: this.getTenant(), // keep tenant from your protocol mapper
+    };
   }
 
   /** Tenant claim (defaults to 'tenant'; change claimName if your mapper differs). */
@@ -172,14 +194,5 @@ export class KeycloakService {
     const tp = this.tokenParsed as any;
     const t = tp?.[claimName];
     return typeof t === 'string' && t.length ? t : null;
-  }
-
-  /** Convenient snapshot for feature system / guards. */
-  getUserCtx(): { isAuthenticated: boolean; roles: string[]; tenant: string | null } {
-    return {
-      isAuthenticated: this.isAuthenticated,
-      roles: this.getAllRoles(),
-      tenant: this.getTenant(),
-    };
   }
 }

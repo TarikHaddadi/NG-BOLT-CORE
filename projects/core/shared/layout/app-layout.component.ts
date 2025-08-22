@@ -21,8 +21,14 @@ import { Store } from '@ngrx/store';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { map, Observable } from 'rxjs';
 
-import { AuthProfile, FieldConfig } from '@cadai/pxs-ng-core/interfaces';
-import { ConfigService, LayoutService, ThemeService } from '@cadai/pxs-ng-core/services';
+import { AuthProfile, FeatureNavItem, FieldConfig } from '@cadai/pxs-ng-core/interfaces';
+import {
+  ConfigService,
+  FeatureService,
+  KeycloakService,
+  LayoutService,
+  ThemeService,
+} from '@cadai/pxs-ng-core/services';
 import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
 
 import { SelectComponent } from '../forms/fields/select/select.component';
@@ -51,10 +57,8 @@ import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
   styleUrls: ['./app-layout.component.scss'],
 })
 export class AppLayoutComponent implements OnInit, AfterViewInit {
-  public menuItems = [
-    { label: 'DASHBOARD_TITLE', icon: 'dashboard', route: '/dashboard' },
-    { label: 'TEAM_MEMBERS', icon: 'group', route: '/team' },
-  ];
+  public menuItems: FeatureNavItem[] = [];
+
   public isOpen = true;
   public title$!: Observable<string>;
   public version!: string;
@@ -96,6 +100,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     public theme: ThemeService,
     private injector: Injector,
     private store: Store,
+    private features: FeatureService,
+    private keycloak: KeycloakService,
   ) {}
 
   public ngAfterViewInit(): void {
@@ -139,6 +145,19 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     // User informations
     this.profile$ = this.store.select(AppSelectors.AuthSelectors.selectProfile);
     this.roles$ = this.profile$.pipe(map((p) => p?.authorization ?? []));
+
+    // ✅ build the menu from runtime features
+    this.menuItems = this.features.visibleFeatures();
+
+    // (Optional) If your auth/user can change at runtime and you want the menu to react,
+    // re-derive the user context and refresh visible features:
+    this.profile$.subscribe((p) => {
+      const roles = p?.authorization ?? [];
+      const { isAuthenticated, tenant } = this.keycloak.getUserCtx();
+
+      this.features.setUser({ isAuthenticated, roles, tenant });
+      this.menuItems = this.features.visibleFeatures();
+    });
   }
 
   displayName(p: AuthProfile | null): string {

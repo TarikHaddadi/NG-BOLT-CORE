@@ -18,7 +18,8 @@ Workload (est.): **S ≤1d**, **M 2–3d**, **L 4–7d**, **XL >1wk**
 | Core     | Pre-commit Lints all over the project |     ✅ | P1       | S        | use ling before commit                                                                                              | `husky`                                                                                                | -----             | FE    |
 | Core     | Versionning                           |     ✅ | P1       | S        | Auto upgrade version by bumping a Tag and pushing it when commiting a new release + creating a release note + CI/CD | ---                                                                                                    |                   | FE    |
 | Core     | Storybook                             |     ❌ | P2       | XL       | Storybook implementation for every custom component in the app                                                      | `projects/core/shared/*`                                                                               | TO BE IMPLEMENTED | FE    |
-| Core     | Env Vars                              |     🟡 | P1       | XL       | Adapt the ENV configuration multitenant and multi feature                                                           | see all files `REAMD-ENV-*`                                                                            | In progress       | FE    |
+| Core     | Backend For Front (BFF)               |     ❌ | P2       | XL       | TO BE IMPLEMENTED                                                                                                   | see `REAMD-ENV-CONFIG-UPGRADE-V2-BFF`                                                                  | TO BE IMPLEMENTED | FE    |
+| Core     | Env Vars                              |     ✅ | P1       | XL       | Adapt the ENV configuration multitenant and multi feature                                                           | `REAMD-ENV-CONFIG-ASIS`                                                                                | ---               | FE    |
 | Core     | Docs                                  |     🟡 | P1       | M        | Update all documentations                                                                                           | ---                                                                                                    | Inprogress        | FE    |
 
 ## 📃 Documentation Index
@@ -27,15 +28,14 @@ Legend: **✅ Done** · **🟡 Ongoing** · **❌ To do**
 
 - [[✅] - Global Readme](./README.md)
 - [[✅] - Core Overview](./README-OVERVIEW.md)
-- [[✅] - Authentication and state management](./README-AUTH-NGRX.md)
+- [[✅] - Authentication and state management](./projects/core/store/README.md)
 - [[✅] - Theming, Assets and translattions](./README-ASSETS-TRANSLATIONS.md)
 - [[✅] - Contribution Guide](./CONTRIBUTING.md)
 - [[✅] - Contributing on forms](projects/core/shared/CONTRIBUTING.md)
 - [[✅] - Custom Form Builder and custom fields](projects/core/shared/README-FORMS.md)
 - [[✅] - Authentication Flow](README-CURRENT-AUTH.md)
-- [[✅] - Environment Config as is](README-ENV-CONFIG-ASIS.md)
 - [[🟡] - Content Security Policw CSP](./README-CSP.md)
-- [[🟡] - Environment Config Upgrade Custom Config – V1](README-ENV-CONFIG-UPGRADE-V1.md)
+- [[✅] - Environment Config Custom AS IS](README-ENV-CONFIG-ASIS.md)
 - [[❌] - Environment Config – Upgrade BFF V2](README-ENV-CONFIG-UPGRADE-V2-BBF.md)
 - [[❌] - Authentication Flow Upgrade BFF](README-AUTH-UPGRADE-V2-BFF.md)
 
