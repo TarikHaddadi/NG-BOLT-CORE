@@ -213,10 +213,8 @@ export class KeycloakService implements OnDestroy {
   }
 
   getTenant(claimName: string = 'tenant'): string | null {
-    const access = this.getClaimStringFrom(this.tokenParsed, claimName);
-    if (access) return access;
-    // fallback to ID token
-    const idp = this.instance?.idTokenParsed;
-    return this.getClaimStringFrom(idp, claimName);
+    const v = this.instance.tokenParsed?.[claimName];
+    if (!v) return null;
+    return Array.isArray(v) ? v[0] : v;
   }
 }
