@@ -6,6 +6,7 @@
       <ng-container *ngFor="let item of menuItems">
         <a
           mat-list-item
+          [class.isDark]="theme.isDark()"
           class="menu-link"
           [routerLink]="item.route"
           routerLinkActive="active"
@@ -20,15 +21,15 @@
 
     <div class="switchers-trigger" [class.collapsed]="!isOpen">
       <button
-        mat-stroked-button
-        color="primary"
+        mat-button
+        class="quick-settings"
         (click)="openSwitchers()"
-        matTooltip="Quick settings"
+        matTooltip="{{ 'quick_settings' | translate }}"
         [matTooltipPosition]="isOpen ? 'above' : 'right'"
         aria-label="Open quick settings"
       >
         <mat-icon>tune</mat-icon>
-        <span *ngIf="isOpen" class="btn-label">Quick settings</span>
+        <span *ngIf="isOpen" class="btn-label">{{ 'quick_settings' | translate }}</span>
       </button>
     </div>
 
@@ -36,7 +37,7 @@
     <ng-template #switchersTpl>
       <h2 mat-dialog-title class="dialog-title">
         <mat-icon>tune</mat-icon>
-        <span>Quick settings</span>
+        <span>{{ 'quick_settings' | translate }}</span>
       </h2>
 
       <mat-dialog-content class="switchers-dialog">

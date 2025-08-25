@@ -1,12 +1,18 @@
-import { Injectable, signal } from '@angular/core';
+import { OverlayContainer } from '@angular/cdk/overlay';
+import { isPlatformBrowser } from '@angular/common';
+import { inject, Injectable, PLATFORM_ID, signal } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   private _isDark = signal<boolean>(false);
   public isDark = this._isDark.asReadonly();
 
+  private overlay = inject(OverlayContainer);
+  private platformId = inject(PLATFORM_ID);
+
   constructor() {
-    const storedTheme = localStorage.getItem('theme');
+    const isBrowser = isPlatformBrowser(this.platformId);
+    const storedTheme = isBrowser ? localStorage.getItem('theme') : null;
     const isDark = storedTheme === 'dark';
     this._isDark.set(isDark);
     this.setTheme(isDark);
@@ -16,15 +22,34 @@ export class ThemeService {
     const newDark = !this._isDark();
     this._isDark.set(newDark);
     this.setTheme(newDark);
-    localStorage.setItem('theme', newDark ? 'dark' : 'light');
+    try {
+      localStorage.setItem('theme', newDark ? 'dark' : 'light');
+    } catch {}
   }
 
   private setTheme(isDark: boolean): void {
-    const themeLink = document.getElementById('theme-style') as HTMLLinkElement;
-    themeLink.href = isDark ? 'assets/theme/dark.css' : 'assets/theme/light.css';
+    // Swap CSS file (if present)
+    if (typeof document !== 'undefined') {
+      const themeLink = document.getElementById('theme-style') as HTMLLinkElement | null;
+      if (themeLink) {
+        themeLink.href = isDark ? 'assets/theme/dark.css' : 'assets/theme/light.css';
+      }
 
-    const html = document.documentElement;
-    html.classList.remove('dark', 'light');
-    html.classList.add(isDark ? 'dark' : 'light');
+      // Tag <html> for global scoping
+      const html = document.documentElement.classList;
+      html.remove('dark', 'light');
+      html.add(isDark ? 'dark' : 'light');
+    }
+
+    // Mirror classes to the CDK overlay container
+    this.updateOverlayClasses(isDark);
+  }
+
+  /** Add a stable hook + current theme to the overlay container. */
+  private updateOverlayClasses(isDark: boolean): void {
+    const cls = this.overlay.getContainerElement().classList;
+    cls.add('app-overlay'); // your custom hook class
+    cls.remove('dark', 'light'); // keep only the current one
+    cls.add(isDark ? 'dark' : 'light');
   }
 }

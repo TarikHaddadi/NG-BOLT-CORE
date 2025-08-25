@@ -193,8 +193,11 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .map(([k]) => k);
 
     this.aiScopeField.options = [
-      { label: 'Global', value: '' },
-      ...featuresWithVariants.map((k) => ({ label: k, value: k })),
+      { label: this.translate.instant('ai.global'), value: '' },
+      ...featuresWithVariants.map((k) => ({
+        label: this.translate.instant(k),
+        value: this.translate.instant(k),
+      })),
     ];
 
     // Controls
@@ -215,7 +218,10 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
             ),
           );
 
-      this.aiKeyField.options = keys.map((k) => ({ label: k, value: k }));
+      this.aiKeyField.options = keys.map((k) => ({
+        label: this.translate.instant(k),
+        value: this.translate.instant(k),
+      }));
 
       // Pick first key if none selected or selection no longer valid
       const nextKey = keys.includes(this.aiKeyControl.value)
@@ -248,7 +254,10 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       // Fallback if empty: show a simple placeholder option
       const finalValues = optionValues.length ? optionValues : [''];
 
-      this.aiValueField.options = finalValues.map((v) => ({ label: v || '(empty)', value: v }));
+      this.aiValueField.options = finalValues.map((v) => ({
+        label: this.translate.instant(v) || '(empty)',
+        value: this.translate.instant(v),
+      }));
       const nextVal = finalValues.includes(this.aiValueControl.value)
         ? this.aiValueControl.value
         : finalValues[0];
@@ -276,7 +285,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         AppActions.AiVariantsActions.setVariant({
           path: key,
           value,
-          featureKey: scope || undefined, // undefined → global override
+          featureKey: scope || undefined,
         }),
       );
     });
