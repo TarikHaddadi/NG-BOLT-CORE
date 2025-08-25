@@ -46,6 +46,25 @@ mat-sidenav {
   padding: 8px 16px;
   text-decoration: none;
   color: inherit;
+  border-radius: 4px !important;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+
+  &:hover,
+  &:focus-visible {
+    background-color: rgba(0, 0, 0, 0.05);
+    outline: none;
+  }
+
+  &.active {
+    background-color: rgba(0, 0, 0, 0.1);
+    font-weight: 600;
+  }
+
+  mat-icon {
+    margin-right: 16px;
+  }
 
   &:hover,
   &:active,
@@ -54,26 +73,11 @@ mat-sidenav {
       display: none;
     }
   }
-
-  .menu-anchor {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    text-decoration: none;
-    color: inherit;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.05); // Light hover effect
-    }
-  }
-
   mat-icon {
     margin-right: 16px;
   }
 
-  &.active .menu-anchor {
+  &.active {
     background-color: rgba(0, 0, 0, 0.1); // Persisted effect
     font-weight: bold;
   }
@@ -121,14 +125,17 @@ mat-sidenav {
   .user-meta {
     display: grid;
     gap: 2px;
+
     .user-name {
       font-weight: 600;
       line-height: 1.2;
     }
+
     .user-email {
       font-size: 12px;
       opacity: 0.8;
     }
+
     .user-roles {
       margin-top: 4px;
     }

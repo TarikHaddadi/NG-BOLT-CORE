@@ -4,17 +4,8 @@
 
     <mat-nav-list class="menu-list">
       <ng-container *ngFor="let item of menuItems">
-        <a
-          mat-list-item
-          matLine
-          class="menu-anchor"
-          disableRipple
-          class="menu-link"
-          [routerLinkActive]="'active'"
-          [routerLink]="item.route"
-          [matTooltip]="!isOpen ? item.label : ''"
-          matTooltipPosition="right"
-        >
+        <a mat-list-item class="menu-link" [routerLink]="item.route" routerLinkActive="active"
+          [matTooltip]="!isOpen ? item.label : ''" matTooltipPosition="right">
           <mat-icon>{{ item.icon }}</mat-icon>
           <span class="menu-label">{{ item.label | translate }}</span>
         </a>
@@ -41,12 +32,7 @@
     <!-- USER PANEL -->
     <ng-container *ngIf="profile$ | async as p">
       <div class="user-panel" [class.collapsed]="!isOpen">
-        <button
-          mat-button
-          class="user-trigger"
-          [matMenuTriggerFor]="userMenu"
-          [attr.aria-label]="displayName(p)"
-        >
+        <button mat-button class="user-trigger" [matMenuTriggerFor]="userMenu" [attr.aria-label]="displayName(p)">
           <mat-icon class="avatar">account_circle</mat-icon>
           <div class="user-meta" *ngIf="isOpen">
             <div class="user-name">{{ displayName(p) }}</div>
