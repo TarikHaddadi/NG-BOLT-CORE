@@ -33,10 +33,39 @@ mat-sidenav {
     width: 72px !important;
   }
 }
-
 .menu-list {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
+}
+
+.switchers-accordion {
+  margin: 8px 8px 0;
+}
+
+.switchers {
+  display: grid;
+  gap: 8px;
+}
+
+/* Collapsed sidenav: keep the icon near the bottom-left */
+.switchers-button {
+  position: sticky;
+  bottom: 8px;
+  margin: 8px;
+  align-self: flex-end;
+}
+
+/* Dialog tweaks */
+.switchers-dialog-panel .mat-mdc-dialog-content {
+  padding-top: 0;
+}
+.switchers-dialog {
+  display: grid;
+  gap: 12px;
+}
+.dialog-title {
+  margin: 0 0 12px;
+  font-weight: 600;
 }
 
 .menu-link {

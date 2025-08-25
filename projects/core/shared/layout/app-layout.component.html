@@ -4,35 +4,69 @@
 
     <mat-nav-list class="menu-list">
       <ng-container *ngFor="let item of menuItems">
-        <a mat-list-item class="menu-link" [routerLink]="item.route" routerLinkActive="active"
-          [matTooltip]="!isOpen ? item.label : ''" matTooltipPosition="right">
+        <a
+          mat-list-item
+          class="menu-link"
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          [matTooltip]="!isOpen ? item.label : ''"
+          matTooltipPosition="right"
+        >
           <mat-icon>{{ item.icon }}</mat-icon>
           <span class="menu-label">{{ item.label | translate }}</span>
         </a>
       </ng-container>
     </mat-nav-list>
 
-    <div class="switchers">
-      <!-- Theme switcher using ToggleComponent -->
-      <app-toggle [field]="themeField" [control]="themeControl"></app-toggle>
-
-      <!-- Language switcher using SelectComponent -->
-      <app-select [field]="langField" [control]="langControl"></app-select>
-
-      <!-- AI Variant Scope (Global or per feature) -->
-      <app-select [field]="aiScopeField" [control]="aiScopeControl"></app-select>
-
-      <!-- AI Variant Key (e.g., ai.provider, ai.model) -->
-      <app-select [field]="aiKeyField" [control]="aiKeyControl"></app-select>
-
-      <!-- AI Variant Value (derived from config + current effective) -->
-      <app-select [field]="aiValueField" [control]="aiValueControl"></app-select>
+    <div class="switchers-trigger" [class.collapsed]="!isOpen">
+      <button
+        mat-stroked-button
+        color="primary"
+        (click)="openSwitchers()"
+        matTooltip="Quick settings"
+        [matTooltipPosition]="isOpen ? 'above' : 'right'"
+        aria-label="Open quick settings"
+      >
+        <mat-icon>tune</mat-icon>
+        <span *ngIf="isOpen" class="btn-label">Quick settings</span>
+      </button>
     </div>
+
+    <!-- Dialog content -->
+    <ng-template #switchersTpl>
+      <h2 mat-dialog-title class="dialog-title">
+        <mat-icon>tune</mat-icon>
+        <span>Quick settings</span>
+      </h2>
+
+      <mat-dialog-content class="switchers-dialog">
+        <!-- Theme -->
+        <app-toggle [field]="themeField" [control]="themeControl"></app-toggle>
+
+        <!-- Language -->
+        <app-select [field]="langField" [control]="langControl"></app-select>
+
+        <!-- AI Scope / Key / Value -->
+        <app-select [field]="aiScopeField" [control]="aiScopeControl"></app-select>
+        <app-select [field]="aiKeyField" [control]="aiKeyControl"></app-select>
+        <app-select [field]="aiValueField" [control]="aiValueControl"></app-select>
+      </mat-dialog-content>
+
+      <mat-dialog-actions align="end">
+        <button mat-button mat-dialog-close>Close</button>
+        <button mat-flat-button color="primary" (click)="close()">Ok</button>
+      </mat-dialog-actions>
+    </ng-template>
 
     <!-- USER PANEL -->
     <ng-container *ngIf="profile$ | async as p">
       <div class="user-panel" [class.collapsed]="!isOpen">
-        <button mat-button class="user-trigger" [matMenuTriggerFor]="userMenu" [attr.aria-label]="displayName(p)">
+        <button
+          mat-button
+          class="user-trigger"
+          [matMenuTriggerFor]="userMenu"
+          [attr.aria-label]="displayName(p)"
+        >
           <mat-icon class="avatar">account_circle</mat-icon>
           <div class="user-meta" *ngIf="isOpen">
             <div class="user-name">{{ displayName(p) }}</div>

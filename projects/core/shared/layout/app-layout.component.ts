@@ -6,10 +6,14 @@ import {
   effect,
   Injector,
   OnInit,
+  TemplateRef,
+  ViewChild,
 } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialogModule } from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
@@ -57,12 +61,14 @@ import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
     ToggleComponent,
     MatMenuModule,
     MatChipsModule,
+    MatDialogModule,
   ],
   templateUrl: './app-layout.component.html',
   styleUrls: ['./app-layout.component.scss'],
 })
 export class AppLayoutComponent implements OnInit, AfterViewInit {
   public menuItems: FeatureNavItem[] = [];
+  @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<any>;
 
   public isOpen = true;
   public title$!: Observable<string>;
@@ -132,6 +138,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     private store: Store,
     private features: FeatureService,
     private keycloak: KeycloakService,
+    private dialog: MatDialog,
   ) {}
 
   public ngAfterViewInit(): void {
@@ -308,5 +315,19 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         featureKey: scope || undefined,
       }),
     );
+  }
+
+  openSwitchers() {
+    this.dialog.open(this.switchersTpl, {
+      panelClass: 'switchers-dialog-panel',
+      autoFocus: false,
+      restoreFocus: true,
+      width: '520px',
+      maxWidth: '95vw',
+    });
+  }
+
+  close() {
+    this.dialog.closeAll();
   }
 }
