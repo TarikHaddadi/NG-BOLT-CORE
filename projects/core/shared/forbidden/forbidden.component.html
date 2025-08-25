@@ -1,3 +1,12 @@
+<!-- SEO -->
+<app-seo
+  [pageTitle]="'Forbidden | AI Product'"
+  [description]="'This is the forbidden page.'"
+  [keywords]="'forbidden'"
+  (titleChange)="onTitleChange($event)"
+>
+</app-seo>
+
 <div class="wrap" role="region" aria-label="Forbidden">
   <div class="card">
     <mat-icon class="icon" aria-hidden="true">block</mat-icon>

@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class LayoutService {
-  private titleSubject = new BehaviorSubject<string>('My App');
+  private titleSubject = new BehaviorSubject<string>('App');
   title$ = this.titleSubject.asObservable();
 
   setTitle(title: string) {

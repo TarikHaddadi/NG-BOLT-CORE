@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, OnDestroy } from '@angular/core';
 import Keycloak, {
   KeycloakConfig,
   KeycloakInitOptions,
@@ -14,8 +14,12 @@ import { AuthRuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
 
 import { ConfigService } from './public-api';
 
+interface MyToken extends KeycloakTokenParsed {
+  tenant?: string | string[];
+}
+
 @Injectable({ providedIn: 'root' })
-export class KeycloakService {
+export class KeycloakService implements OnDestroy {
   private kc!: Keycloak;
   private ready$ = new BehaviorSubject<boolean>(false);
   private auth$ = new BehaviorSubject<boolean>(false);
@@ -23,6 +27,14 @@ export class KeycloakService {
   private initPromise?: Promise<void>; // ← idempotent init
 
   private config = inject(ConfigService);
+
+  ngOnDestroy() {
+    this.refreshSub?.unsubscribe();
+  }
+
+  constructor() {
+    window.addEventListener('beforeunload', () => this.refreshSub?.unsubscribe());
+  }
 
   /** Call once at app start (provideCore initializer). Safe if called again. */
   async init(): Promise<void> {
@@ -48,7 +60,11 @@ export class KeycloakService {
         // silentCheckSsoRedirectUri: ...
       };
 
-      await this.kc.init(initOpts);
+      await this.kc.init(initOpts).catch((err) => {
+        this.ready$.next(false);
+        this.auth$.next(false);
+        throw new Error('[KeycloakService] init failed: ' + (err?.message ?? err));
+      });
 
       // Keep local state in sync
       this.auth$.next(!!this.kc.authenticated);
@@ -138,24 +154,22 @@ export class KeycloakService {
   }
 
   /** Parsed JWT payload (or null if not available). */
-  get tokenParsed(): KeycloakTokenParsed | null {
+  get tokenParsed(): MyToken | null {
     this.assertReady('tokenParsed');
-    return this.kc?.tokenParsed ?? null;
+    return (this.kc.tokenParsed ?? null) as MyToken | null;
   }
 
   /** Roles from custom claim (default: 'authorization') */
   getAuthorizationRoles(claimName: string = 'authorization'): UserRole[] {
-    const tp = this.tokenParsed as KeycloakTokenParsed;
-    const raw = tp?.[claimName];
+    const raw = (this.tokenParsed as MyToken | null)?.[claimName];
     if (!Array.isArray(raw)) return [];
-    // keep only known enum values
     const allowed = new Set<UserRole>(Object.values(UserRole));
-    return (raw as unknown[]).filter((r): r is UserRole => allowed.has(r as UserRole));
+    return (raw as string[]).filter((r): r is UserRole => allowed.has(r as UserRole));
   }
 
   /** Realm roles from token (`realm_access.roles`). */
   getRealmRoles(): string[] {
-    return (this.tokenParsed as KeycloakTokenParsed)?.realm_access?.roles ?? [];
+    return (this.tokenParsed as MyToken)?.realm_access?.roles ?? [];
   }
 
   /**
@@ -163,7 +177,7 @@ export class KeycloakService {
    * If `clientId` is omitted, returns a flat list of all client roles.
    */
   getClientRoles(clientId?: string): string[] {
-    const ra = (this.tokenParsed as KeycloakTokenParsed)?.resource_access ?? {};
+    const ra = (this.tokenParsed as MyToken)?.resource_access ?? {};
     if (!ra) return [];
     if (clientId) return ra[clientId]?.roles ?? [];
     // flatten all client roles
@@ -191,8 +205,14 @@ export class KeycloakService {
 
   /** Tenant claim (defaults to 'tenant'; change claimName if your mapper differs). */
   getTenant(claimName: string = 'tenant'): string | null {
-    const tp = this.tokenParsed as KeycloakTokenParsed;
-    const t = tp?.[claimName];
-    return typeof t === 'string' && t.length ? t : null;
+    return this.getClaimString(claimName);
+  }
+
+  private getClaimString(claimName: string): string | null {
+    const v = (this.tokenParsed as MyToken | null)?.[claimName as keyof MyToken];
+    if (!v) return null;
+    if (typeof v === 'string') return v.trim() || null;
+    if (Array.isArray(v) && v.length) return String(v[0]).trim() || null;
+    return null;
   }
 }
