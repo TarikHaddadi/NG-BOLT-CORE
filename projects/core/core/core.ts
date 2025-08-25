@@ -105,7 +105,6 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       const env = inject(EnvironmentInjector);
       const config = env.get(ConfigService);
       const kc = env.get(KeycloakService);
-      const features = env.get(FeatureService);
 
       let store: Store | undefined;
       try {
@@ -116,6 +115,9 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         // 1) Load runtime config and init auth
         await config.loadConfig();
         await kc.init();
+
+        const features = env.get(FeatureService);
+        features.reseedFromConfig();
 
         // 2) Hydrate Auth slice if present
         if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
