@@ -21,7 +21,12 @@ import { Store } from '@ngrx/store';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { map, Observable } from 'rxjs';
 
-import { AuthProfile, FeatureNavItem, FieldConfig } from '@cadai/pxs-ng-core/interfaces';
+import {
+  AuthProfile,
+  FeatureNavItem,
+  FieldConfig,
+  RuntimeConfig,
+} from '@cadai/pxs-ng-core/interfaces';
 import {
   ConfigService,
   FeatureService,
@@ -69,11 +74,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     label: 'form.labels.themeSwitcher',
     type: 'toggle',
     color: 'accent',
-    toggleIcons: {
-      on: 'dark_mode',
-      off: 'light_mode',
-      position: 'start',
-    },
+    toggleIcons: { on: 'dark_mode', off: 'light_mode', position: 'start' },
   };
   public themeControl!: FormControl<boolean>;
 
@@ -89,8 +90,37 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   };
   public langControl!: FormControl<string>;
 
+  // ───────────────────────────────────────────────────────────
+  // AI Variant selectors (scope → key → value)
+  public aiScopeField: FieldConfig = {
+    name: 'aiScope',
+    label: 'AI Scope',
+    type: 'dropdown',
+    options: [], // filled in ngOnInit
+  };
+  public aiScopeControl!: FormControl<string>; // '' means global; else featureKey
+
+  public aiKeyField: FieldConfig = {
+    name: 'aiKey',
+    label: 'AI Variant',
+    type: 'dropdown',
+    options: [], // filled dynamically
+  };
+  public aiKeyControl!: FormControl<string>;
+
+  public aiValueField: FieldConfig = {
+    name: 'aiValue',
+    label: 'AI Value',
+    type: 'dropdown',
+    options: [], // filled dynamically
+  };
+  public aiValueControl!: FormControl<string>;
+  // ───────────────────────────────────────────────────────────
+
   profile$!: Observable<AuthProfile | null>;
   roles$!: Observable<string[]>;
+
+  private cfg!: RuntimeConfig;
 
   constructor(
     private layoutService: LayoutService,
@@ -110,26 +140,19 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
   public ngOnInit(): void {
     this.title$ = this.layoutService.title$;
-    // Env configs
-    this.version = this.configService.getAll().version || '0.0.0';
+    this.cfg = this.configService.getAll() as RuntimeConfig;
+    this.version = this.cfg.version || '0.0.0';
 
-    // IMPORTANT: nonNullable so the type is FormControl<boolean>, not boolean | null
+    // Theme toggle
     this.themeControl = new FormControl<boolean>(this.theme.isDark(), { nonNullable: true });
-    this.langControl = new FormControl<string>(this.translate.getCurrentLang(), {
-      nonNullable: true,
-    });
-
-    // 1) UI -> Service: when user toggles the control, call toggleTheme if different
     this.themeControl.valueChanges.subscribe((wantDark) => {
       const current = this.theme.isDark();
       if (wantDark !== current) this.theme.toggleTheme();
     });
 
-    // 2) Service -> UI: keep control in sync if something else toggles the theme
     effect(
       () => {
         const isDark = this.theme.isDark();
-        // avoid feedback loop
         if (this.themeControl.value !== isDark) {
           this.themeControl.setValue(isDark, { emitEvent: false });
         }
@@ -137,27 +160,126 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       { injector: this.injector },
     );
 
-    // Language control (optional)
-    this.langControl.valueChanges.subscribe((lang) => {
-      if (lang) this.translate.use(lang);
+    // Language
+    this.langControl = new FormControl<string>(this.translate.getCurrentLang(), {
+      nonNullable: true,
     });
+    this.langControl.valueChanges.subscribe((lang) => lang && this.translate.use(lang));
 
-    // User informations
+    // Auth → roles/menus
     this.profile$ = this.store.select(AppSelectors.AuthSelectors.selectProfile);
     this.roles$ = this.profile$.pipe(map((p) => p?.authorization ?? []));
 
-    // ✅ build the menu from runtime features
     this.menuItems = this.features.visibleFeatures();
-
-    // (Optional) If your auth/user can change at runtime and you want the menu to react,
-    // re-derive the user context and refresh visible features:
     this.profile$.subscribe((p) => {
       const roles = p?.authorization ?? [];
       const { isAuthenticated, tenant } = this.keycloak.getUserCtx();
-
       this.features.setUser({ isAuthenticated, roles, tenant });
       this.menuItems = this.features.visibleFeatures();
     });
+
+    // ───────────────────────────────────────────────────────────
+    // AI Variant: build dynamic selectors
+    // 1) Scope options: Global + features that declare variants
+    const featuresWithVariants = Object.entries(this.cfg.features ?? {})
+      .filter(([, f]) => f?.variants && typeof f.variants === 'object')
+      .map(([k]) => k);
+
+    this.aiScopeField.options = [
+      { label: 'Global', value: '' },
+      ...featuresWithVariants.map((k) => ({ label: k, value: k })),
+    ];
+
+    // Controls
+    this.aiScopeControl = new FormControl<string>('', { nonNullable: true }); // default: Global
+    this.aiKeyControl = new FormControl<string>('', { nonNullable: true });
+    this.aiValueControl = new FormControl<string>('', { nonNullable: true });
+
+    // Initialize key/value lists based on scope
+    const refreshKeys = (scope: string) => {
+      // Collect variant keys either for a specific feature or union across features
+      const keys = scope
+        ? Object.keys(this.cfg.features?.[scope]?.variants ?? {})
+        : Array.from(
+            new Set(
+              Object.values(this.cfg.features ?? {}).flatMap((f: any) =>
+                f?.variants ? Object.keys(f.variants) : [],
+              ),
+            ),
+          );
+
+      this.aiKeyField.options = keys.map((k) => ({ label: k, value: k }));
+
+      // Pick first key if none selected or selection no longer valid
+      const nextKey = keys.includes(this.aiKeyControl.value)
+        ? this.aiKeyControl.value
+        : (keys[0] ?? '');
+      this.aiKeyControl.setValue(nextKey ?? '', { emitEvent: true });
+    };
+
+    const refreshValues = (scope: string, key: string) => {
+      // Values from config (either from that feature or union across features)
+      const valuesFromConfig: unknown[] = scope
+        ? [this.cfg.features?.[scope]?.variants?.[key]].filter((v) => v !== undefined)
+        : Array.from(
+            new Set(
+              Object.values(this.cfg.features ?? {})
+                .map((f: any) => f?.variants?.[key])
+                .filter((v) => v !== undefined),
+            ),
+          );
+
+      // Current effective value (from FeatureService which looks at store+config)
+      const effective = this.features.variant<unknown>(key, undefined, scope || undefined);
+
+      // Build options (stringify to display); include effective if not present
+      const asString = (v: unknown) => (v === null || v === undefined ? '' : String(v));
+      const optionValues = [...valuesFromConfig.map(asString)];
+      const effStr = asString(effective);
+      if (effStr && !optionValues.includes(effStr)) optionValues.unshift(effStr);
+
+      // Fallback if empty: show a simple placeholder option
+      const finalValues = optionValues.length ? optionValues : [''];
+
+      this.aiValueField.options = finalValues.map((v) => ({ label: v || '(empty)', value: v }));
+      const nextVal = finalValues.includes(this.aiValueControl.value)
+        ? this.aiValueControl.value
+        : finalValues[0];
+      this.aiValueControl.setValue(nextVal, { emitEvent: false });
+    };
+
+    // React to scope changes → rebuild keys (and then values)
+    this.aiScopeControl.valueChanges.subscribe((scope) => {
+      refreshKeys(scope);
+    });
+
+    // React to key changes → rebuild values
+    this.aiKeyControl.valueChanges.subscribe((key) => {
+      const scope = this.aiScopeControl.value;
+      if (!key) return;
+      refreshValues(scope, key);
+    });
+
+    // Dispatch override on value change
+    this.aiValueControl.valueChanges.subscribe((value) => {
+      const scope = this.aiScopeControl.value;
+      const key = this.aiKeyControl.value;
+      if (!key) return;
+      this.store.dispatch(
+        AppActions.AiVariantsActions.setVariant({
+          path: key,
+          value,
+          featureKey: scope || undefined, // undefined → global override
+        }),
+      );
+    });
+
+    // Seed initial selections
+    refreshKeys(this.aiScopeControl.value);
+    if (this.aiKeyControl.value) {
+      refreshValues(this.aiScopeControl.value, this.aiKeyControl.value);
+    }
+    // ───────────────────────────────────────────────────────────
   }
 
   displayName(p: AuthProfile | null): string {
@@ -172,5 +294,19 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
   logout(): void {
     this.store.dispatch(AppActions.AuthActions.logout());
+  }
+
+  // Remove the current override so the value falls back to config
+  resetVariant(): void {
+    const scope = this.aiScopeControl.value;
+    const key = this.aiKeyControl.value;
+    if (!key) return;
+    this.store.dispatch(
+      AppActions.AiVariantsActions.setVariant({
+        path: key,
+        value: undefined,
+        featureKey: scope || undefined,
+      }),
+    );
   }
 }

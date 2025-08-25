@@ -1,5 +1,7 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 
+import { UserRole } from '@cadai/pxs-ng-core/enums';
+
 import { AuthRuntimeConfig } from './keycloack.model';
 
 export type CoreTheme = 'light' | 'dark';
@@ -23,7 +25,7 @@ export interface RealtimeTransportPush {
 
 export interface AppFeature {
   enabled: boolean;
-  roles?: string[];
+  roles?: UserRole[];
   allow?: { tenants?: string[] };
   key?: string;
   label?: string;
@@ -61,7 +63,7 @@ export interface CoreI18nOptions {
 
 export interface UserCtx {
   isAuthenticated: boolean;
-  roles: string[];
+  roles: UserRole[];
   tenant?: string | null;
 }
 

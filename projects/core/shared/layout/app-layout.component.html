@@ -27,6 +27,15 @@
 
       <!-- Language switcher using SelectComponent -->
       <app-select [field]="langField" [control]="langControl"></app-select>
+
+      <!-- AI Variant Scope (Global or per feature) -->
+      <app-select [field]="aiScopeField" [control]="aiScopeControl"></app-select>
+
+      <!-- AI Variant Key (e.g., ai.provider, ai.model) -->
+      <app-select [field]="aiKeyField" [control]="aiKeyControl"></app-select>
+
+      <!-- AI Variant Value (derived from config + current effective) -->
+      <app-select [field]="aiValueField" [control]="aiValueControl"></app-select>
     </div>
 
     <!-- USER PANEL -->

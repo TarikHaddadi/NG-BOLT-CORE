@@ -65,6 +65,7 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     ConfigService,
     KeycloakService,
 
+    // Expose user context for guards
     {
       provide: CORE_GET_USER_CTX,
       deps: [KeycloakService],
@@ -73,8 +74,9 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         () =>
           kc.getUserCtx(),
     },
-    // Angular Material date providers (NgModule via importProvidersFrom)
-    importProvidersFrom(MatNativeDateModule), // ✅
+
+    // Angular Material date providers
+    importProvidersFrom(MatNativeDateModule),
     ...APP_DATE_PROVIDERS,
 
     // HttpClient with curated interceptor order: auth -> (extras) -> error
@@ -96,9 +98,9 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     provideAppInitializer(() => loadTheme(normalized.theme)),
 
     // Animations (ON/OFF)
-    ...(normalized.animations === false ? [provideNoopAnimations()] : [provideAnimations()]), // ✅
+    ...(normalized.animations === false ? [provideNoopAnimations()] : [provideAnimations()]),
 
-    // Async boot: config -> keycloak -> hydrate store (if present) -> feature user
+    // Async boot: config -> keycloak -> hydrate store (if present) -> feature user -> variants
     provideAppInitializer(() => {
       const env = inject(EnvironmentInjector);
       const config = env.get(ConfigService);
@@ -111,13 +113,21 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       } catch {}
 
       return (async () => {
+        // 1) Load runtime config and init auth
         await config.loadConfig();
         await kc.init();
+
+        // 2) Hydrate Auth slice if present
         if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
 
-        // ✅ No casts — use KC helpers
+        // 3) Set user for FeatureService (menus/guards)
         const { isAuthenticated, roles, tenant } = kc.getUserCtx();
         features.setUser({ isAuthenticated, roles, tenant });
+
+        // 4) Hydrate Variants from RuntimeConfig.features[*].variants (if Store is available)
+        if (store) {
+          store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
+        }
       })();
     }),
   ]);

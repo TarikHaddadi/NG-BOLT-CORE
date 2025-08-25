@@ -545,7 +545,7 @@ function chooseRealtimeClient(cfg, deps): RealtimeClient | null {
 
 **UX/i18n**
 
-- [ ] All `label` keys exist in `/assets/i18n/*.json`.
+- [ ] All `label` keys exist in the Hosting APP in `public/assets/i18n/*.json`.
 - [ ] All `icon` names resolve; routes/components exist.
 
 **Realtime (if used)**
@@ -566,5 +566,7 @@ function chooseRealtimeClient(cfg, deps): RealtimeClient | null {
 
 ---
 
-**Author — Angular Product Skeleton**  
+## 🧑‍💻 Author
+
+**Angular Product Skeleton**  
 Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).

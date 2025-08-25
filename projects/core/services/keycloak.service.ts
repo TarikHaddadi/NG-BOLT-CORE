@@ -145,7 +145,7 @@ export class KeycloakService {
 
   /** Roles from custom claim (default: 'authorization') */
   getAuthorizationRoles(claimName: string = 'authorization'): UserRole[] {
-    const tp = this.tokenParsed as any;
+    const tp = this.tokenParsed as KeycloakTokenParsed;
     const raw = tp?.[claimName];
     if (!Array.isArray(raw)) return [];
     // keep only known enum values
@@ -163,7 +163,7 @@ export class KeycloakService {
    * If `clientId` is omitted, returns a flat list of all client roles.
    */
   getClientRoles(clientId?: string): string[] {
-    const ra = (this.tokenParsed as any)?.resource_access ?? {};
+    const ra = (this.tokenParsed as KeycloakTokenParsed)?.resource_access ?? {};
     if (!ra) return [];
     if (clientId) return ra[clientId]?.roles ?? [];
     // flatten all client roles
@@ -179,19 +179,19 @@ export class KeycloakService {
   }
 
   /** Tenant claim (defaults to 'tenant'; change claimName if your mapper differs). */
-  getUserCtx(): { isAuthenticated: boolean; roles: string[]; tenant: string | null } {
+  getUserCtx(): { isAuthenticated: boolean; roles: UserRole[]; tenant: string | null } {
     // Prefer your custom claim; still populate tenant from token if you use it elsewhere
     const roles = this.getAuthorizationRoles();
     return {
       isAuthenticated: this.isAuthenticated,
-      roles: (roles.length ? roles : this.getAllRoles()) as unknown as string[],
+      roles: (roles.length ? roles : this.getAllRoles()) as unknown as UserRole[],
       tenant: this.getTenant(), // keep tenant from your protocol mapper
     };
   }
 
   /** Tenant claim (defaults to 'tenant'; change claimName if your mapper differs). */
   getTenant(claimName: string = 'tenant'): string | null {
-    const tp = this.tokenParsed as any;
+    const tp = this.tokenParsed as KeycloakTokenParsed;
     const t = tp?.[claimName];
     return typeof t === 'string' && t.length ? t : null;
   }
