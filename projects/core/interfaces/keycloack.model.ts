@@ -16,5 +16,5 @@ export interface AuthProfile {
   family_name?: string;
   email?: string;
   authorization?: UserRole[];
-  tenant?: string | null;
+  tenant?: string[] | null;
 }

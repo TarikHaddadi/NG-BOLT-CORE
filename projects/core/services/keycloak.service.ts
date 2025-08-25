@@ -161,7 +161,7 @@ export class KeycloakService implements OnDestroy {
 
   /** Roles from custom claim (default: 'authorization') */
   getAuthorizationRoles(claimName: string = 'authorization'): UserRole[] {
-    const raw = (this.tokenParsed as MyToken | null)?.[claimName];
+    const raw = this.tokenParsed?.[claimName];
     if (!Array.isArray(raw)) return [];
     const allowed = new Set<UserRole>(Object.values(UserRole));
     return (raw as string[]).filter((r): r is UserRole => allowed.has(r as UserRole));
@@ -169,7 +169,7 @@ export class KeycloakService implements OnDestroy {
 
   /** Realm roles from token (`realm_access.roles`). */
   getRealmRoles(): string[] {
-    return (this.tokenParsed as MyToken)?.realm_access?.roles ?? [];
+    return this.tokenParsed?.realm_access?.roles ?? [];
   }
 
   /**
@@ -177,7 +177,7 @@ export class KeycloakService implements OnDestroy {
    * If `clientId` is omitted, returns a flat list of all client roles.
    */
   getClientRoles(clientId?: string): string[] {
-    const ra = (this.tokenParsed as MyToken)?.resource_access ?? {};
+    const ra = this.tokenParsed?.resource_access ?? {};
     if (!ra) return [];
     if (clientId) return ra[clientId]?.roles ?? [];
     // flatten all client roles
@@ -204,15 +204,19 @@ export class KeycloakService implements OnDestroy {
   }
 
   /** Tenant claim (defaults to 'tenant'; change claimName if your mapper differs). */
-  getTenant(claimName: string = 'tenant'): string | null {
-    return this.getClaimString(claimName);
-  }
-
-  private getClaimString(claimName: string): string | null {
-    const v = (this.tokenParsed as MyToken | null)?.[claimName as keyof MyToken];
+  private getClaimStringFrom(obj: any, claim: string): string | null {
+    const v = obj?.[claim];
     if (!v) return null;
     if (typeof v === 'string') return v.trim() || null;
     if (Array.isArray(v) && v.length) return String(v[0]).trim() || null;
     return null;
+  }
+
+  getTenant(claimName: string = 'tenant'): string | null {
+    const access = this.getClaimStringFrom(this.tokenParsed, claimName);
+    if (access) return access;
+    // fallback to ID token
+    const idp = this.instance?.idTokenParsed;
+    return this.getClaimStringFrom(idp, claimName);
   }
 }
