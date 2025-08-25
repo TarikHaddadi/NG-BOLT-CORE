@@ -23,7 +23,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule, RouterOutlet } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { map, Observable } from 'rxjs';
+import { firstValueFrom, map, Observable } from 'rxjs';
 
 import {
   AuthProfile,
@@ -40,6 +40,7 @@ import {
 } from '@cadai/pxs-ng-core/services';
 import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
 
+import { ConfirmDialogComponent,ConfirmDialogData } from '../dialog/dialog.component';
 import { SelectComponent } from '../forms/fields/select/select.component';
 import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
 
@@ -196,7 +197,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       { label: this.translate.instant('ai.global'), value: '' },
       ...featuresWithVariants.map((k) => ({
         label: this.translate.instant(k),
-        value: this.translate.instant(k),
+        value: k,
       })),
     ];
 
@@ -220,7 +221,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
       this.aiKeyField.options = keys.map((k) => ({
         label: this.translate.instant(k),
-        value: this.translate.instant(k),
+        value: k,
       }));
 
       // Pick first key if none selected or selection no longer valid
@@ -256,7 +257,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
       this.aiValueField.options = finalValues.map((v) => ({
         label: this.translate.instant(v) || '(empty)',
-        value: this.translate.instant(v),
+        value: v,
       }));
       const nextVal = finalValues.includes(this.aiValueControl.value)
         ? this.aiValueControl.value
@@ -326,17 +327,30 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     );
   }
 
-  openSwitchers() {
-    this.dialog.open(this.switchersTpl, {
-      panelClass: 'switchers-dialog-panel',
-      autoFocus: false,
-      restoreFocus: true,
-      width: '520px',
-      maxWidth: '95vw',
-    });
-  }
+  async openSwitchers(): Promise<void> {
+    const ref = this.dialog.open<ConfirmDialogComponent, ConfirmDialogData, any>(
+      ConfirmDialogComponent,
+      {
+        width: '520px',
+        maxWidth: '95vw',
+        panelClass: 'switchers-dialog-panel', // (optional) for custom styling
+        backdropClass: 'app-overlay-backdrop', // (optional)
+        data: {
+          title: 'quick_settings',
+          contentTpl: this.switchersTpl,
+          // Provide a function so the dialog can return a payload on confirm
+          getResult: () => ({
+            theme: this.themeControl.value,
+            lang: this.langControl.value,
+            scope: this.aiScopeControl.value,
+            key: this.aiKeyControl.value,
+            value: this.aiValueControl.value,
+          }),
+        },
+      },
+    );
 
-  close() {
-    this.dialog.closeAll();
+    const result = await firstValueFrom(ref.afterClosed());
+    if (!result) return; // user canceled
   }
 }

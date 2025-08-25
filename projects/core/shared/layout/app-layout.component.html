@@ -35,12 +35,7 @@
 
     <!-- Dialog content -->
     <ng-template #switchersTpl>
-      <h2 mat-dialog-title class="dialog-title">
-        <mat-icon>tune</mat-icon>
-        <span>{{ 'quick_settings' | translate }}</span>
-      </h2>
-
-      <mat-dialog-content class="switchers-dialog">
+      <div class="switchers-dialog">
         <!-- Theme -->
         <app-toggle [field]="themeField" [control]="themeControl"></app-toggle>
 
@@ -51,12 +46,7 @@
         <app-select [field]="aiScopeField" [control]="aiScopeControl"></app-select>
         <app-select [field]="aiKeyField" [control]="aiKeyControl"></app-select>
         <app-select [field]="aiValueField" [control]="aiValueControl"></app-select>
-      </mat-dialog-content>
-
-      <mat-dialog-actions align="end">
-        <button mat-button mat-dialog-close>Close</button>
-        <button mat-flat-button color="primary" (click)="close()">Ok</button>
-      </mat-dialog-actions>
+      </div>
     </ng-template>
 
     <!-- USER PANEL -->
