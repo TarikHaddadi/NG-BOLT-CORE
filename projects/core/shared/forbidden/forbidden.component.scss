@@ -1,0 +1,47 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.wrap {
+  min-height: calc(100vh - 128px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.card {
+  max-width: 560px;
+  width: 100%;
+  padding: 32px 24px;
+  border-radius: 16px;
+  box-shadow: var(--mat-elevation-z6, 0 3px 5px rgba(0, 0, 0, 0.2));
+  background: var(--mat-sys-surface, #fff);
+}
+
+.icon {
+  font-size: 72px;
+  width: 72px;
+  height: 72px;
+  display: inline-flex;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+p {
+  margin: 0 0 24px;
+  opacity: 0.8;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}

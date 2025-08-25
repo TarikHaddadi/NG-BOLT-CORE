@@ -1,0 +1,19 @@
+<div class="wrap" role="region" aria-label="Not found">
+  <div class="card">
+    <mat-icon class="icon" aria-hidden="true">search_off</mat-icon>
+    <h1>404 — {{ 'error.404.title' | translate: { default: 'Page not found' } }}</h1>
+    <p>
+      {{ 'error.404.text' | translate: { default: 'We couldn’t find' } }}
+      <code>{{ currentUrl }}</code>
+    </p>
+
+    <div class="actions">
+      <button mat-stroked-button (click)="goBack()">
+        {{ 'common.back' | translate: { default: 'Back' } }}
+      </button>
+      <button mat-flat-button color="primary" (click)="goHome()">
+        {{ 'common.home' | translate: { default: 'Home' } }}
+      </button>
+    </div>
+  </div>
+</div>

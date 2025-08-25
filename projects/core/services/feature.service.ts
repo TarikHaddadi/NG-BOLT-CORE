@@ -11,11 +11,10 @@ import {
 
 import { ConfigService } from './config.service';
 
+export const VARIANTS_SLICE_KEY = 'variants' as const;
 // Local, zero-dependency selector to avoid importing from the store barrel
-const selectVariantsUnsafe = (root: unknown): VariantsState => {
-  const v = (root as any)?.['variants'];
-  return v ?? { global: {}, features: {} };
-};
+const selectVariantsUnsafe = (root: unknown): VariantsState =>
+  ((root as any)?.[VARIANTS_SLICE_KEY] as VariantsState) ?? { global: {}, features: {} };
 
 @Injectable({ providedIn: 'root' })
 export class FeatureService {

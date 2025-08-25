@@ -1,4 +1,5 @@
 export { ConfirmDialogComponent } from './dialog/dialog.component';
+export { ForbiddenComponent } from './forbidden/forbidden.component';
 export { DynamicFormComponent } from './forms/dynamic-form.component';
 export { FieldHostComponent } from './forms/field-host/field-host.component';
 export { AutocompleteComponent } from './forms/fields/autocomplete/autocomplete.component';
@@ -10,4 +11,5 @@ export { TextFieldComponent } from './forms/fields/text-field/text-field.compone
 export { TextInputComponent } from './forms/fields/text-input/text-input.component';
 export { ToggleComponent } from './forms/fields/toggle/toggle.component';
 export { AppLayoutComponent } from './layout/app-layout.component';
+export { NotFoundComponent } from './not-found/not-found.component';
 export { SeoComponent } from './seo/seo.component';
