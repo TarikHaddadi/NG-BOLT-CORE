@@ -1,4 +1,4 @@
-# Authentication & Security – Current SPA Setup (Angular 19 + Keycloak + NgRx)
+# 🔐 Authentication & Security – Current SPA Setup (Angular 19 + Keycloak + NgRx)
 
 >_Last updated: 2025-08-21_
 
@@ -10,11 +10,27 @@ This README documents **how authentication works today**, the **benefits** of th
 - **Keycloak (Broker realm)** for OIDC Code Flow with **PKCE (S256)**.
 - **Tokens** are held **in memory** by `keycloak-js`. No browser storage.
 - **NgRx** mirrors minimal session metadata (e.g., `isAuthenticated`, `profile`, `expiresAt`).  
-  > If tokens exist in the `auth` slice, they are *in-memory only* and **not persisted** unless explicitly synced to storage (we do **not** persist the `auth` slice neither tokens informations on the store , we only take user information and authentication status).
 - **CSP** is strict and **iframe-free** (`checkLoginIframe: false`, no `silent-check-sso.html`).
 
 
-## 🔁 Process Flow (as-is)
+**What**: Redirect-only OIDC login with **Keycloak** in a **Broker** realm. No `silent-check-sso.html`, no session-check iframe.
+
+**Why**: Works with strict CSP. Simple SPA flow.
+
+### Keycloak prerequisites
+
+- Client type: **Public** with **PKCE S256**.
+- **Valid Redirect URIs**: `https://<your-app>/*`
+- **Web Origins**: `https://<your-app>`
+
+### App behavior
+
+- On app start: if not authenticated, **top-level redirect** to Keycloak (no iframe).
+- After login: tokens live **in memory** and are refreshed periodically.
+- HTTP requests include `Authorization: Bearer <access_token>`.
+- Guards redirect to login when a protected route is accessed unauthenticated.
+
+### 🔁 Process Flow (as-is)
 
 1) **App Boot**
    - `APP_INITIALIZER` loads `/assets/config.json` (runtime config).
@@ -94,46 +110,13 @@ Content-Security-Policy:
 - **Low operational overhead**: no extra backend layer required.
 - **IdP brokering**: easy provider jump via `kc_idp_hint`.
 
-
 ## ⚠️ Residual Risks / Vulnerabilities
 
 - **XSS → token theft (in-memory)**  
   If an attacker executes JS in our page, they can read `keycloak().token`. CSP + Angular sanitization reduce risk, but **don’t make it zero**.
 
-- **CSP trade-offs**  
-  `style-src 'unsafe-inline'` (used by Angular Material) is less strict than hashing styles. Dev must ensure **no inline scripts**.
-
-- **Misconfiguration risk**  
-  Over-broad Keycloak **Redirect URIs**/**Web Origins** or API **CORS** could open attack paths. Keep origins exact and reviewed.
-
-- **Token lifetimes**  
-  Longer lifetimes increase risk if exfiltrated. (Tune realm/client lifetimes and rotation.)
-
 - **Source maps**  
   Public source maps can help attackers find XSS. Keep off in prod (or protect).
-
-
-## 🛡️ Non-Breaking Hardening (keep current architecture)
-
-1) **Keycloak tuning**
-   - Access token lifetime: **2–5 min**
-   - Enable **Refresh Token Rotation**; reduce max reuse
-   - Restrict scopes/claims (only what the UI needs)
-   - Exact **Redirect URIs/Web Origins** (no wildcards)
-
-2) **Headers (Nginx/API)**
-   - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
-   - `Referrer-Policy: strict-origin-when-cross-origin`
-   - `X-Content-Type-Options: nosniff`
-   - `Cross-Origin-Opener-Policy: same-origin`
-
-3) **CSP discipline**
-   - Enforce in prod (not report-only)
-   - `connect-src`: only Keycloak + API origins
-   - Consider **Trusted Types** if you want to further reduce DOM XSS
-
-4) **CORS discipline (API)**
-   - Allow only the SPA origin; avoid `*` with credentials
 
 
 ## 📌 Developer Checklist
@@ -148,12 +131,7 @@ Content-Security-Policy:
 - [ ] Source maps: disabled or protected in prod
 
 
-## 🧠 Notes
-
-This is a **solid, industry-standard SPA** posture. The **main residual risk** is XSS → in-memory token theft. If that’s unacceptable for your data classification, the next step is a **BFF** (Backend-for-Frontend), which keeps tokens server-side (HttpOnly cookies to the SPA). We can revisit that architecture when needed.
-
-
 ## 🧑‍💻 Author
 
 **Angular Product Skeleton**  
-Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).
+Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).

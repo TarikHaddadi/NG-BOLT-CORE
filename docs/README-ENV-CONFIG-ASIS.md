@@ -11,66 +11,10 @@ fetch('assets/config.json');
 ## As Is Configs
 
 ```text
+public/assets/config.json
 public/assets/config.dev.json
 public/assets/config.uat.json
 public/assets/config.prod.json
-```
-
-Keep deploy-time environment in `public/assets/config.json` (copied to `/assets/config.json` at build). Example:
-
-**Example (`public/assets/config.dev.json`)**
-
-```json
-{
-  "name": "dev",
-  "production": false,
-  "apiUrl": "https://dev.api.yourdomain.com",
-  "auth": {
-    "url": "http://localhost:8080/",
-    "realm": "my-realm",
-    "clientId": "eportal_chatbot",
-    "init": {
-      "onLoad": "login-required",
-      "checkLoginIframe": false,
-      "pkceMethod": "S256"
-    }
-  }
-}
-```
-
-Minimal typed access:
-
-```ts
-export interface AppConfig {
-  name: 'dev' | 'uat' | 'prod';
-  production: boolean;
-  apiUrl: string;
-}
-
-export class ConfigService {
-  private config!: AppConfig;
-
-  async load(): Promise<void> {
-    const res = await fetch('assets/config.json');
-    this.config = (await res.json()) as AppConfig;
-  }
-
-  get<T extends keyof AppConfig>(key: T): AppConfig[T] {
-    return this.config[key];
-  }
-
-  all(): AppConfig {
-    return this.config;
-  }
-}
-```
-
-Bootstrap-time load (example):
-
-```ts
-const cfg = new ConfigService();
-await cfg.load();
-// provide it in DI or attach to app initializer before bootstrap
 ```
 
 **Why this setup?**
@@ -382,65 +326,7 @@ export const routes = [
 
 ---
 
-## 9) CI/CD Process
-
-**Inputs**
-
-- Presets: `public/assets/config.dev|uat|prod.json`
-- Optional customer overlay: `public/assets/config.customer-{TENANT}.json`
-- Pipeline variables:
-  - `TENANT`
-  - `FEATURE_*` overrides (e.g., `FEATURE_AI_CHAT=true/false`)
-  - `AI_PROVIDER`, `AI_MODEL` variant overrides
-
-**Steps**
-
-1. Choose preset by branch.
-2. Overlay customer config if `TENANT` is set.
-3. Apply feature/variant overrides via env vars.
-4. Validate JSON against a schema.
-5. Write the final `public/assets/config.json`.
-6. Build, dockerize, run CSP smoke test.
-
-> Copy‑paste Azure/GitLab YAML and jq snippets — **see original section** for full scripts.
-
-**Schema (excerpt)**
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "realtime": { "type": "object" /* ... */ },
-    "features": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "enabled": { "type": "boolean" },
-          "roles": { "type": "array", "items": { "type": "string" } },
-          "allow": {
-            "type": "object",
-            "properties": { "tenants": { "type": "array", "items": { "type": "string" } } }
-          },
-          "key": { "type": "string" },
-          "label": { "type": "string" },
-          "icon": { "type": "string" },
-          "route": { "type": "string" },
-          "requireAuth": { "type": "boolean" },
-          "variants": { "type": "object" }
-        },
-        "required": ["enabled"]
-      }
-    }
-  },
-  "required": ["features"]
-}
-```
-
----
-
-## 10) Realtime Integration
+## 9) Realtime Integration
 
 **Interface**
 
@@ -569,4 +455,4 @@ function chooseRealtimeClient(cfg, deps): RealtimeClient | null {
 ## 🧑‍💻 Author
 
 **Angular Product Skeleton**  
-Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).
+Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).

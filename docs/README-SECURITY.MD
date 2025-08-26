@@ -1,5 +1,5 @@
 # Security Posture & Migration Plan – SPA → BFF
->_Last updated: 2025-08-21_
+>_Last updated: 2025-08-26_
 
 **Stack:** Angular 19 SPA + Keycloak (Broker, PKCE) + NgRx + Nginx (Docker)  
 **Decision:** Keep the SPA for UI, **implement a BFF (Backend‑for‑Frontend)** to hold tokens server‑side.
@@ -9,7 +9,7 @@
 
 - **Auth**: Keycloak Authorization Code + **PKCE S256**, **redirect‑only** (no iframes, no `silent-check-sso.html`).  
 - **Tokens**: live **only in `keycloak-js` memory**; **not persisted**; removed from NgRx store.  
-- **Store**: contains **minimal user info** (`name`, `email`, optionally `isAuthenticated` & `expiresAt`).  
+- **NGRX Store**: contains **minimal user info** (`name`, `email`, optionally `isAuthenticated` & `expiresAt`).  
 - **CSP**: strict & iframe‑free; `connect-src` limited to Keycloak + API.  
 - **HTTP**: interceptor reads token from `keycloak().token` per request.  
 - **Logout/Refresh**: handled by `keycloak-js` (`updateToken`, `logout`).
@@ -22,7 +22,7 @@
 
 ---
 
-## 2) Target State (To‑Be): BFF Pattern
+## 2) Target State (Optional): BFF Pattern
 
 **Why BFF?** Eliminate SPA token exposure even under XSS; simplify CSP/CORS; centralize auth & refresh.
 
@@ -47,10 +47,6 @@
 - `connect-src 'self'` (SPA never calls Keycloak or API directly).  
 - CSRF protection on mutating routes.  
 - Centralized token rotation/refresh on server.
-
----
-
-## 3) Implementation Checklist
 
 ### A) Keycloak (Broker realm & client)
 - [ ] Client uses **Authorization Code + PKCE S256**; **implicit/hybrid disabled**.  
@@ -106,73 +102,30 @@
 
 ---
 
-## 4) Small Plan (Phased)
-
-### Phase 0 – Already Done
+## 3) Already Done
 - [x] Tokens removed from NgRx store (store only `name`, `email`, etc.).  
 - [x] CSP enforcing, iframe‑free; Keycloak redirect‑only.
 
-### Phase 1 – Prep (1 week)
-- [ ] Finalize Keycloak client settings (redirect URIs to BFF; PKCE only; lifetimes; rotation).  
-- [ ] Stand up BFF skeleton: `/login`, `/oauth/callback`, `/session`, `/logout`, `/api/*` proxy.  
-- [ ] Add security headers (HSTS, COOP, CORP, XFO).  
-- [ ] CI: CSP smoke test + dependency audit.
-
-**Exit criteria:** BFF starts, callback works locally, `/session` returns auth state after login.
-
-### Phase 2 – Switch SPA to BFF (1 week)
-- [ ] SPA uses `/session` to hydrate auth.  
-- [ ] SPA calls `/api/*` (BFF proxy) instead of direct API.  
-- [ ] Login/logout wired to BFF endpoints.  
-- [ ] CSRF token flow implemented for `POST/PUT/DELETE`.
-
-**Exit criteria:** App works end‑to‑end without `keycloak-js` in the browser; tokens never exposed to JS.
-
-### Phase 3 – Harden & Clean (1 week)
-- [ ] Enable refresh rotation verification; tighten lifetimes.  
-- [ ] CSP restrict `connect-src 'self'` only.  
-- [ ] Observability (CSP reports) optional.  
-- [ ] ZAP baseline scan clean.
-
-**Exit criteria:** Security checks green; simplified CSP; docs updated.
-
 ---
 
-## 5) Definition of Done
+## 4) Definition of Done
 
-- [ ] **No tokens** in browser (storage, memory, logs, DevTools).  
-- [ ] SPA uses only the **BFF**; no direct calls to Keycloak/API.  
-- [ ] **CSP** in prod: `connect-src 'self'`; `frame-src 'none'`.  
-- [ ] **HSTS/COOP/CORP/XFO** headers present.  
-- [ ] **Keycloak**: PKCE only; exact origins; short lifetimes; refresh rotation.  
-- [ ] **API**: CORS restricted to BFF; JWT validated.  
-- [ ] **CI/CD**: dependency scan + CSP smoke test; optional ZAP baseline.  
+- [x] **CSP** in dev, uat and prod: `connect-src 'self'`; `frame-src 'none'`.  
+- [x] **Keycloak**: PKCE only; exact origins; short lifetimes; refresh rotation.  
+- [x] **API**: CORS restricted; JWT validated.  
+- [ ] **CI/CD**: dependency scan + CSP smoke test;.  
 - [ ] Runbook & onboarding docs updated.
 
 ---
 
-## 6) FAQ
+## 5) FAQ
 
-**Q: Can we keep the SPA flow for dev?**  
-A: Yes. You can run SPA‑only in dev with a looser CSP and keep the BFF flow in staging/prod. But it’s simpler to use BFF consistently.
-
-**Q: Do we still need NgRx for auth?**  
-A: Yes for UI state (user info, flags). But keep **no tokens** in state.
-
-**Q: What about SSO across tabs?**  
-A: The BFF session cookie covers tabs. Server token refresh is centralized.
+**Q: Can we keep the actual SPA flow?**  
+A: Yes. Yes its safe tokens are secure and the CSP covers most parts.
 
 ---
-
-## 7) Owners & Review
-
-- **Security lead:** …  
-- **BFF owner:** …  
-- **Frontend owner:** …  
-- **API owner:** …
-
 
 ## 🧑‍💻 Author
 
 **Angular Product Skeleton**  
-Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).
+Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).

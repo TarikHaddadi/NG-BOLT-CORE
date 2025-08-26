@@ -3,12 +3,15 @@ import {
   AfterViewInit,
   ChangeDetectorRef,
   Component,
+  DestroyRef,
   effect,
+  inject,
   Injector,
   OnInit,
   TemplateRef,
   ViewChild,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
@@ -40,7 +43,7 @@ import {
 } from '@cadai/pxs-ng-core/services';
 import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
 
-import { ConfirmDialogComponent,ConfirmDialogData } from '../dialog/dialog.component';
+import { ConfirmDialogComponent, ConfirmDialogData } from '../dialog/dialog.component';
 import { SelectComponent } from '../forms/fields/select/select.component';
 import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
 
@@ -70,6 +73,7 @@ import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
 export class AppLayoutComponent implements OnInit, AfterViewInit {
   public menuItems: FeatureNavItem[] = [];
   @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<any>;
+  private destroyRef = inject(DestroyRef);
 
   public isOpen = true;
   public title$!: Observable<string>;
@@ -101,7 +105,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   // AI Variant selectors (scope → key → value)
   public aiScopeField: FieldConfig = {
     name: 'aiScope',
-    label: 'AI Scope',
+    label: 'ai.scope',
     type: 'dropdown',
     options: [], // filled in ngOnInit
   };
@@ -109,7 +113,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
   public aiKeyField: FieldConfig = {
     name: 'aiKey',
-    label: 'AI Variant',
+    label: 'ai.variant',
     type: 'dropdown',
     options: [], // filled dynamically
   };
@@ -117,7 +121,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
   public aiValueField: FieldConfig = {
     name: 'aiValue',
-    label: 'AI Value',
+    label: 'ai.value',
     type: 'dropdown',
     options: [], // filled dynamically
   };
@@ -264,6 +268,27 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         : finalValues[0];
       this.aiValueControl.setValue(nextVal, { emitEvent: false });
     };
+
+    this.translate.onLangChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      // Rebuild SCOPE options
+      const featuresWithVariants = Object.entries(this.cfg.features ?? {})
+        .filter(([, f]) => f?.variants && typeof f.variants === 'object')
+        .map(([k]) => k);
+
+      this.aiScopeField.options = [
+        { label: this.translate.instant('ai.global'), value: '' },
+        ...featuresWithVariants.map((k) => ({
+          label: this.translate.instant(k),
+          value: k,
+        })),
+      ];
+
+      // Rebuild KEY and VALUE options for the current selections
+      const scope = this.aiScopeControl.value;
+      const key = this.aiKeyControl.value;
+      refreshKeys(scope); // will re-fill aiKeyField.options with translated labels
+      if (key) refreshValues(scope, key); // will re-fill aiValueField.options with translated labels
+    });
 
     // React to scope changes → rebuild keys (and then values)
     this.aiScopeControl.valueChanges.subscribe((scope) => {

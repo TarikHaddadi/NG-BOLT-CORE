@@ -1,6 +1,6 @@
-
 # 🎨 Theming Support
->_Last updated: 2025-08-21_
+
+> _Last updated: 2025-08-21_
 
 This project includes a fully dynamic theming system that allows runtime switching between **light** and **dark** modes with the following structure:
 
@@ -37,16 +37,13 @@ export function httpLoaderFactory(http: HttpClient) {
 
 // In your providers/imports:
 TranslateModule.forRoot({
-  loader: { provide: TranslateLoader, useFactory: httpLoaderFactory, deps: [HttpClient] }
+  loader: { provide: TranslateLoader, useFactory: httpLoaderFactory, deps: [HttpClient] },
 });
 ```
 
 Usage in templates: `{{ 'home.title' | translate }}`
 
-
-
 ## 🧑‍💻 Author
 
 **Angular Product Skeleton**  
-Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).
-
+Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).

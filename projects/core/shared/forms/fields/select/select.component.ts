@@ -39,7 +39,9 @@ type SelCtrl = FormControl<SelValue | SelValue[] | null>;
           *ngFor="let option of field.options ?? []; trackBy: trackByValue"
           [value]="option.value"
         >
-          {{ field['translateOptionLabels'] ? (option.label | translate) : option.label }}
+          {{
+            field['translateOptionLabels'] ? (option.label | translate) : (option.label | translate)
+          }}
         </mat-option>
       </mat-select>
 
@@ -48,7 +50,7 @@ type SelCtrl = FormControl<SelValue | SelValue[] | null>;
       </mat-hint>
 
       <mat-error *ngIf="showError" [id]="errorId" role="alert" aria-live="polite">
-        {{ errorText }}
+        {{ errorText | translate }}
       </mat-error>
     </mat-form-field>
   `,

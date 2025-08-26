@@ -1,6 +1,6 @@
 # AI Product – Angular 19 CORE PSX-NG-CORE (@cadai/psx-ng-core)
 
-> _Last updated: 2025-08-21_
+> _Last updated: 2025-08-26_
 
 > 🚀 Modern Angular 19 project (Proximus core Angular SDK) with runtime environment configs, standalone components, NgRx state management, dynamic forms, internationalization, and full CI/CD support.
 
@@ -223,58 +223,49 @@ Below is an overview of the main directories and their responsibilities:
 - **Dynamic Form system**  
   New form fields must be declared inside `shared/forms/fields`, exported in its local `index.ts`, and mapped inside `field-host.component.ts`.
 
-## Development server
+## 🎯 Project Roadmap – Ordered Checklist (Angular 19 + NgRx + Keycloak)
 
-To start a local development server, run:
+> _Last updated: 2025-08-22_
 
-```bash
-ng serve
-```
+Legend: **✅ Done** · **🟡 In progress** · **❌ To do**  
+Severity: **P0 Critical**, **P1 High**, **P2 Medium**, **P3 Low**  
+Workload (est.): **S ≤1d**, **M 2–3d**, **L 4–7d**, **XL >1wk**
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+> Update **Status**, **Owner**, and **Next Actions** as you progress. Add links to PRs or wiki when relevant.
 
-## Code scaffolding
+## ✅ Summary Table (Done → In Progress → To Do)
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+| Category | Item                                                                    | Status | Severity | Workload | Summary                                                                                                             | Key Files / Paths                                                                                      | Next Actions      | Owner |
+| -------- | ----------------------------------------------------------------------- | -----: | -------- | -------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------- | ----- |
+| Core     | Barrels and config                                                      |     ✅ | P1       | XL       | App uses standalone components, strict TS/ESLint. Also imports are done via barels `@cadai/pxs-ng-core/*`           | `See core repository on Azure actifacts https://dev.azure.com/cadai/Socle/_artifacts/feed/PXS-NG-CORE` | —                 | FE    |
+| Core     | Theming                                                                 |     ❌ | P2       | XL       | Customize app theming by providing primary, secondary, error, success, infor, danger,etc.. colors `*.scss*`         | `See theming docs`                                                                                     | to be implement   | FE    |
+| Core     | CI/CD                                                                   |     ✅ | P1       | M        | Automatic builds and deployments + Bumping versions                                                                 | `azure-pipelines.ylm`                                                                                  | -------           | FE    |
+| Core     | TS linter                                                               |     ✅ | P1       | S        | Lint implementation to prevent from committing unsecure scripts + lint bfrore commit                                | `husky`                                                                                                | --                | FE    |
+| Core     | Pre-commit Lints all over the project                                   |     ✅ | P1       | S        | use ling before commit                                                                                              | `husky`                                                                                                | -----             | FE    |
+| Core     | Versionning                                                             |     ✅ | P1       | S        | Auto upgrade version by bumping a Tag and pushing it when commiting a new release + creating a release note + CI/CD | ---                                                                                                    |                   | FE    |
+| Core     | Storybook                                                               |     ❌ | P2       | XL       | Storybook implementation for every custom component in the app                                                      | `projects/core/shared/*`                                                                               | TO BE IMPLEMENTED | FE    |
+| Core     | Typings `<any>` to be correctly typed + Linter enhanced also            |     ❌ | P2       | M        | TO BE IMPLEMENTED                                                                                                   | see `REAMD-ENV-CONFIG-UPGRADE-V2-BFF`                                                                  | TO BE IMPLEMENTED | FE    |
+| Core     | ngFor amnd ngIf to be removed and replaced with the new implementations |     ❌ | P2       | M        | TO BE IMPLEMENTED                                                                                                   | see `REAMD-ENV-CONFIG-UPGRADE-V2-BFF`                                                                  | TO BE IMPLEMENTED | FE    |
+| Core     | Env Vars                                                                |     ✅ | P1       | XL       | Adapt the ENV configuration multitenant and multi feature                                                           | `REAMD-ENV-CONFIG-ASIS`                                                                                | ---               | FE    |
+| Core     | Docs                                                                    |     🟡 | P1       | M        | Update all documentations                                                                                           | ---                                                                                                    | Inprogress        | FE    |
 
-```bash
-ng generate component component-name
-```
+## 📃 Documentation Index
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+Legend: **✅ Done** · **🟡 Ongoing** · **❌ To do**
 
-```bash
-ng generate --help
-```
+- [[✅] - Global Readme](./README.md)
+- [[✅] - Contributing on Core](projects/core/shared/CONTRIBUTING.md)
+- [[✅] - Authentication and state management](./projects/core/store/README.md)
+- [[✅] - Theming, Assets and translattions](./docs/README-ASSETS-TRANSLATIONS.md)
+- [[✅] - Contribution Guide](./CONTRIBUTING.md)
+- [[✅] - Custom Form Builder and custom fields](projects/core/shared/README.md)
+- [[✅] - Authentication Flow](./docs/README-CURRENT-AUTH.md)
+- [[✅] - Security Posture & Migration Plan – SPA](./docs/README-SECURITY.md)
+- [[✅] - Environment Config Custom AS IS](./docs/README-ENV-CONFIG-ASIS.md)
+- [[🟡] - Content Security Policw CSP](./docs/README-CSP.md)
+- [[❌] - Environment Config – Upgrade config from Backend](./docs/README-ENV-CONFIG-UPGRADE-V2-BBF.md)
 
-## Building
+## 🧑‍💻 Author
 
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+**Angular Product Skeleton**  
+Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).

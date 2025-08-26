@@ -24,7 +24,7 @@ const FIELD_MAP: Partial<Record<FieldType | string, Type<FieldComponent>>> = {
 
   // selections
   dropdown: SelectComponent,
-  select: SelectComponent, // alias
+  select: SelectComponent,
   autocomplete: AutocompleteComponent,
   chips: ChipsComponent,
   toggle: ToggleComponent,

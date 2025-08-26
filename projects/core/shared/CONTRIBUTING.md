@@ -321,4 +321,4 @@ Fix: Check `dist/core/package.json` `"exports"`. In consumer app, **remove** dev
 ## 🧑‍💻 Author
 
 **Angular Product Skeleton**  
-Built by **Tarik Haddadi** using Angular 19 and modern best practices (2025).
+Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).
