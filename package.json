@@ -1,6 +1,6 @@
 {
   "name": "pxs-ng-core",
-  "version": "1.1.10",
+  "version": "1.1.28",
   "type": "module",
   "scripts": {
     "ng": "ng",
@@ -18,7 +18,9 @@
     "lint:ci": "eslint projects/. --ext .ts,.html --max-warnings=0",
     "format": "prettier projects/. --write",
     "format:check": "prettier projects/. --check",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "deps:check": "node ./scripts/remove-unused.mjs",
+    "deps:apply": "node ./scripts/remove-unused.mjs --apply"
   },
   "prettier": {
     "printWidth": 100,
@@ -74,6 +76,7 @@
     "@types/jasmine": "~5.1.0",
     "@typescript-eslint/eslint-plugin": "^8.40.0",
     "@typescript-eslint/parser": "^8.40.0",
+    "depcheck": "^1.4.7",
     "eslint": "^9.33.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
