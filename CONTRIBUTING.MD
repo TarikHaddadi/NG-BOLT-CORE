@@ -22,10 +22,28 @@ This document is the **source of truth** for how to work in this repository. It 
 - Source code lives in `projects/core/`  
 - Build output goes to `dist/core/`  
 
-Build locally:
-```bash
-npm run build:core
-```
+1. **Install**:
+   ```bash
+   npm ci
+   ```
+
+2. **Lint (CI rules)**:
+   ```bash
+   npm run lint:ci
+   ```
+
+3. **Build**:
+   ```bash
+   npm run build:core
+   ```
+
+4. **Pack (preview the artifact)**:
+   ```bash
+   cd dist/core
+   npm pack --dry-run
+   ```
+
+> The library uses `ng-packagr`. Only `tslib` is allowed as a non-peer dependency; all Angular/NgRx/Translate/Keycloak/RxJS are **peers** (provided by consumers).
 
 
 ### Core Layer
@@ -146,28 +164,8 @@ npm run version:minor   # 1.0.0 → 1.1.0
 npm run version:major   # 1.0.0 → 2.0.0
 ```
 
----
 
-## 4. 🚀 Publishing to Azure Artifacts
-
-1. Build the library:
-   ```bash
-   npm run build:core
-   ```
-
-2. Publish:
-   ```bash
-   npm run publish:core
-   ```
-
-This will:
-- Build with Angular CLI  
-- Copy `.npmrc` into `dist/core`  
-- Publish to the Azure feed  
-
----
-
-## 5. Routing & Roles (on Host App)
+## 4. ⚙️ Routing & Roles (on Host App)
 
 ```ts
 // app.routes.ts
@@ -196,7 +194,7 @@ export const routes: Routes = [
 ];
 ```
 
-## 7. ⚡ package.json Scripts
+## 5. ⚡ package.json Scripts
 
 Available at the repo root:
 
@@ -214,14 +212,127 @@ Available at the repo root:
 
 ---
 
-## 8. ✅ Checklist Before Publishing
+## 6. 🚀 Contributing & Publishing — Core SDK (`@cadai/pxs-ng-core`)
 
-- [ ] Run `npm run build:core` – build passes with no errors  
-- [ ] Update version with `npm run version:patch|minor|major`  
-- [ ] Run `npm run publish:core`  
-- [ ] Verify package is available on [Azure Artifacts feed](https://dev.azure.com/cadai/Socle/_packaging?_a=feed&feed=PXS-NG-CORE)  
+This document explains **how CI/CD works** for the Core SDK and **what contributors must do** to keep builds green and releases smooth.
 
-###  Pre‑Push Checklist
+> **TL;DR**  
+> - Target branches: `develop` (integration), `main|master` (release).  
+> - CI runs **lint + build** on PRs that touch `projects/core/**`.  
+> - Merges into `main` automatically **publish** `@cadai/pxs-ng-core` to Azure Artifacts and **create a git tag** `PXS-NG-CORE@<version>`.  
+> - The **package version is read from** `projects/core/package.json` and must be bumped **before merging** to `main`.
+
+
+### How to Release
+
+1. From latest `develop`, bump the version:
+
+2. Open a PR: **`develop` → `main`**. Wait for **Build & Test** to pass.
+
+3. Merge the PR. On `main`:
+   - CI **publishes** to Azure Artifacts (if new version).
+   - CI creates **tag** `PXS-NG-CORE@x.y.z`.
+
+---
+---
+
+## 7. 👣 Branching & PR Policy
+
+- Work on **feature branches** cut from `develop`.
+- Open PRs **into `develop`** for regular work.  
+- When preparing a release:
+  1. Bump version in `projects/core/package.json` (using the `npm run version:patch|minor|major`).
+  2. Merge `develop` → `main` via PR.
+- CI is **triggered only for changes** to:
+  - `projects/core/**` (library code),
+  - pipeline files and workspace configs (`azure-pipelines.yml`, `package.json`, `package-lock.json`, `tsconfig*.json`, `projects/**`).
+
+### Required checks on PRs
+- **ESLint (CI)** must pass.
+- **Library build** must succeed (`ng build core --configuration production`).
+
+> CI also runs on PRs targeting `main`, `master`, or `develop` if they modify `projects/core/**`.
+
+---
+
+## 8. 🚀 CI/CD Overview (Azure Pipelines)
+
+| Stage            | When it runs                                   | What it does                                                                                                 |
+|------------------|--------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| **Build & Test** | On any commit/PR that matches the path filters  | Uses Node `20.x`, `npm ci`, runs `npm run lint:ci`, builds the library (`npm run build:core`). Publishes `dist/core` as artifact `pxs-ng-core`. |
+| **Publish**      | **Only** on `main` after a successful build     | Downloads artifact. Creates `.npmrc` for the artifact. Authenticates with **NpmAuthenticate**. Skips if the version already exists. Otherwise **publishes** to Azure Artifacts feed. |
+| **Tag**          | **Only** on `main` after publish                | Reads version from `projects/core/package.json`, creates git tag `PXS-NG-CORE@<version>` and pushes it to origin. |
+
+### Environments / Variables
+- Node version: `20.x`
+- Feed URL: `https://pkgs.dev.azure.com/cadai/Socle/_packaging/PXS-NG-CORE/npm/registry/`
+- Artifact name: `pxs-ng-core`
+- Library paths: `projects/core` → `dist/core`
+
+---
+
+### Recommended commit style
+We follow **Conventional Commits**:
+- `feat(core): add X`
+- `fix(core): handle Y`
+- `chore(release): bump to 1.2.3`
+
+---
+
+## 9. 📝 Publishing Details
+
+### Authentication
+The pipeline creates a **scoped `.npmrc` inside the artifact directory** and authenticates it with **NpmAuthenticate@0**. This ensures `npm publish` uses the Azure Artifacts feed.
+
+### Idempotent publish
+Before publishing, CI checks if `@cadai/pxs-ng-core@<version>` already exists on the feed:
+- If **exists** → **skip** publish gracefully.
+- If **not found** → `npm publish --ignore-scripts --registry <FEED_URL>`.
+
+> Lifecycle scripts are disabled for safety during CI publishing.
+
+### Tagging
+- CI uses `System.AccessToken` to push the tag.  
+- The tag format is **`PXS-NG-CORE@<version>`**.
+
+---
+
+## 10. 📥 Consuming the Package (Host Apps)
+
+Add the Azure Artifacts registry in your **Host** project:
+
+```npmrc
+@cadai:registry=https://pkgs.dev.azure.com/cadai/Socle/_packaging/PXS-NG-CORE/npm/registry/
+always-auth=true
+```
+
+Install:
+```bash
+npm i @cadai/pxs-ng-core@^<major>.<minor>.<patch>
+```
+
+Host apps must satisfy the **peer dependencies** (Angular/NgRx/Translate/Keycloak/RxJS).
+
+---
+
+## 11. 🪲 Troubleshooting
+
+- **Publish skipped**: The exact version already exists. Bump `projects/core/package.json` and retry a `develop → main` merge.
+- **Auth errors (`npm publish`)**: Ensure the pipeline ran **NpmAuthenticate@0** and the `.npmrc` path points to the **file inside the artifact directory**.
+- **Tag push failed**: Confirm the pipeline has **`persistCredentials: true`** on checkout and uses `$(System.AccessToken)`.
+- **Build fails on missing types**: Ensure the **SDK workspace** has peer packages in **devDependencies** (they are required for type-checking during build). This does not affect published peers.
+
+---
+
+## 12. 🛡️ Security Notes
+
+- Do **not** print tokens or `.npmrc` contents in logs.  
+- Use **`--ignore-scripts`** on `npm publish` in CI to avoid executing arbitrary lifecycle scripts.  
+- Tags are created by CI using a dedicated identity (`Build Bot`).
+
+---
+
+###  ✅ Checklist Before Publishing
 
 - [ ] **Build passes**: `npm run build:core`
 - [ ] **Lint passes**: `pnpm lint` (or `npm run lint`)

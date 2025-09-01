@@ -1,10 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit } from '@angular/core';
-import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import {
-  MatAutocompleteModule,
-  MatAutocompleteSelectedEvent,
-} from '@angular/material/autocomplete';
+  AbstractControl,
+  FormControl,
+  ReactiveFormsModule,
+  ValidationErrors,
+} from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -31,48 +33,51 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         matInput
         type="text"
         [id]="field.name"
-        [formControl]="control"
+        [formControl]="fc"
         [matAutocomplete]="auto"
         [attr.placeholder]="field.placeholder ?? '' | translate"
         [attr.pattern]="field.pattern || null"
         [attr.minlength]="field.minLength || null"
         [attr.maxlength]="field.maxLength || null"
         autocomplete="off"
-        (blur)="control.markAsTouched()"
+        (blur)="fc.markAsTouched()"
         [attr.aria-label]="field.label | translate"
         [attr.aria-describedby]="ariaDescribedBy"
-        [attr.aria-invalid]="control.invalid || null"
+        [attr.aria-invalid]="fc.invalid || null"
         [attr.aria-required]="field.required || null"
       />
 
       <mat-autocomplete
         #auto="matAutocomplete"
         [displayWith]="displayWith"
-        (optionSelected)="onSelected($event)"
-        (closed)="control.markAsTouched()"
+        (optionSelected)="onSelected()"
+        (closed)="fc.markAsTouched()"
       >
-        <mat-option
-          *ngFor="let option of filteredOptions$ | async; trackBy: trackByIndex"
-          [value]="option"
-        >
-          {{ option | translate }}
-        </mat-option>
+        @for (option of (filteredOptions$ | async) ?? []; track $index) {
+          <mat-option [value]="option">
+            {{ option | translate }}
+          </mat-option>
+        }
       </mat-autocomplete>
 
-      <mat-hint *ngIf="field.helperText && !showError" [id]="hintId">
-        {{ field.helperText | translate }}
-      </mat-hint>
+      @if (field.helperText && !showError) {
+        <mat-hint [id]="hintId">
+          {{ field.helperText | translate }}
+        </mat-hint>
+      }
 
-      <mat-error *ngIf="showError" [id]="errorId" role="alert" aria-live="polite">
-        {{ errorText }}
-      </mat-error>
+      @if (showError) {
+        <mat-error [id]="errorId" role="alert" aria-live="polite">
+          {{ errorText }}
+        </mat-error>
+      }
     </mat-form-field>
   `,
   styleUrls: ['./autocomplete.component.scss'],
 })
 export class AutocompleteComponent implements OnInit {
   @Input({ required: true }) field!: FieldConfig;
-  @Input({ required: true }) control!: FormControl<string>;
+  @Input({ required: true }) control!: AbstractControl<string>;
 
   filteredOptions$!: Observable<string[]>;
 
@@ -81,8 +86,8 @@ export class AutocompleteComponent implements OnInit {
   ngOnInit(): void {
     const all = this.field.autocompleteOptions ?? [];
     // live filter
-    this.filteredOptions$ = this.control.valueChanges.pipe(
-      startWith(this.control.value ?? ''),
+    this.filteredOptions$ = this.fc.valueChanges.pipe(
+      startWith(this.fc.value ?? ''),
       map((v) => this.filter(all, v ?? '')),
     );
   }
@@ -95,17 +100,16 @@ export class AutocompleteComponent implements OnInit {
   }
   displayWith = (val: string | null) => val ?? '';
 
-  onSelected(event: MatAutocompleteSelectedEvent) {
-    console.log(event);
+  onSelected() {
     // ensure touched when selected via keyboard/mouse
-    this.control.markAsTouched();
+    this.fc.markAsTouched();
   }
 
   trackByIndex = (i: number) => i;
 
   // --- ARIA helpers ---
   get showError(): boolean {
-    return !!(this.control?.touched && this.control?.invalid);
+    return !!(this.fc?.touched && this.fc?.invalid);
   }
   get hintId() {
     return `${this.field.name}-hint`;
@@ -121,7 +125,7 @@ export class AutocompleteComponent implements OnInit {
 
   // --- Error text with interpolation & fallbacks ---
   get errorText(): string {
-    const errs = this.control?.errors ?? {};
+    const errs = this.fc?.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
 
     // prioritize common autocomplete errors
@@ -144,5 +148,9 @@ export class AutocompleteComponent implements OnInit {
       default:
         return {};
     }
+  }
+
+  get fc(): FormControl {
+    return this.control as FormControl;
   }
 }

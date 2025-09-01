@@ -1,6 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, Inject, Input, ViewChild } from '@angular/core';
-import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  ReactiveFormsModule,
+  ValidationErrors,
+} from '@angular/forms';
 import { DateAdapter, MAT_DATE_FORMATS, MatDateFormats } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -30,35 +35,39 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         #raw
         matInput
         [matDatepicker]="picker"
-        [formControl]="control"
+        [formControl]="fc"
         [placeholder]="field.placeholder || ''"
         [attr.pattern]="field.pattern"
         inputmode="numeric"
         maxlength="10"
         (input)="onRawInput(raw.value)"
-        (blur)="control.markAsTouched()"
+        (blur)="fc.markAsTouched()"
         [attr.aria-describedby]="hintId"
-        [attr.aria-invalid]="control.invalid || null"
+        [attr.aria-invalid]="fc.invalid || null"
         [attr.aria-required]="field.required || null"
       />
 
       <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
       <mat-datepicker #picker></mat-datepicker>
 
-      <mat-hint *ngIf="field.helperText && !showError" [id]="hintId">
-        {{ field.helperText | translate }}
-      </mat-hint>
+      @if (field.helperText && !showError) {
+        <mat-hint [id]="hintId">
+          {{ field.helperText | translate }}
+        </mat-hint>
+      }
 
-      <mat-error *ngIf="showError" role="alert">
-        {{ firstErrorMessage() }}
-      </mat-error>
+      @if (showError) {
+        <mat-error role="alert">
+          {{ firstErrorMessage() }}
+        </mat-error>
+      }
     </mat-form-field>
   `,
   styleUrls: ['./datepicker.component.scss'],
 })
 export class DatepickerComponent {
   @Input({ required: true }) field!: FieldConfig;
-  @Input({ required: true }) control!: FormControl<Date | null>;
+  @Input({ required: true }) control!: AbstractControl<Date | null>;
   @ViewChild('raw', { static: true }) rawInput!: ElementRef<HTMLInputElement>;
 
   private lastText = '';
@@ -70,7 +79,7 @@ export class DatepickerComponent {
   ) {}
 
   get showError() {
-    return !!(this.control?.touched && this.control?.invalid);
+    return !!(this.fc?.touched && this.fc?.invalid);
   }
   get hintId() {
     return `${this.field.name}-hint`;
@@ -98,7 +107,7 @@ export class DatepickerComponent {
 
   /** Merge/remove specific error keys without clobbering others (e.g., min/max/parse) */
   private mergeErrors(patch: ValidationErrors) {
-    const existing = this.control.errors ?? {};
+    const existing = this.fc.errors ?? {};
     const next: ValidationErrors = { ...existing };
 
     Object.keys(patch).forEach((k) => {
@@ -110,12 +119,12 @@ export class DatepickerComponent {
     });
 
     // Keep null when empty so control becomes valid if no other errors remain
-    this.control.setErrors(Object.keys(next).length ? next : null);
+    this.fc.setErrors(Object.keys(next).length ? next : null);
   }
 
   /** Choose the most relevant error to show (format/parse > min/max/filter > required) */
   firstErrorMessage(): string {
-    const errors = this.control.errors ?? {};
+    const errors = this.fc.errors ?? {};
 
     // Priority order
     const order = [
@@ -166,5 +175,9 @@ export class DatepickerComponent {
   private formatDate(d: unknown): string {
     if (!(d instanceof Date)) return '';
     return this.dateAdapter.format(d, this.dateFormats.display.dateInput);
+  }
+
+  get fc(): FormControl {
+    return this.control as FormControl;
   }
 }

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { AbstractControl, FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -20,43 +20,43 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
   template: `
     <div class="toggle-field">
       <mat-slide-toggle
-        [formControl]="control"
+        [formControl]="fc"
         [color]="field.color || 'accent'"
         [attr.aria-label]="field.label | translate"
-        [attr.aria-checked]="control.value"
-        [attr.aria-invalid]="control.invalid || null"
+        [attr.aria-checked]="fc.value"
+        [attr.aria-invalid]="fc.invalid || null"
         [attr.aria-required]="field.required || null"
         [attr.aria-describedby]="ariaDescribedBy"
-        [attr.aria-disabled]="control.disabled || null"
+        [attr.aria-disabled]="fc.disabled || null"
         (change)="markTouched()"
         (blur)="markTouched()"
       >
-        <ng-container *ngIf="field.toggleIcons?.position !== 'end'">
+        @if (field.toggleIcons?.position !== 'end') {
           <mat-icon class="toggle-icon" aria-hidden="true">
-            {{
-              control.value ? field.toggleIcons?.on || 'check' : field.toggleIcons?.off || 'close'
-            }}
+            {{ fc.value ? field.toggleIcons?.on || 'check' : field.toggleIcons?.off || 'close' }}
           </mat-icon>
-        </ng-container>
+        }
 
         <span class="toggle-label">{{ field.label | translate }}</span>
 
-        <ng-container *ngIf="field.toggleIcons?.position === 'end'">
+        @if (field.toggleIcons?.position === 'end') {
           <mat-icon class="toggle-icon" aria-hidden="true">
-            {{
-              control.value ? field.toggleIcons?.on || 'check' : field.toggleIcons?.off || 'close'
-            }}
+            {{ fc.value ? field.toggleIcons?.on || 'check' : field.toggleIcons?.off || 'close' }}
           </mat-icon>
-        </ng-container>
+        }
       </mat-slide-toggle>
 
-      <div *ngIf="field.helperText && !showError" class="toggle-hint" [id]="hintId">
-        {{ field.helperText | translate }}
-      </div>
+      @if (field.helperText && !showError) {
+        <div class="toggle-hint" [id]="hintId">
+          {{ field.helperText | translate }}
+        </div>
+      }
 
-      <div *ngIf="showError" class="toggle-error" [id]="errorId" role="alert" aria-live="polite">
-        {{ errorText }}
-      </div>
+      @if (showError) {
+        <div class="toggle-error" [id]="errorId" role="alert" aria-live="polite">
+          {{ errorText }}
+        </div>
+      }
     </div>
   `,
   styleUrls: ['./toggle.component.scss'],
@@ -66,12 +66,12 @@ export class ToggleComponent {
     toggleIcons?: { on: string; off: string; position?: 'start' | 'end' };
     color?: 'primary' | 'accent' | 'warn';
   };
-  @Input({ required: true }) control!: FormControl<boolean>;
+  @Input({ required: true }) control!: AbstractControl<boolean>;
 
   constructor(private t: TranslateService) {}
 
   get showError() {
-    return !!(this.control?.touched && this.control?.invalid);
+    return !!(this.fc?.touched && this.fc?.invalid);
   }
   get hintId() {
     return `${this.field.name}-hint`;
@@ -87,11 +87,11 @@ export class ToggleComponent {
   }
 
   markTouched() {
-    this.control?.markAsTouched();
+    this.fc?.markAsTouched();
   }
 
   get errorText(): string {
-    const errs = this.control?.errors ?? {};
+    const errs = this.fc?.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
 
     // prioritize boolean-toggle errors
@@ -105,5 +105,9 @@ export class ToggleComponent {
       this.field.errorMessages?.[mapped] ?? `form.errors.${this.field.name}.${mapped}`;
 
     return this.t.instant(i18nKey);
+  }
+
+  get fc(): FormControl {
+    return this.control as FormControl;
   }
 }

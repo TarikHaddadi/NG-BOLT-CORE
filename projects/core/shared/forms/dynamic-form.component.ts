@@ -30,6 +30,7 @@ export class DynamicFormComponent implements OnInit, OnChanges {
 
   private fb = inject(FormBuilder);
   public translateService = inject(TranslateService);
+  public controls: Record<string, AbstractControl> = {};
 
   ngOnInit(): void {
     this.ensureControls();
@@ -45,7 +46,6 @@ export class DynamicFormComponent implements OnInit, OnChanges {
     if (!this.form) return;
 
     for (const field of this.config) {
-      // Skip if control already exists (idempotent)
       if (this.form.get(field.name)) continue;
 
       if (field.type === 'group') {
@@ -56,9 +56,7 @@ export class DynamicFormComponent implements OnInit, OnChanges {
       }
 
       if (field.type === 'array') {
-        // Arrays should be FormArray, not FormControl([])
         const arr = new FormArray<AbstractControl>([]);
-        // Optional: seed with one child group using the provided children schema
         if (field.children?.length) {
           const g = this.fb.group({});
           field.children.forEach((ch) => g.addControl(ch.name, this.createControl(ch)));
@@ -70,6 +68,9 @@ export class DynamicFormComponent implements OnInit, OnChanges {
 
       this.form.addControl(field.name, this.createControl(field));
     }
+
+    // Rebuild the lookup after (idempotent)
+    this.controls = this.form.controls;
   }
 
   /** Create a control for a single field */

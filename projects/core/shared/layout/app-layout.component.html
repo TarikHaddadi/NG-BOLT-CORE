@@ -3,7 +3,7 @@
     <div class="nav-title">Navigation</div>
 
     <mat-nav-list class="menu-list">
-      <ng-container *ngFor="let item of menuItems">
+      @for (item of menuItems; track item.route) {
         <a
           mat-list-item
           [class.isDark]="theme.isDark()"
@@ -16,7 +16,7 @@
           <mat-icon>{{ item.icon }}</mat-icon>
           <span class="menu-label">{{ item.label | translate }}</span>
         </a>
-      </ng-container>
+      }
     </mat-nav-list>
 
     <div class="switchers-trigger" [class.collapsed]="!isOpen">
@@ -29,7 +29,9 @@
         aria-label="Open quick settings"
       >
         <mat-icon>tune</mat-icon>
-        <span *ngIf="isOpen" class="btn-label">{{ 'quick_settings' | translate }}</span>
+        @if (isOpen) {
+          <span class="btn-label">{{ 'quick_settings' | translate }}</span>
+        }
       </button>
     </div>
 
@@ -50,7 +52,7 @@
     </ng-template>
 
     <!-- USER PANEL -->
-    <ng-container *ngIf="profile$ | async as p">
+    @if (profile$ | async; as p) {
       <div class="user-panel" [class.collapsed]="!isOpen">
         <button
           mat-button
@@ -59,20 +61,25 @@
           [attr.aria-label]="displayName(p)"
         >
           <mat-icon class="avatar">account_circle</mat-icon>
-          <div class="user-meta" *ngIf="isOpen">
-            <div class="user-name">{{ displayName(p) }}</div>
-            <div class="user-email">{{ p.email }}</div>
-          </div>
+          @if (isOpen) {
+            <div class="user-meta">
+              <div class="user-name">{{ displayName(p) }}</div>
+              <div class="user-email">{{ p.email }}</div>
+            </div>
+          }
         </button>
+
         <mat-menu #userMenu="matMenu">
-          <p mat-menu-item *ngFor="let r of roles$ | async">{{ r }}</p>
+          @for (r of (roles$ | async) ?? []; track r) {
+            <p mat-menu-item>{{ r }}</p>
+          }
           <button mat-menu-item (click)="logout()">
             <mat-icon>logout</mat-icon>
             <span>{{ 'Logout' | translate }}</span>
           </button>
         </mat-menu>
       </div>
-    </ng-container>
+    }
 
     <div class="version-wrapper">
       <small class="version">v{{ version }}</small>

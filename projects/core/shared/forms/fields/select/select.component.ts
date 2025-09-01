@@ -1,6 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  ReactiveFormsModule,
+  ValidationErrors,
+} from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -8,7 +13,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
 type SelValue = string | number;
-type SelCtrl = FormControl<SelValue | SelValue[] | null>;
+type SelCtrl = AbstractControl<SelValue | SelValue[] | null>;
 
 @Component({
   selector: 'app-select',
@@ -25,33 +30,34 @@ type SelCtrl = FormControl<SelValue | SelValue[] | null>;
       <mat-label>{{ field.label | translate }}</mat-label>
 
       <mat-select
-        [formControl]="control"
+        [formControl]="fc"
         [multiple]="field['multiple'] || false"
         [attr.aria-label]="field.label | translate"
         [attr.aria-describedby]="ariaDescribedBy"
-        [attr.aria-invalid]="control.invalid || null"
+        [attr.aria-invalid]="fc.invalid || null"
         [attr.aria-required]="field.required || null"
-        [attr.aria-disabled]="control.disabled || null"
+        [attr.aria-disabled]="fc.disabled || null"
         (selectionChange)="markTouched()"
         (closed)="markTouched()"
       >
-        <mat-option
-          *ngFor="let option of field.options ?? []; trackBy: trackByValue"
-          [value]="option.value"
-        >
-          {{
-            field['translateOptionLabels'] ? (option.label | translate) : (option.label | translate)
-          }}
-        </mat-option>
+        @for (option of field.options ?? []; track option.value) {
+          <mat-option [value]="option.value">
+            {{ field['translateOptionLabels'] ? (option.label | translate) : option.label }}
+          </mat-option>
+        }
       </mat-select>
 
-      <mat-hint *ngIf="field.helperText && !showError" [id]="hintId">
-        {{ field.helperText | translate }}
-      </mat-hint>
+      @if (field.helperText && !showError) {
+        <mat-hint [id]="hintId">
+          {{ field.helperText | translate }}
+        </mat-hint>
+      }
 
-      <mat-error *ngIf="showError" [id]="errorId" role="alert" aria-live="polite">
-        {{ errorText | translate }}
-      </mat-error>
+      @if (showError) {
+        <mat-error [id]="errorId" role="alert" aria-live="polite">
+          {{ errorText | translate }}
+        </mat-error>
+      }
     </mat-form-field>
   `,
   styleUrls: ['./select.component.scss'],
@@ -67,7 +73,7 @@ export class SelectComponent {
 
   // ARIA + states
   get showError() {
-    return !!(this.control?.touched && this.control?.invalid);
+    return !!(this.fc?.touched && this.fc?.invalid);
   }
   get hintId() {
     return `${this.field.name}-hint`;
@@ -82,12 +88,12 @@ export class SelectComponent {
   }
 
   markTouched() {
-    this.control?.markAsTouched();
+    this.fc?.markAsTouched();
   }
 
   // Errors with fallback + params
   get errorText(): string {
-    const errs = this.control?.errors ?? {};
+    const errs = this.fc?.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
 
     // Include array-length keys first for multi-select
@@ -110,7 +116,7 @@ export class SelectComponent {
     // Multi-select: show the number of selected items
     if (key === 'minlengthArray' || key === 'maxlengthArray') {
       const requiredLength = (val as { requiredLength?: number })?.requiredLength;
-      const actualLength = Array.isArray(this.control.value) ? this.control.value.length : 0;
+      const actualLength = Array.isArray(this.fc.value) ? this.fc.value.length : 0;
       return { requiredLength, actualLength };
     }
 
@@ -136,4 +142,8 @@ export class SelectComponent {
 
   // TrackBy
   trackByValue = (_: number, opt: { value: SelValue }) => opt.value;
+
+  get fc(): FormControl {
+    return this.control as FormControl;
+  }
 }

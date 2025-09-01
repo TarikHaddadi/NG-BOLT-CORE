@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, SimpleChanges, Type } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { AbstractControl, FormControl, ReactiveFormsModule } from '@angular/forms';
 
 import { FieldComponent, FieldConfig, FieldType } from '@cadai/pxs-ng-core/interfaces';
 
@@ -33,34 +33,32 @@ const FIELD_MAP: Partial<Record<FieldType | string, Type<FieldComponent>>> = {
   // date
   datepicker: DatepickerComponent,
 };
-
 @Component({
   selector: 'app-field-host',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <ng-container *ngIf="componentType as cmp; else fallback">
-      <ng-container *ngComponentOutlet="cmp; inputs: inputsObj"></ng-container>
-    </ng-container>
-
-    <ng-template #fallback></ng-template>
+    <ng-container *ngComponentOutlet="componentType; inputs: inputsObj"> </ng-container>
   `,
 })
 export class FieldHostComponent implements OnChanges {
   @Input({ required: true }) field!: FieldConfig;
-  @Input({ required: true }) control!: FormControl;
+  @Input({ required: true }) control!: AbstractControl;
 
-  componentType?: Type<FieldComponent>;
+  componentType: Type<any> | null = null;
   inputsObj: Record<string, unknown> = {};
 
-  ngOnChanges(_changes: SimpleChanges): void {
+  ngOnChanges(_: SimpleChanges): void {
     const key = (this.field?.type ?? '').toString().toLowerCase();
-    this.componentType = FIELD_MAP[key] ?? undefined;
+    this.componentType = (FIELD_MAP[key] ?? null) as Type<any> | null;
 
-    // Only pass what child components actually declare as @Input()
     this.inputsObj = {
       field: this.field,
       control: this.control,
     };
+  }
+
+  get fc(): FormControl {
+    return this.control as FormControl;
   }
 }

@@ -1,7 +1,12 @@
 import { TextFieldModule } from '@angular/cdk/text-field';
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  ReactiveFormsModule,
+  ValidationErrors,
+} from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -23,34 +28,32 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
     <mat-form-field appearance="outline" class="w-full" floatLabel="always">
       <mat-label>{{ field.label | translate }}</mat-label>
 
-      <!-- Textarea mode -->
-      <textarea
-        *ngIf="isTextarea; else singleLine"
-        matInput
-        [id]="field.name"
-        [formControl]="control"
-        [placeholder]="field.placeholder || '' | translate"
-        [attr.minlength]="field.minLength || null"
-        [attr.maxlength]="field.maxLength || null"
-        [attr.aria-label]="field.label | translate"
-        [attr.aria-describedby]="ariaDescribedBy"
-        [attr.aria-invalid]="control.invalid || null"
-        [attr.aria-required]="field.required || null"
-        [attr.aria-disabled]="control.disabled || null"
-        (blur)="control.markAsTouched()"
-        cdkTextareaAutosize
-        [cdkAutosizeMinRows]="minRows"
-        [cdkAutosizeMaxRows]="maxRows"
-        [rows]="!field.autoResize ? minRows : null"
-      ></textarea>
-
-      <!-- Input mode -->
-      <ng-template #singleLine>
+      <!-- Textarea vs Input -->
+      @if (isTextarea) {
         <textarea
           matInput
           [id]="field.name"
+          [formControl]="fc"
+          [placeholder]="field.placeholder || '' | translate"
+          [attr.minlength]="field.minLength || null"
+          [attr.maxlength]="field.maxLength || null"
+          [attr.aria-label]="field.label | translate"
+          [attr.aria-describedby]="ariaDescribedBy"
+          [attr.aria-invalid]="fc.invalid || null"
+          [attr.aria-required]="field.required || null"
+          [attr.aria-disabled]="fc.disabled || null"
+          (blur)="fc.markAsTouched()"
+          cdkTextareaAutosize
+          [cdkAutosizeMinRows]="minRows"
+          [cdkAutosizeMaxRows]="maxRows"
+          [rows]="!field.autoResize ? minRows : null"
+        ></textarea>
+      } @else {
+        <input
+          matInput
+          [id]="field.name"
           [type]="inputType"
-          [formControl]="control"
+          [formControl]="fc"
           [maxlength]="field.maxLength || null"
           [placeholder]="field.placeholder || '' | translate"
           [attr.pattern]="patternAttr"
@@ -58,35 +61,39 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
           [attr.maxlength]="field.maxLength || null"
           [attr.inputmode]="inputMode"
           [attr.autocomplete]="autoComplete"
-          (blur)="control.markAsTouched()"
+          (blur)="fc.markAsTouched()"
           [attr.aria-label]="field.label | translate"
           [attr.aria-describedby]="ariaDescribedBy"
-          [attr.aria-invalid]="control.invalid || null"
+          [attr.aria-invalid]="fc.invalid || null"
           [attr.aria-required]="field.required || null"
-          [attr.aria-disabled]="control.disabled || null"
-        ></textarea>
-      </ng-template>
+          [attr.aria-disabled]="fc.disabled || null"
+        />
+      }
 
       <!-- Hint (left) -->
-      <mat-hint *ngIf="field.helperText && !showError" [id]="hintId">
-        {{ field.helperText | translate: { max: field.maxLength } }}
-      </mat-hint>
+      @if (field.helperText && !showError) {
+        <mat-hint [id]="hintId">
+          {{ field.helperText | translate: { max: field.maxLength } }}
+        </mat-hint>
+      }
 
       <!-- Counter (right) -->
-      <mat-hint *ngIf="field.showCounter && field.maxLength" align="end">
-        {{ charCount }} / {{ field.maxLength }}
-      </mat-hint>
+      @if (field.showCounter && field.maxLength) {
+        <mat-hint align="end"> {{ charCount }} / {{ field.maxLength }} </mat-hint>
+      }
 
-      <mat-error *ngIf="showError" [id]="errorId" role="alert" aria-live="polite">
-        {{ errorText }}
-      </mat-error>
+      @if (showError) {
+        <mat-error [id]="errorId" role="alert" aria-live="polite">
+          {{ errorText }}
+        </mat-error>
+      }
     </mat-form-field>
   `,
   styleUrls: ['./text-field.component.scss'],
 })
 export class TextFieldComponent {
   @Input({ required: true }) field!: FieldConfig;
-  @Input({ required: true }) control!: FormControl<string>;
+  @Input({ required: true }) control!: AbstractControl<string>;
 
   constructor(private t: TranslateService) {}
 
@@ -144,7 +151,7 @@ export class TextFieldComponent {
 
   // ---- ARIA helpers ----
   get showError(): boolean {
-    return !!(this.control?.touched && this.control?.invalid);
+    return !!(this.fc?.touched && this.fc?.invalid);
   }
   get hintId() {
     return `${this.field.name}-hint`;
@@ -159,13 +166,13 @@ export class TextFieldComponent {
   }
 
   get charCount(): number {
-    const v = this.control?.value as unknown;
+    const v = this.fc?.value as unknown;
     return typeof v === 'string' ? v.length : Array.isArray(v) ? v.length : 0;
   }
 
   // ---- error text with interpolation + fallbacks ----
   get errorText(): string {
-    const errs = this.control?.errors ?? {};
+    const errs = this.fc?.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
 
     const order = ['required', 'minlength', 'maxlength', 'invalidChars', 'pattern'];
@@ -184,11 +191,15 @@ export class TextFieldComponent {
       case 'maxlength':
         return { requiredLength: val?.requiredLength, actualLength: val?.actualLength };
       case 'pattern':
-        return { text: this.control?.value ?? '' };
+        return { text: this.fc?.value ?? '' };
       case 'invalidChars':
         return { char: val?.char ?? '' };
       default:
         return {};
     }
+  }
+
+  get fc(): FormControl {
+    return this.control as FormControl;
   }
 }

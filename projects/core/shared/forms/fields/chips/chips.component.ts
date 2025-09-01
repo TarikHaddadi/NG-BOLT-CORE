@@ -1,4 +1,3 @@
-// fields/chips/chips.component.ts
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -8,7 +7,12 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  ReactiveFormsModule,
+  ValidationErrors,
+} from '@angular/forms';
 import { MatChipListbox, MatChipsModule } from '@angular/material/chips';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
@@ -32,37 +36,40 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       >
         {{ field.label | translate }}
       </span>
+
       <mat-chip-listbox
         #listbox
         [id]="listboxId"
         [multiple]="field['multiple'] || false"
-        [formControl]="control"
+        [formControl]="fc"
         [attr.aria-labelledby]="labelId"
         [attr.aria-describedby]="ariaDescribedBy"
-        [attr.aria-invalid]="control.invalid || null"
+        [attr.aria-invalid]="fc.invalid || null"
         [attr.aria-required]="field.required || null"
-        [attr.aria-disabled]="control.disabled || null"
+        [attr.aria-disabled]="fc.disabled || null"
         (selectionChange)="markTouched()"
         (blur)="markTouched()"
       >
-        <mat-chip-option
-          *ngFor="let chip of field.chipOptions ?? []; trackBy: trackByIndex"
-          [value]="chip"
-          [disabled]="control.disabled"
-        >
-          {{ chip | translate }}
-        </mat-chip-option>
+        @for (chip of field.chipOptions ?? []; track chip) {
+          <mat-chip-option [value]="chip" [disabled]="fc.disabled">
+            {{ chip | translate }}
+          </mat-chip-option>
+        }
       </mat-chip-listbox>
 
       <!-- Error -->
-      <div class="chips-error" *ngIf="showError" [id]="errorId" role="alert" aria-live="polite">
-        {{ errorText }}
-      </div>
+      @if (showError) {
+        <div class="chips-error" [id]="errorId" role="alert" aria-live="polite">
+          {{ errorText }}
+        </div>
+      }
 
       <!-- Hint -->
-      <div class="chips-hint" *ngIf="field.helperText && !showError" [id]="hintId">
-        {{ field.helperText | translate }}
-      </div>
+      @if (field.helperText && !showError) {
+        <div class="chips-hint" [id]="hintId">
+          {{ field.helperText | translate }}
+        </div>
+      }
     </div>
   `,
   styleUrls: ['./chips.component.scss'],
@@ -70,24 +77,24 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 })
 export class ChipsComponent implements OnInit, OnChanges {
   @Input({ required: true }) field!: FieldConfig;
-  @Input({ required: true }) control!: FormControl<string[] | string | null>;
+  @Input({ required: true }) control!: AbstractControl<string[] | string | null>;
   @Input() multiple = false;
   @ViewChild('listbox') listbox!: MatChipListbox;
 
   constructor(private t: TranslateService) {}
 
   ngOnInit(): void {
-    const v = this.control.value;
+    const v = this.fc.value;
     if (this.field['multiple']) {
-      if (!Array.isArray(v)) this.control.setValue([], { emitEvent: false });
+      if (!Array.isArray(v)) this.fc.setValue([], { emitEvent: false });
     } else {
-      if (Array.isArray(v)) this.control.setValue(null, { emitEvent: false });
+      if (Array.isArray(v)) this.fc.setValue(null, { emitEvent: false });
     }
   }
 
   ngOnChanges() {
-    if (this.field.disabled) this.control.disable({ emitEvent: false });
-    else this.control.enable({ emitEvent: false });
+    if (this.field.disabled) this.fc.disable({ emitEvent: false });
+    else this.fc.enable({ emitEvent: false });
   }
 
   private length(v: unknown): number {
@@ -110,7 +117,7 @@ export class ChipsComponent implements OnInit, OnChanges {
   }
 
   get showError(): boolean {
-    return !!(this.control?.touched && this.control?.invalid);
+    return !!(this.fc?.touched && this.fc?.invalid);
   }
 
   get ariaDescribedBy(): string | null {
@@ -120,19 +127,18 @@ export class ChipsComponent implements OnInit, OnChanges {
   }
 
   markTouched() {
-    this.control?.markAsTouched();
+    this.fc?.markAsTouched();
   }
 
   trackByIndex = (index: number) => index;
 
   get errorText(): string {
-    const errs = this.control?.errors ?? {};
+    const errs = this.fc?.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
 
     // Priority for list selections
     const order = ['minlengthArray', 'required', 'maxlengthArray', 'optionNotAllowed'];
-    const key =
-      order.find((k) => this.control.hasError(k)) || Object.keys(this.control.errors ?? {})[0];
+    const key = order.find((k) => this.fc.hasError(k)) || Object.keys(this.fc.errors ?? {})[0];
 
     const i18nKey = this.field.errorMessages?.[key] ?? `form.errors.${this.field.name}.${key}`;
 
@@ -146,7 +152,7 @@ export class ChipsComponent implements OnInit, OnChanges {
       case 'maxlengthArray':
         return {
           requiredLength: val?.requiredLength,
-          actualLength: this.length(this.control.value),
+          actualLength: this.length(this.fc.value),
         };
       default:
         return {};
@@ -155,5 +161,9 @@ export class ChipsComponent implements OnInit, OnChanges {
 
   focusListbox() {
     this.listbox?.focus?.();
+  }
+
+  get fc(): FormControl {
+    return this.control as FormControl;
   }
 }

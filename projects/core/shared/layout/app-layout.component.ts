@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import {
   AfterViewInit,
+  ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
   DestroyRef,
@@ -15,8 +16,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatDialogModule } from '@angular/material/dialog';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
@@ -50,34 +50,39 @@ import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
 @Component({
   selector: 'app-layout',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     RouterOutlet,
+    RouterModule,
+    // Material
     MatSidenavModule,
     MatToolbarModule,
     MatIconModule,
     MatButtonModule,
-    RouterModule,
     MatTooltipModule,
     MatListModule,
-    TranslateModule,
-    SelectComponent,
-    ToggleComponent,
     MatMenuModule,
     MatChipsModule,
     MatDialogModule,
+    // Fields
+    TranslateModule,
+    SelectComponent,
+    ToggleComponent,
   ],
   templateUrl: './app-layout.component.html',
   styleUrls: ['./app-layout.component.scss'],
 })
 export class AppLayoutComponent implements OnInit, AfterViewInit {
-  public menuItems: FeatureNavItem[] = [];
   @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<any>;
-  private destroyRef = inject(DestroyRef);
 
+  // Sidebar + header
   public isOpen = true;
   public title$!: Observable<string>;
   public version!: string;
+
+  // Menu (typed for @for track item.route)
+  public menuItems: FeatureNavItem[] = [];
 
   // Theme toggle config
   public themeField: FieldConfig = {
@@ -101,21 +106,20 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   };
   public langControl!: FormControl<string>;
 
-  // ───────────────────────────────────────────────────────────
   // AI Variant selectors (scope → key → value)
   public aiScopeField: FieldConfig = {
     name: 'aiScope',
     label: 'ai.scope',
     type: 'dropdown',
-    options: [], // filled in ngOnInit
+    options: [],
   };
-  public aiScopeControl!: FormControl<string>; // '' means global; else featureKey
+  public aiScopeControl!: FormControl<string>; // '' = global; else featureKey
 
   public aiKeyField: FieldConfig = {
     name: 'aiKey',
     label: 'ai.variant',
     type: 'dropdown',
-    options: [], // filled dynamically
+    options: [],
   };
   public aiKeyControl!: FormControl<string>;
 
@@ -123,45 +127,47 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     name: 'aiValue',
     label: 'ai.value',
     type: 'dropdown',
-    options: [], // filled dynamically
+    options: [],
   };
   public aiValueControl!: FormControl<string>;
-  // ───────────────────────────────────────────────────────────
 
   profile$!: Observable<AuthProfile | null>;
   roles$!: Observable<string[]>;
 
   private cfg!: RuntimeConfig;
 
-  constructor(
-    private layoutService: LayoutService,
-    private cdr: ChangeDetectorRef,
-    private configService: ConfigService,
-    public translate: TranslateService,
-    public theme: ThemeService,
-    private injector: Injector,
-    private store: Store,
-    private features: FeatureService,
-    private keycloak: KeycloakService,
-    private dialog: MatDialog,
-  ) {}
+  // inject()
+  private destroyRef = inject(DestroyRef);
+  private cdr = inject(ChangeDetectorRef);
+  private injector = inject(Injector);
+  private layoutService = inject(LayoutService);
+  private configService = inject(ConfigService);
+  public translate = inject(TranslateService);
+  public theme = inject(ThemeService);
+  private store = inject(Store);
+  private features = inject(FeatureService);
+  private keycloak = inject(KeycloakService);
+  private dialog = inject(MatDialog);
 
-  public ngAfterViewInit(): void {
+  ngAfterViewInit(): void {
+    // Toolbar title initial push, etc.
     this.cdr.detectChanges();
   }
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.title$ = this.layoutService.title$;
     this.cfg = this.configService.getAll() as RuntimeConfig;
     this.version = this.cfg.version || '0.0.0';
 
     // Theme toggle
     this.themeControl = new FormControl<boolean>(this.theme.isDark(), { nonNullable: true });
-    this.themeControl.valueChanges.subscribe((wantDark) => {
-      const current = this.theme.isDark();
-      if (wantDark !== current) this.theme.toggleTheme();
-    });
+    this.themeControl.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((wantDark) => {
+        if (wantDark !== this.theme.isDark()) this.theme.toggleTheme();
+      });
 
+    // Mirror theme -> control via effect (no loops)
     effect(
       () => {
         const isDark = this.theme.isDark();
@@ -176,43 +182,38 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     this.langControl = new FormControl<string>(this.translate.getCurrentLang(), {
       nonNullable: true,
     });
-    this.langControl.valueChanges.subscribe((lang) => lang && this.translate.use(lang));
+    this.langControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((lang) => {
+      if (lang) this.translate.use(lang);
+    });
 
     // Auth → roles/menus
     this.profile$ = this.store.select(AppSelectors.AuthSelectors.selectProfile);
     this.roles$ = this.profile$.pipe(map((p) => p?.authorization ?? []));
 
+    // Initialize menu and react to auth context
     this.menuItems = this.features.visibleFeatures();
-    this.profile$.subscribe((p) => {
+    this.profile$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
       const roles = p?.authorization ?? [];
       const { isAuthenticated, tenant } = this.keycloak.getUserCtx();
       this.features.setUser({ isAuthenticated, roles, tenant });
       this.menuItems = this.features.visibleFeatures();
+      this.cdr.markForCheck();
     });
 
-    // ───────────────────────────────────────────────────────────
-    // AI Variant: build dynamic selectors
-    // 1) Scope options: Global + features that declare variants
-    const featuresWithVariants = Object.entries(this.cfg.features ?? {})
-      .filter(([, f]) => f?.variants && typeof f.variants === 'object')
-      .map(([k]) => k);
+    // AI Variant selectors
+    const featuresWithVariants = () =>
+      Object.entries(this.cfg.features ?? {})
+        .filter(([, f]) => f?.variants && typeof f.variants === 'object')
+        .map(([k]) => k);
 
-    this.aiScopeField.options = [
-      { label: this.translate.instant('ai.global'), value: '' },
-      ...featuresWithVariants.map((k) => ({
-        label: this.translate.instant(k),
-        value: k,
-      })),
-    ];
+    const buildScopeOptions = () => {
+      this.aiScopeField.options = [
+        { label: this.translate.instant('ai.global'), value: '' },
+        ...featuresWithVariants().map((k) => ({ label: this.translate.instant(k), value: k })),
+      ];
+    };
 
-    // Controls
-    this.aiScopeControl = new FormControl<string>('', { nonNullable: true }); // default: Global
-    this.aiKeyControl = new FormControl<string>('', { nonNullable: true });
-    this.aiValueControl = new FormControl<string>('', { nonNullable: true });
-
-    // Initialize key/value lists based on scope
     const refreshKeys = (scope: string) => {
-      // Collect variant keys either for a specific feature or union across features
       const keys = scope
         ? Object.keys(this.cfg.features?.[scope]?.variants ?? {})
         : Array.from(
@@ -223,12 +224,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
             ),
           );
 
-      this.aiKeyField.options = keys.map((k) => ({
-        label: this.translate.instant(k),
-        value: k,
-      }));
+      this.aiKeyField.options = keys.map((k) => ({ label: this.translate.instant(k), value: k }));
 
-      // Pick first key if none selected or selection no longer valid
       const nextKey = keys.includes(this.aiKeyControl.value)
         ? this.aiKeyControl.value
         : (keys[0] ?? '');
@@ -236,7 +233,6 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     };
 
     const refreshValues = (scope: string, key: string) => {
-      // Values from config (either from that feature or union across features)
       const valuesFromConfig: unknown[] = scope
         ? [this.cfg.features?.[scope]?.variants?.[key]].filter((v) => v !== undefined)
         : Array.from(
@@ -247,81 +243,72 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
             ),
           );
 
-      // Current effective value (from FeatureService which looks at store+config)
       const effective = this.features.variant<unknown>(key, undefined, scope || undefined);
+      const asString = (v: unknown) => (v == null ? '' : String(v));
 
-      // Build options (stringify to display); include effective if not present
-      const asString = (v: unknown) => (v === null || v === undefined ? '' : String(v));
       const optionValues = [...valuesFromConfig.map(asString)];
       const effStr = asString(effective);
       if (effStr && !optionValues.includes(effStr)) optionValues.unshift(effStr);
 
-      // Fallback if empty: show a simple placeholder option
       const finalValues = optionValues.length ? optionValues : [''];
 
       this.aiValueField.options = finalValues.map((v) => ({
         label: this.translate.instant(v) || '(empty)',
         value: v,
       }));
+
       const nextVal = finalValues.includes(this.aiValueControl.value)
         ? this.aiValueControl.value
         : finalValues[0];
       this.aiValueControl.setValue(nextVal, { emitEvent: false });
     };
 
+    // Controls
+    this.aiScopeControl = new FormControl<string>('', { nonNullable: true });
+    this.aiKeyControl = new FormControl<string>('', { nonNullable: true });
+    this.aiValueControl = new FormControl<string>('', { nonNullable: true });
+
+    // i18n re-compute labels
     this.translate.onLangChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-      // Rebuild SCOPE options
-      const featuresWithVariants = Object.entries(this.cfg.features ?? {})
-        .filter(([, f]) => f?.variants && typeof f.variants === 'object')
-        .map(([k]) => k);
-
-      this.aiScopeField.options = [
-        { label: this.translate.instant('ai.global'), value: '' },
-        ...featuresWithVariants.map((k) => ({
-          label: this.translate.instant(k),
-          value: k,
-        })),
-      ];
-
-      // Rebuild KEY and VALUE options for the current selections
+      buildScopeOptions();
       const scope = this.aiScopeControl.value;
       const key = this.aiKeyControl.value;
-      refreshKeys(scope); // will re-fill aiKeyField.options with translated labels
-      if (key) refreshValues(scope, key); // will re-fill aiValueField.options with translated labels
-    });
-
-    // React to scope changes → rebuild keys (and then values)
-    this.aiScopeControl.valueChanges.subscribe((scope) => {
       refreshKeys(scope);
+      if (key) refreshValues(scope, key);
+      this.cdr.markForCheck();
     });
 
-    // React to key changes → rebuild values
-    this.aiKeyControl.valueChanges.subscribe((key) => {
+    // React to scope/key/value changes
+    this.aiScopeControl.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((scope) => refreshKeys(scope));
+
+    this.aiKeyControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((key) => {
       const scope = this.aiScopeControl.value;
-      if (!key) return;
-      refreshValues(scope, key);
+      if (key) refreshValues(scope, key);
     });
 
-    // Dispatch override on value change
-    this.aiValueControl.valueChanges.subscribe((value) => {
-      const scope = this.aiScopeControl.value;
-      const key = this.aiKeyControl.value;
-      if (!key) return;
-      this.store.dispatch(
-        AppActions.AiVariantsActions.setVariant({
-          path: key,
-          value,
-          featureKey: scope || undefined,
-        }),
-      );
-    });
+    this.aiValueControl.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => {
+        const scope = this.aiScopeControl.value;
+        const key = this.aiKeyControl.value;
+        if (!key) return;
+        this.store.dispatch(
+          AppActions.AiVariantsActions.setVariant({
+            path: key,
+            value,
+            featureKey: scope || undefined,
+          }),
+        );
+      });
 
     // Seed initial selections
+    buildScopeOptions();
     refreshKeys(this.aiScopeControl.value);
     if (this.aiKeyControl.value) {
       refreshValues(this.aiScopeControl.value, this.aiKeyControl.value);
     }
-    // ───────────────────────────────────────────────────────────
   }
 
   displayName(p: AuthProfile | null): string {
@@ -338,7 +325,6 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     this.store.dispatch(AppActions.AuthActions.logout());
   }
 
-  // Remove the current override so the value falls back to config
   resetVariant(): void {
     const scope = this.aiScopeControl.value;
     const key = this.aiKeyControl.value;
@@ -358,12 +344,11 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       {
         width: '520px',
         maxWidth: '95vw',
-        panelClass: 'switchers-dialog-panel', // (optional) for custom styling
-        backdropClass: 'app-overlay-backdrop', // (optional)
+        panelClass: 'switchers-dialog-panel',
+        backdropClass: 'app-overlay-backdrop',
         data: {
           title: 'quick_settings',
           contentTpl: this.switchersTpl,
-          // Provide a function so the dialog can return a payload on confirm
           getResult: () => ({
             theme: this.themeControl.value,
             lang: this.langControl.value,
@@ -376,6 +361,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     );
 
     const result = await firstValueFrom(ref.afterClosed());
-    if (!result) return; // user canceled
+    if (!result) return;
+    // You can handle persisted quick-settings here if needed
   }
 }

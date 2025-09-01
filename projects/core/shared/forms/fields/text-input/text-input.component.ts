@@ -1,6 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  ReactiveFormsModule,
+  ValidationErrors,
+} from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -19,34 +24,38 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         matInput
         [id]="field.name"
         [type]="inputType"
-        [formControl]="control"
+        [formControl]="fc"
         [placeholder]="field.placeholder ?? '' | translate"
         [attr.pattern]="patternAttr"
         [attr.minlength]="field.minLength || null"
         [attr.maxlength]="field.maxLength || null"
         [attr.inputmode]="inputMode"
         [attr.autocomplete]="autoComplete"
-        (blur)="control.markAsTouched()"
+        (blur)="fc.markAsTouched()"
         [attr.aria-label]="field.label | translate"
         [attr.aria-describedby]="ariaDescribedBy"
-        [attr.aria-invalid]="control.invalid || null"
+        [attr.aria-invalid]="fc.invalid || null"
         [attr.aria-required]="field.required || null"
       />
 
-      <mat-hint *ngIf="field.helperText && !showError" [id]="hintId">
-        {{ field.helperText | translate }}
-      </mat-hint>
+      @if (field.helperText && !showError) {
+        <mat-hint [id]="hintId">
+          {{ field.helperText | translate }}
+        </mat-hint>
+      }
 
-      <mat-error *ngIf="showError" [id]="errorId" role="alert" aria-live="polite">
-        {{ errorMessage }}
-      </mat-error>
+      @if (showError) {
+        <mat-error [id]="errorId" role="alert" aria-live="polite">
+          {{ errorMessage }}
+        </mat-error>
+      }
     </mat-form-field>
   `,
   styleUrls: ['./text-input.component.scss'],
 })
 export class TextInputComponent {
   @Input({ required: true }) field!: FieldConfig;
-  @Input({ required: true }) control!: FormControl<string>;
+  @Input({ required: true }) control!: AbstractControl<string>;
 
   constructor(private t: TranslateService) {}
 
@@ -99,7 +108,7 @@ export class TextInputComponent {
   }
 
   get showError(): boolean {
-    return !!(this.control?.touched && this.control?.invalid);
+    return !!(this.fc?.touched && this.fc?.invalid);
   }
 
   get ariaDescribedBy(): string | null {
@@ -110,7 +119,7 @@ export class TextInputComponent {
 
   // --- Error building with interpolation + fallbacks ---
   get errorMessage(): string {
-    const errs = this.control.errors ?? {};
+    const errs = this.fc.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
 
     // Common text-input priorities
@@ -142,9 +151,13 @@ export class TextInputComponent {
       case 'invalidChars':
         return { char: val?.char ?? '' };
       case 'pattern':
-        return { text: this.control?.value ?? '' };
+        return { text: this.fc?.value ?? '' };
       default:
         return {};
     }
+  }
+
+  get fc(): FormControl {
+    return this.control as FormControl;
   }
 }

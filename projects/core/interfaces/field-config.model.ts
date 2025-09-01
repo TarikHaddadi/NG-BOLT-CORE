@@ -17,7 +17,7 @@ export type FieldType =
 
 export interface FieldComponent {
   field: FieldConfig;
-  control: import('@angular/forms').FormControl<any>;
+  control: import('@angular/forms').AbstractControl<any>;
 }
 
 export interface FieldConfig {
