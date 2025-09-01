@@ -3,6 +3,7 @@ import { Store } from '@ngrx/store';
 
 import {
   AppFeature,
+  AuthRuntimeConfig,
   FeatureNavItem,
   RuntimeConfig,
   UserCtx,
@@ -17,7 +18,7 @@ const selectVariantsUnsafe = (root: unknown): VariantsState =>
 
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
-  private cfg?: RuntimeConfig; // ← may be undefined until config is loaded
+  public cfg?: RuntimeConfig; // ← may be undefined until config is loaded
   private readonly store = inject(Store, { optional: true });
 
   private variantCache: VariantsState = { global: {}, features: {} };
@@ -123,12 +124,12 @@ export class FeatureService {
         production: false,
         apiUrl: '',
         version: '0.0.0',
-        auth: {} as any,
+        auth: {} as AuthRuntimeConfig,
         features: {},
       }) as RuntimeConfig;
     }
     // Ensure features bag exists
-    if (!this.cfg.features) (this.cfg as any).features = {};
+    if (!this.cfg.features) this.cfg.features = {};
     return this.cfg as RuntimeConfig & { features: Record<string, AppFeature> };
   }
 
