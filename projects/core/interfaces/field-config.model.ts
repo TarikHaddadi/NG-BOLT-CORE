@@ -15,9 +15,9 @@ export type FieldType =
   | 'autocomplete'
   | 'textarea';
 
-export interface FieldComponent {
+export interface FieldComponent<T = unknown> {
   field: FieldConfig;
-  control: import('@angular/forms').AbstractControl<any>;
+  control: import('@angular/forms').AbstractControl<T>;
 }
 
 export interface FieldConfig {

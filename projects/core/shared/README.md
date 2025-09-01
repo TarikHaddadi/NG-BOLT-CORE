@@ -51,11 +51,14 @@ export class MyFeatureComponent {
 
 ```html
 <form [formGroup]="form" class="grid gap-2">
-  <ng-container *ngFor="let field of fieldConfig">
-    <div class="{{ field.layoutClass || 'col-12' }}" *ngIf="!field.hidden">
-      <app-field-host [field]="field" [control]="form.get(field.name)!"></app-field-host>
-    </div>
-  </ng-container>
+  @for (field of config; track field.name) { @if (!field.hidden) { @if (controls[field.name]; as
+  ctl) {
+  <app-field-host [field]="field" [control]="ctl"></app-field-host>
+  } @else {
+  <div style="min-height: 48px"></div>
+  } } } @empty {
+  <p class="text-sm opacity-60">No fields configured.</p>
+  }
 </form>
 ```
 

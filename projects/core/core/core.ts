@@ -14,7 +14,7 @@ import { provideTranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
-import { CoreOptions } from '@cadai/pxs-ng-core/interfaces';
+import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
 import {
   APP_DATE_PROVIDERS,
   ConfigService,
@@ -49,8 +49,8 @@ function normalize(opts: CoreOptions): Required<CoreOptions> {
     interceptors: opts.interceptors ?? [],
     animations: opts.animations ?? true,
     appVersion: opts.appVersion ?? '0.0.0',
-    // If environments is optional in CoreOptions, prefer: environments: opts.environments as any
-    environments: (opts.environments as any) ?? ({} as any),
+    // If environments is optional in CoreOptions, prefer: environments: opts.environments as RuntimeConfig
+    environments: (opts.environments as RuntimeConfig) ?? ({} as RuntimeConfig),
   } as Required<CoreOptions>;
 }
 

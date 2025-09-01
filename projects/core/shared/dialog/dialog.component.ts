@@ -1,25 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, Inject, TemplateRef } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 
-export interface ConfirmDialogData {
-  title?: string;
-  message?: string;
-
-  // Optional custom content/actions
-  contentTpl?: TemplateRef<any>;
-  actionsTpl?: TemplateRef<any>;
-  context?: any;
-
-  // Button labels
-  confirmText?: string;
-  cancelText?: string;
-
-  // Optional: compute a value to return on confirm
-  getResult?: () => any;
-}
+import { ConfirmDialogData } from '@cadai/pxs-ng-core/interfaces';
 
 @Component({
   selector: 'app-confirm-dialog',
@@ -52,10 +37,10 @@ export interface ConfirmDialogData {
     </div>
   `,
 })
-export class ConfirmDialogComponent {
+export class ConfirmDialogComponent<TContext = unknown> {
   constructor(
-    public dialogRef: MatDialogRef<ConfirmDialogComponent, any>,
-    @Inject(MAT_DIALOG_DATA) public data: ConfirmDialogData,
+    public dialogRef: MatDialogRef<ConfirmDialogComponent<TContext>, any>,
+    @Inject(MAT_DIALOG_DATA) public data: ConfirmDialogData<TContext>,
   ) {}
 
   closeWithResult() {

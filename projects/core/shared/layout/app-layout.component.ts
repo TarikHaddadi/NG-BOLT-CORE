@@ -29,10 +29,13 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom, map, Observable } from 'rxjs';
 
 import {
+  AppFeature,
   AuthProfile,
+  ConfirmDialogData,
   FeatureNavItem,
   FieldConfig,
   RuntimeConfig,
+  SwitchersResult,
 } from '@cadai/pxs-ng-core/interfaces';
 import {
   ConfigService,
@@ -43,7 +46,7 @@ import {
 } from '@cadai/pxs-ng-core/services';
 import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
 
-import { ConfirmDialogComponent, ConfirmDialogData } from '../dialog/dialog.component';
+import { ConfirmDialogComponent } from '../dialog/dialog.component';
 import { SelectComponent } from '../forms/fields/select/select.component';
 import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
 
@@ -74,7 +77,7 @@ import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
   styleUrls: ['./app-layout.component.scss'],
 })
 export class AppLayoutComponent implements OnInit, AfterViewInit {
-  @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<any>;
+  @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<unknown>;
 
   // Sidebar + header
   public isOpen = true;
@@ -218,7 +221,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         ? Object.keys(this.cfg.features?.[scope]?.variants ?? {})
         : Array.from(
             new Set(
-              Object.values(this.cfg.features ?? {}).flatMap((f: any) =>
+              Object.values(this.cfg.features ?? {}).flatMap((f: AppFeature) =>
                 f?.variants ? Object.keys(f.variants) : [],
               ),
             ),
@@ -238,7 +241,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         : Array.from(
             new Set(
               Object.values(this.cfg.features ?? {})
-                .map((f: any) => f?.variants?.[key])
+                .map((f: AppFeature) => f?.variants?.[key])
                 .filter((v) => v !== undefined),
             ),
           );
@@ -339,7 +342,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   }
 
   async openSwitchers(): Promise<void> {
-    const ref = this.dialog.open<ConfirmDialogComponent, ConfirmDialogData, any>(
+    const ref = this.dialog.open<ConfirmDialogComponent, ConfirmDialogData, SwitchersResult>(
       ConfirmDialogComponent,
       {
         width: '520px',

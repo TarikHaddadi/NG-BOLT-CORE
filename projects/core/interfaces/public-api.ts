@@ -11,6 +11,7 @@ export {
   type UserCtx,
 } from './core.interface';
 export { type FeatureNavItem } from './core.interface';
+export { type ConfirmDialogData, type SwitchersResult } from './dialog.model';
 export { type FieldComponent, type FieldConfig, type FieldType } from './field-config.model';
 export { type AuthProfile, type AuthRuntimeConfig } from './keycloack.model';
 export { type AppEvents, type RealtimeClient, type RealtimeEventMap } from './realtime.model';

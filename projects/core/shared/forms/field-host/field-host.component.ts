@@ -45,12 +45,12 @@ export class FieldHostComponent implements OnChanges {
   @Input({ required: true }) field!: FieldConfig;
   @Input({ required: true }) control!: AbstractControl;
 
-  componentType: Type<any> | null = null;
+  componentType: Type<FieldComponent> | null = null;
   inputsObj: Record<string, unknown> = {};
 
   ngOnChanges(_: SimpleChanges): void {
     const key = (this.field?.type ?? '').toString().toLowerCase();
-    this.componentType = (FIELD_MAP[key] ?? null) as Type<any> | null;
+    this.componentType = (FIELD_MAP[key] ?? null) as Type<FieldComponent> | null;
 
     this.inputsObj = {
       field: this.field,

@@ -203,15 +203,6 @@ export class KeycloakService implements OnDestroy {
     };
   }
 
-  /** Tenant claim (defaults to 'tenant'; change claimName if your mapper differs). */
-  private getClaimStringFrom(obj: any, claim: string): string | null {
-    const v = obj?.[claim];
-    if (!v) return null;
-    if (typeof v === 'string') return v.trim() || null;
-    if (Array.isArray(v) && v.length) return String(v[0]).trim() || null;
-    return null;
-  }
-
   getTenant(claimName: string = 'tenant'): string | null {
     const v = this.instance.tokenParsed?.[claimName];
     if (!v) return null;

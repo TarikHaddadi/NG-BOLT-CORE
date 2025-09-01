@@ -49,7 +49,7 @@ export class WebSocketClient<M extends RealtimeEventMap = RealtimeEventMap>
   }
 }
 
-function safeParse(s: any): unknown {
+function safeParse<T = unknown>(s: string | T): T | unknown {
   try {
     return typeof s === 'string' ? JSON.parse(s) : s;
   } catch {
