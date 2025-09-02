@@ -32,49 +32,50 @@ export const hydrateFromConfigEffect = createEffect(
     return actions$.pipe(
       ofType(VariantsActions.hydrateFromConfig, ROOT_EFFECTS_INIT),
       map(() => {
-        const cfg = (config.getAll?.() ?? {}) as RuntimeConfig;
-        const featuresCfg = (cfg.features ?? {}) as Record<string, AppFeature>;
+        try {
+          const cfg = (config.getAll?.() ?? {}) as RuntimeConfig;
+          const featuresCfg = (cfg.features ?? {}) as Record<string, AppFeature>;
 
-        const features: Record<string, Record<string, VariantValue>> = {};
+          const features: Record<string, Record<string, VariantValue>> = {};
 
-        // Per-feature options (meta)
-        Object.entries(featuresCfg).forEach(([featureKey, f]) => {
-          const v = f?.variants as unknown;
-          if (Array.isArray(v)) {
+          Object.entries(featuresCfg).forEach(([featureKey, f]) => {
+            const v = f?.variants as unknown;
+            if (!Array.isArray(v) && !(v && typeof v === 'object')) return;
+
             const providers = new Set<string>();
             const models = new Set<string>();
             const byProv: ModelsByProvider = {};
 
-            (v as Array<Record<string, unknown>>).forEach((group) => {
-              const prov = normProvider(group['ai.provider']);
-              if (!prov) return;
-              providers.add(prov);
-              const list = normModels(group['ai.model']);
-              if (list.length) {
-                byProv[prov] = Array.from(new Set([...(byProv[prov] ?? []), ...list]));
+            if (Array.isArray(v)) {
+              (v as Array<Record<string, unknown>>).forEach((group) => {
+                const prov = normProvider(group['ai.provider']);
+                const list = normModels(group['ai.model']);
+                if (prov) providers.add(prov);
                 list.forEach((m) => models.add(m));
-              }
-            });
+                if (prov && list.length) {
+                  byProv[prov] = Array.from(new Set([...(byProv[prov] ?? []), ...list]));
+                }
+              });
+            } else {
+              const obj = v as Record<string, unknown>;
+              const prov = normProvider(obj['ai.provider']);
+              const list = normModels(obj['ai.model']);
+              if (prov) providers.add(prov);
+              list.forEach((m) => models.add(m));
+              if (prov && list.length) byProv[prov] = list;
+            }
 
             features[featureKey] = {
               '__ai.providers': Array.from(providers),
               '__ai.models': Array.from(models),
               '__ai.modelsByProvider': byProv,
             };
-          } else if (v && typeof v === 'object') {
-            const obj = v as Record<string, unknown>;
-            const prov = normProvider(obj['ai.provider']);
-            const list = normModels(obj['ai.model']);
-            const byProv: ModelsByProvider = prov ? { [prov]: list } : {};
-            features[featureKey] = {
-              '__ai.providers': prov ? [prov] : [],
-              '__ai.models': list,
-              '__ai.modelsByProvider': byProv,
-            };
-          }
-        });
+          });
 
-        return VariantsActions.hydrateSuccess({ features });
+          return VariantsActions.hydrateSuccess({ features });
+        } catch (error) {
+          return VariantsActions.hydrateFailure({ error });
+        }
       }),
       catchError((error) => of(VariantsActions.hydrateFailure({ error }))),
     );

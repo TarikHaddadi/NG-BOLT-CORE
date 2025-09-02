@@ -91,7 +91,6 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         suffix: normalized.i18n.suffix,
       }),
       fallbackLang: normalized.i18n.fallbackLang,
-      lang: normalized.i18n.lang,
     }),
     provideAppInitializer(() => {
       const translate = inject(TranslateService);
