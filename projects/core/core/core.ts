@@ -10,7 +10,7 @@ import { provideAppInitializer } from '@angular/core';
 import { MatNativeDateModule } from '@angular/material/core';
 import { provideAnimations, provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Store } from '@ngrx/store';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
@@ -92,6 +92,11 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       }),
       fallbackLang: normalized.i18n.fallbackLang,
       lang: normalized.i18n.lang,
+    }),
+    provideAppInitializer(() => {
+      const translate = inject(TranslateService);
+      translate.addLangs(['en', 'fr']);
+      translate.setFallbackLang('en');
     }),
 
     // Theme init
