@@ -32,7 +32,6 @@ import {
   ConfirmDialogData,
   FeatureNavItem,
   FieldConfig,
-  Lang,
   RuntimeConfig,
   SwitchersResult,
 } from '@cadai/pxs-ng-core/interfaces';
@@ -191,8 +190,10 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         distinctUntilChanged(),
       )
       .subscribe((lang: string) => {
-        if (this.langControl.value !== lang) {
-          this.langControl.setValue(lang, { emitEvent: false }); // avoid feedback loop
+        const currentLang = lang === 'English' ? 'en' : 'fr';
+
+        if (this.langControl.value !== currentLang) {
+          this.langControl.setValue(currentLang, { emitEvent: false }); // avoid feedback loop
         }
       });
 
@@ -205,7 +206,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .subscribe((lang) => {
         this.store.dispatch(
           AppActions.LangActions.setLang({
-            lang: lang === 'en' ? 'English' : ('Français' as Lang),
+            lang: lang === 'en' ? 'English' : 'Français',
           }),
         );
       });
