@@ -194,7 +194,7 @@ function normalizeFeatureVariants(variants: unknown): Record<string, VariantValu
     // Cast to VariantValue map (arrays of strings + optional meta object)
     return {
       ...out,
-      __ai_modelsByProvider: modelsByProvider, // VariantValue allows Record<string, unknown>
+      '__ai.modelsByProvider': modelsByProvider, // VariantValue allows Record<string, unknown>
     } as Record<string, VariantValue>;
   }
 

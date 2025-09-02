@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
-import { Actions, createEffect, ofType,ROOT_EFFECTS_INIT } from '@ngrx/effects';
+import { Actions, createEffect, ofType, ROOT_EFFECTS_INIT } from '@ngrx/effects';
 import { of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, mergeMap } from 'rxjs/operators';
 
 import { AppFeature, RuntimeConfig, VariantValue } from '@cadai/pxs-ng-core/interfaces';
 import { ConfigService } from '@cadai/pxs-ng-core/services';
@@ -32,79 +32,81 @@ export const hydrateFromConfigEffect = createEffect(
     return actions$.pipe(
       ofType(VariantsActions.hydrateFromConfig, ROOT_EFFECTS_INIT),
       map(() => {
-        try {
-          const cfg = (config.getAll?.() ?? {}) as RuntimeConfig;
-          const featuresCfg = (cfg.features ?? {}) as Record<string, AppFeature>;
+        const cfg = (config.getAll?.() ?? {}) as RuntimeConfig;
+        const featuresCfg = (cfg.features ?? {}) as Record<string, AppFeature>;
 
-          const featureVariants: Record<string, Record<string, VariantValue>> = {};
+        const features: Record<string, Record<string, VariantValue>> = {};
 
-          // Per-feature extraction
-          Object.entries(featuresCfg).forEach(([featureKey, f]) => {
-            const v = f?.variants as unknown;
+        // Per-feature options (meta)
+        Object.entries(featuresCfg).forEach(([featureKey, f]) => {
+          const v = f?.variants as unknown;
+          if (Array.isArray(v)) {
+            const providers = new Set<string>();
+            const models = new Set<string>();
+            const byProv: ModelsByProvider = {};
 
-            if (Array.isArray(v)) {
-              const providers = new Set<string>();
-              const models = new Set<string>();
-              const byProv: ModelsByProvider = {};
-
-              (v as Array<Record<string, unknown>>).forEach((group) => {
-                const prov = normProvider(group['ai.provider']);
-                if (!prov) return;
-
-                providers.add(prov);
-
-                const list = normModels(group['ai.model']);
-                if (!list.length) return;
-
+            (v as Array<Record<string, unknown>>).forEach((group) => {
+              const prov = normProvider(group['ai.provider']);
+              if (!prov) return;
+              providers.add(prov);
+              const list = normModels(group['ai.model']);
+              if (list.length) {
                 byProv[prov] = Array.from(new Set([...(byProv[prov] ?? []), ...list]));
                 list.forEach((m) => models.add(m));
-              });
-
-              featureVariants[featureKey] = {
-                'ai.provider': Array.from(providers),
-                'ai.model': Array.from(models),
-                '__ai.modelsByProvider': byProv,
-              };
-            } else if (v && typeof v === 'object') {
-              // Legacy single-object shape
-              const obj = v as Record<string, unknown>;
-              const prov = normProvider(obj['ai.provider']);
-              const list = normModels(obj['ai.model']);
-              const byProv: ModelsByProvider = prov ? { [prov]: list } : {};
-
-              featureVariants[featureKey] = {
-                ...(obj as Record<string, VariantValue>),
-                '__ai.modelsByProvider': byProv,
-              };
-            }
-            // else: no variants → skip
-          });
-
-          // GLOBAL scope: merge all features
-          const globalByProv: ModelsByProvider = {};
-          Object.values(featureVariants).forEach((rec) => {
-            const m = rec['__ai.modelsByProvider'] as ModelsByProvider | undefined;
-            if (!m) return;
-            Object.entries(m).forEach(([prov, list]) => {
-              const acc = globalByProv[prov] ?? [];
-              globalByProv[prov] = Array.from(new Set([...acc, ...list]));
+              }
             });
-          });
 
-          featureVariants[''] = {
-            '__ai.modelsByProvider': globalByProv,
-            'ai.provider': Object.keys(globalByProv),
-            'ai.model': Array.from(new Set(Object.values(globalByProv).flat())),
-          };
+            features[featureKey] = {
+              '__ai.providers': Array.from(providers),
+              '__ai.models': Array.from(models),
+              '__ai.modelsByProvider': byProv,
+            };
+          } else if (v && typeof v === 'object') {
+            const obj = v as Record<string, unknown>;
+            const prov = normProvider(obj['ai.provider']);
+            const list = normModels(obj['ai.model']);
+            const byProv: ModelsByProvider = prov ? { [prov]: list } : {};
+            features[featureKey] = {
+              '__ai.providers': prov ? [prov] : [],
+              '__ai.models': list,
+              '__ai.modelsByProvider': byProv,
+            };
+          }
+        });
 
-          return VariantsActions.hydrateSuccess({
-            features: featureVariants,
-          });
-        } catch (error) {
-          return VariantsActions.hydrateFailure({ error });
-        }
+        return VariantsActions.hydrateSuccess({ features });
       }),
       catchError((error) => of(VariantsActions.hydrateFailure({ error }))),
+    );
+  },
+  { functional: true },
+);
+
+/** Optional: set sensible defaults after hydrate, if user hasn't chosen yet */
+export const ensureDefaultsEffect = createEffect(
+  () => {
+    const actions$ = inject(Actions);
+
+    return actions$.pipe(
+      ofType(VariantsActions.hydrateSuccess),
+      mergeMap(({ features }) => {
+        const toDispatch: any[] = [];
+        Object.entries(features).forEach(([featureKey, rec]) => {
+          if (!featureKey) return; // skip global
+          const providers = rec['__ai.providers'] as string[] | undefined;
+          const map = rec['__ai.modelsByProvider'] as ModelsByProvider | undefined;
+          if (!providers?.length || !map) return;
+          const p = providers[0];
+          const m = (map[p] ?? [])[0];
+          if (p)
+            toDispatch.push(
+              VariantsActions.setVariant({ featureKey, path: 'ai.provider', value: p }),
+            );
+          if (m)
+            toDispatch.push(VariantsActions.setVariant({ featureKey, path: 'ai.model', value: m }));
+        });
+        return toDispatch.length ? toDispatch : [];
+      }),
     );
   },
   { functional: true },

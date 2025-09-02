@@ -38,25 +38,19 @@ export const variantsReducer = createReducer(
 
   on(VariantsActions.hydrateFailure, (state) => state),
 
-  on(VariantsActions.setVariant, (state, { path, value, featureKey }) => {
-    if (featureKey) {
-      const current = state.features[featureKey] ?? {};
-      if (value === undefined) {
-        const { [path]: _omit, ...rest } = current;
-        return { ...state, features: { ...state.features, [featureKey]: rest } };
-      }
-      return {
-        ...state,
-        features: { ...state.features, [featureKey]: { ...current, [path]: value } },
-      };
-    }
-
-    if (value === undefined) {
-      return { ...state };
-    }
-    return { ...state };
+  on(VariantsActions.setVariant, (state, { featureKey, path, value }) => {
+    if (path.startsWith('__ai.')) return state; // meta is read-only
+    return {
+      ...state,
+      features: {
+        ...state.features,
+        [featureKey ?? '']: {
+          ...(state.features[featureKey ?? ''] ?? {}),
+          [path]: value,
+        },
+      },
+    };
   }),
-
   on(VariantsActions.setModelsByProvider, (state, { featureKey, map }) => ({
     ...state,
     features: {

@@ -9,7 +9,7 @@ import { Lang } from '@cadai/pxs-ng-core/interfaces';
 import { AppActions } from '../../app.actions';
 import { AppSelectors } from '../../app.selectors';
 
-const norm = (l?: string | null) => (l || 'en').toLowerCase().split('-')[0] as 'en' | 'fr';
+const norm = (l?: Lang | null) => (l || 'en').toLowerCase() as Lang;
 
 /** 1) On app start: read lang from store once and activate it */
 export const initLangFromStoreOnce = createEffect(

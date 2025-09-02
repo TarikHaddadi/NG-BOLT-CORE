@@ -24,10 +24,10 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule, RouterOutlet } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { distinctUntilChanged, filter, firstValueFrom, map, Observable } from 'rxjs';
+import { combineLatest, firstValueFrom, Observable } from 'rxjs';
+import { distinctUntilChanged, filter, map, startWith, switchMap } from 'rxjs/operators';
 
 import {
-  AppFeature,
   AuthProfile,
   ConfirmDialogData,
   FeatureNavItem,
@@ -44,6 +44,8 @@ import {
   ThemeService,
 } from '@cadai/pxs-ng-core/services';
 import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
+
+const VarSel = AppSelectors.AiVariantsSelectors;
 
 import { ConfirmDialogComponent } from '../dialog/dialog.component';
 import { SelectComponent } from '../forms/fields/select/select.component';
@@ -79,15 +81,12 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<unknown>;
 
   public isDark$!: Observable<boolean>;
-  // Sidebar + header
   public isOpen = true;
   public title$!: Observable<string>;
   public version!: string;
-
-  // Menu (typed for @for track item.route)
   public menuItems: FeatureNavItem[] = [];
 
-  // Theme toggle config
+  // Theme
   public themeField: FieldConfig = {
     name: 'themeSwitcher',
     label: 'form.labels.themeSwitcher',
@@ -97,7 +96,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   };
   public themeControl!: FormControl<boolean>;
 
-  // Language select config
+  // Language
   public langField: FieldConfig = {
     name: 'language',
     label: 'form.labels.language',
@@ -109,7 +108,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   };
   public langControl!: FormControl<string>;
 
-  // AI Variant selectors (scope → key → value)
+  // AI Variants (scope → key → value)
   public aiScopeField: FieldConfig = {
     name: 'aiScope',
     label: 'ai.scope',
@@ -122,7 +121,10 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     name: 'aiKey',
     label: 'ai.variant',
     type: 'dropdown',
-    options: [],
+    options: [
+      { label: 'ai.provider', value: 'ai.provider' },
+      { label: 'ai.model', value: 'ai.model' },
+    ],
   };
   public aiKeyControl!: FormControl<string>;
 
@@ -152,19 +154,20 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   private dialog = inject(MatDialog);
 
   ngAfterViewInit(): void {
-    // Toolbar title initial push, etc.
     this.cdr.detectChanges();
   }
 
   ngOnInit(): void {
+    // App basics
     this.title$ = this.layoutService.title$;
     this.cfg = this.configService.getAll() as RuntimeConfig;
     this.version = this.cfg.version || '0.0.0';
+    this.menuItems = this.features.visibleFeatures();
 
+    // Theme (store ↔ control)
     this.isDark$ = this.store.select(AppSelectors.ThemeSelectors.selectIsDark);
-
-    // Theme toggle
     this.themeControl = new FormControl<boolean>(false, { nonNullable: true });
+
     this.store
       .select(AppSelectors.ThemeSelectors.selectIsDark)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -178,7 +181,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       this.store.dispatch(AppActions.ThemeActions.setTheme({ mode: isDark ? 'dark' : 'light' }));
     });
 
-    // Language
+    // Language (store ↔ control)
     this.langControl = new FormControl<string>('', { nonNullable: true });
 
     this.store
@@ -188,9 +191,9 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         filter((lang: Lang | null): lang is Lang => !!lang),
         distinctUntilChanged(),
       )
-      .subscribe((lang: Lang) => {
+      .subscribe((lang) => {
         if (this.langControl.value !== lang) {
-          this.langControl.setValue(lang, { emitEvent: false }); // avoid feedback loop
+          this.langControl.setValue(lang, { emitEvent: false });
         }
       });
 
@@ -201,19 +204,12 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         filter((lang): lang is Lang => !!lang),
       )
       .subscribe((lang) => {
-        this.store.dispatch(
-          AppActions.LangActions.setLang({
-            lang,
-          }),
-        );
+        this.store.dispatch(AppActions.LangActions.setLang({ lang }));
       });
 
     // Auth → roles/menus
     this.profile$ = this.store.select(AppSelectors.AuthSelectors.selectProfile);
     this.roles$ = this.profile$.pipe(map((p) => p?.authorization ?? []));
-
-    // Initialize menu and react to auth context
-    this.menuItems = this.features.visibleFeatures();
     this.profile$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
       const roles = p?.authorization ?? [];
       const { isAuthenticated, tenant } = this.keycloak.getUserCtx();
@@ -222,199 +218,156 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       this.cdr.markForCheck();
     });
 
-    // AI Variant selectors
-    const featuresWithVariants = () =>
-      Object.entries(this.cfg.features ?? {})
-        .filter(([_, f]) => {
-          const v = f?.variants;
-          if (!v) return false;
-          return Array.isArray(v)
-            ? v.length > 0
-            : typeof v === 'object' && Object.keys(v as Record<string, unknown>).length > 0;
-        })
-        .map(([k]) => k);
-
-    const buildScopeOptions = () => {
-      const feats = featuresWithVariants();
-
-      this.aiScopeField.options = feats.map((k) => {
-        // try ai.<key>, then nav.<key>, else prettify(k)
-        const aiKey = `ai.${k}`;
-        const navKey = `nav.${k}`;
-        const label = this.translate.instant(aiKey) || this.translate.instant(navKey) || k; // "genai-chat" -> "Genai Chat"
-        return { label, value: k };
-      });
-
-      // ensure a real scope is selected
-      const current = this.aiScopeControl?.value;
-      const next = feats.includes(current) ? current : (feats[0] ?? '');
-      if (next !== current) this.aiScopeControl.setValue(next, { emitEvent: !!next });
-    };
-
-    const refreshKeys = (scope: string) => {
-      const feature = this.cfg.features?.[scope] as AppFeature | undefined;
-
-      let keys: string[] = [];
-
-      if (Array.isArray(feature?.variants)) {
-        // array of objects → collect the object keys, not array indexes
-        keys = Array.from(
-          new Set(feature!.variants.flatMap((v) => Object.keys(v as Record<string, unknown>))),
-        );
-      } else if (feature?.variants && typeof feature.variants === 'object') {
-        // single object
-        keys = Object.keys(feature.variants as Record<string, unknown>);
-      } else if (!scope) {
-        return;
-      }
-
-      // Only show your known AI keys (optional guard)
-      const allowed = new Set(['ai.provider', 'ai.model']);
-      const filtered = keys.filter((k) => allowed.has(k));
-
-      this.aiKeyField.options = filtered.map((k) => ({
-        label: this.translate.instant(k), // you have i18n keys for labels
-        value: k,
-      }));
-
-      const nextKey = filtered.includes(this.aiKeyControl.value)
-        ? this.aiKeyControl.value
-        : (filtered[0] ?? '');
-      this.aiKeyControl.setValue(nextKey ?? '', { emitEvent: true });
-    };
-
-    const refreshValues = (scope: string, key: string, setControl = true) => {
-      if (!key) {
-        this.aiValueField.options = [];
-        this.aiValueControl.setValue('', { emitEvent: false });
-        return;
-      }
-
-      const feature = this.cfg.features?.[scope] as AppFeature | undefined;
-      let finalValues: string[] = [];
-
-      if (Array.isArray(feature?.variants)) {
-        if (key === 'ai.provider') {
-          finalValues = Array.from(
-            new Set(
-              feature!.variants
-                .map((g) => (g as any)['ai.provider'])
-                .filter((p): p is string => typeof p === 'string' && !!p),
-            ),
-          );
-        } else if (key === 'ai.model') {
-          const provider = this.getCurrentProvider(scope); // <-- form-first provider
-          const allModels = feature!.variants.flatMap((g) => {
-            const m = (g as any)['ai.model'];
-            return Array.isArray(m) ? m : typeof m === 'string' ? [m] : [];
-          });
-
-          const models = provider
-            ? feature!.variants
-                .filter((g) => (g as any)['ai.provider'] === provider)
-                .flatMap((g) => {
-                  const m = (g as any)['ai.model'];
-                  return Array.isArray(m) ? m : typeof m === 'string' ? [m] : [];
-                })
-            : allModels;
-
-          finalValues = Array.from(new Set(models.map(String)));
-        } else {
-          finalValues = Array.from(
-            new Set(
-              feature!.variants.flatMap((g) => {
-                const v = (g as any)[key];
-                if (Array.isArray(v)) return v.map(String);
-                if (v != null) return [String(v)];
-                return [];
-              }),
-            ),
-          );
-        }
-      } else if (feature?.variants && typeof feature.variants === 'object') {
-        const v = (feature.variants as Record<string, unknown>)[key];
-        finalValues = Array.isArray(v) ? v.map(String) : v != null ? [String(v)] : [];
-      }
-
-      // push to dropdown
-      this.aiValueField.options = finalValues.map((v) => ({ label: v, value: v }));
-
-      if (!setControl) return;
-
-      const next =
-        finalValues.includes(this.aiValueControl.value) && this.aiValueControl.value
-          ? this.aiValueControl.value
-          : (finalValues[0] ?? '');
-      this.aiValueControl.setValue(next, { emitEvent: false });
-    };
+    // ---------- AI VARIANTS (all store-driven) ----------
 
     // Controls
     this.aiScopeControl = new FormControl<string>('', { nonNullable: true });
-    this.aiKeyControl = new FormControl<string>('', { nonNullable: true });
+    this.aiKeyControl = new FormControl<string>('ai.provider', { nonNullable: true });
     this.aiValueControl = new FormControl<string>('', { nonNullable: true });
 
-    // i18n re-compute labels
-    this.translate.onLangChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-      buildScopeOptions();
-      const scope = this.aiScopeControl.value;
-      const key = this.aiKeyControl.value;
-      refreshKeys(scope);
-      if (key) refreshValues(scope, key);
-      this.cdr.markForCheck();
-    });
-
-    // React to scope/key/value changes
-    this.aiScopeControl.valueChanges
+    // 1) Build scope options from variants slice (features that expose meta)
+    this.store
+      .select(VarSel.selectFeatureVariants) // Record<featureKey, record>
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((scope) => {
-        if (scope) refreshKeys(scope);
+      .subscribe((featuresMap) => {
+        const scopes = Object.entries(featuresMap)
+          .filter(([k, rec]) => !!k && !!(rec as any)['__ai.modelsByProvider'])
+          .map(([k]) => k);
+
+        // label: try nav.<k>, then ai.<k>, else show k
+        this.aiScopeField.options = scopes.map((k) => {
+          const label =
+            this.translate.instant(`nav.${k}`) || this.translate.instant(`ai.${k}`) || k;
+          return { label, value: k };
+        });
+
+        // ensure a valid selected scope
+        const current = this.aiScopeControl.value;
+        const next = scopes.includes(current) ? current : (scopes[0] ?? '');
+        if (next !== current) {
+          this.aiScopeControl.setValue(next, { emitEvent: !!next });
+        }
       });
 
-    this.aiKeyControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((key) => {
-      const scope = this.aiScopeControl.value;
-      if (scope && key) refreshValues(scope, key, true);
+    // 2) Keep aiKey labels translated (optional: updates on lang change)
+    const setKeyLabels = () => {
+      this.aiKeyField.options = [
+        { label: this.translate.instant('ai.provider') || 'ai.provider', value: 'ai.provider' },
+        { label: this.translate.instant('ai.model') || 'ai.model', value: 'ai.model' },
+      ];
+    };
+    setKeyLabels();
+    this.translate.onLangChange
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => setKeyLabels());
+
+    // Derive store selectors by current scope
+    const scope$ = this.aiScopeControl.valueChanges.pipe(
+      startWith(this.aiScopeControl.value),
+      distinctUntilChanged(),
+    );
+
+    const featureRecord$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectFeatureRecord(scope || ''))),
+    );
+
+    const modelsByProvider$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectModelsByProvider(scope || ''))),
+    );
+
+    const selectedProvider$ = scope$.pipe(
+      switchMap((scope) =>
+        this.store.select(VarSel.selectVariantInFeature(scope || '', 'ai.provider') as any),
+      ),
+    );
+
+    const selectedModel$ = scope$.pipe(
+      switchMap((scope) =>
+        this.store.select(VarSel.selectVariantInFeature(scope || '', 'ai.model') as any),
+      ),
+    );
+
+    // 3) When scope or key changes, populate the value options accordingly
+    combineLatest([
+      this.aiKeyControl.valueChanges.pipe(
+        startWith(this.aiKeyControl.value),
+        distinctUntilChanged(),
+      ),
+      featureRecord$,
+      modelsByProvider$,
+      selectedProvider$.pipe(startWith('')),
+    ])
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(([key, rec, mapByProv, selProvider]) => {
+        if (!key) return;
+
+        if (key === 'ai.provider') {
+          const providers = (rec['__ai.providers'] as string[] | undefined) ?? [];
+          this.aiValueField.options = providers.map((p) => ({ label: p, value: p }));
+
+          const next = providers.includes(this.aiValueControl.value)
+            ? this.aiValueControl.value
+            : (providers[0] ?? '');
+          if (this.aiValueControl.value !== next) {
+            this.aiValueControl.setValue(next, { emitEvent: false });
+          }
+        } else if (key === 'ai.model') {
+          const providerInForm =
+            this.aiKeyControl.value === 'ai.provider' ? this.aiValueControl.value : null;
+          const effectiveProvider = providerInForm || selProvider || '';
+          const list = effectiveProvider
+            ? (mapByProv[effectiveProvider] ?? [])
+            : Object.values(mapByProv).flat();
+
+          const models = Array.from(new Set(list.map(String)));
+          this.aiValueField.options = models.map((m) => ({ label: m, value: m }));
+
+          const next = models.includes(this.aiValueControl.value)
+            ? this.aiValueControl.value
+            : (models[0] ?? '');
+          if (this.aiValueControl.value !== next) {
+            this.aiValueControl.setValue(next, { emitEvent: false });
+          }
+        }
+      });
+
+    // 4) Reflect selected values from store back into the value control (when that key is active)
+    selectedProvider$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
+      if (this.aiKeyControl.value === 'ai.provider') {
+        const v = p ?? '';
+        if (this.aiValueControl.value !== v) {
+          this.aiValueControl.setValue(v, { emitEvent: false });
+        }
+      }
     });
 
+    selectedModel$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((m) => {
+      if (this.aiKeyControl.value === 'ai.model') {
+        const v = m ?? '';
+        if (this.aiValueControl.value !== v) {
+          this.aiValueControl.setValue(v, { emitEvent: false });
+        }
+      }
+    });
+
+    // 5) Dispatch when the user picks a value for the current key
     this.aiValueControl.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => {
         const scope = this.aiScopeControl.value;
         const key = this.aiKeyControl.value;
-        if (!key || !scope) return; // require a feature scope
-
-        // No extra refresh here! (removes the jump)
+        if (!scope || !key) return;
         this.store.dispatch(
           AppActions.AiVariantsActions.setVariant({
+            featureKey: scope,
             path: key,
             value,
-            featureKey: scope,
           }),
         );
       });
-    // Seed initial selections
-    buildScopeOptions();
-    refreshKeys(this.aiScopeControl.value);
-    if (this.aiKeyControl.value) {
-      refreshValues(this.aiScopeControl.value, this.aiKeyControl.value);
-    }
-  }
 
-  private getCurrentProvider(scope: string): string {
-    // If the user is currently editing ai.provider in the modal,
-    // prefer that unsaved selection over the store value.
-    const editingKey = this.aiKeyControl?.value;
-    const editingVal = this.aiValueControl?.value;
-
-    if (editingKey === 'ai.provider' && editingVal) {
-      return String(editingVal);
-    }
-
-    // else use the effective value from your features service / store
-    return (
-      (this.features.variant<string>('ai.provider', undefined, scope || undefined) as
-        | string
-        | undefined) || ''
-    );
+    // Seed initial UI (first run)
+    // scope$ handler above will set scope; the combineLatest will fill value options.
   }
 
   displayName(p: AuthProfile | null): string {
@@ -437,9 +390,9 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     if (!key || !scope) return;
     this.store.dispatch(
       AppActions.AiVariantsActions.setVariant({
+        featureKey: scope,
         path: key,
         value: undefined,
-        featureKey: scope || undefined,
       }),
     );
   }
@@ -468,7 +421,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
     const result = await firstValueFrom(ref.afterClosed());
     if (!result) return;
-    // You can handle persisted quick-settings here if needed
+    // Handle persisted quick-settings here if desired
   }
 
   get showAiScope(): boolean {
