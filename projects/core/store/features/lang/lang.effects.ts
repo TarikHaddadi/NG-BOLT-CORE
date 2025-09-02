@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { Actions, createEffect, ofType, ROOT_EFFECTS_INIT } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { TranslateService } from '@ngx-translate/core';
-import { filter, switchMap, take, tap, withLatestFrom } from 'rxjs/operators';
+import { map, switchMap, take, tap, withLatestFrom } from 'rxjs/operators';
 
 import { Lang } from '@cadai/pxs-ng-core/interfaces';
 
@@ -12,7 +12,7 @@ import { AppSelectors } from '../../app.selectors';
 const norm = (l?: Lang | null) => (l || 'en').toLowerCase() as Lang;
 
 /** 1) On app start: read lang from store once and activate it */
-export const initLangFromStoreOnce = createEffect(
+export const bootstrapLang = createEffect(
   () => {
     const actions$ = inject(Actions);
     const store = inject(Store);
@@ -20,21 +20,28 @@ export const initLangFromStoreOnce = createEffect(
 
     return actions$.pipe(
       ofType(ROOT_EFFECTS_INIT),
-      switchMap(() =>
-        store.select(AppSelectors.LangSelectors.selectLang).pipe(
-          filter((l): l is Lang => !!l), // wait until rehydrated
+      switchMap(() => store.select(AppSelectors.LangSelectors.selectLang).pipe(take(1))),
+      switchMap((lang) => {
+        const L = (lang ?? 'en').toLowerCase();
+
+        // ensure available languages & fallback (cheap, idempotent)
+        translate.addLangs(['en', 'fr']);
+        translate.setFallbackLang('en');
+
+        return translate.use(L).pipe(
           take(1),
-          switchMap((l) =>
-            translate.use(norm(l)).pipe(
-              take(1),
-              tap(() => document.documentElement.setAttribute('lang', norm(l))),
-            ),
-          ),
-        ),
-      ),
+          map(() => {
+            document.documentElement.setAttribute('lang', L);
+            // If store was null, seed it now.
+            return lang
+              ? { type: '[Lang] noop' }
+              : AppActions.LangActions.setLang({ lang: L as Lang });
+          }),
+        );
+      }),
     );
   },
-  { functional: true, dispatch: false },
+  { functional: true },
 );
 
 export const applyLangOnChange = createEffect(

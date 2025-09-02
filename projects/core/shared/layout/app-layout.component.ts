@@ -231,7 +231,11 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((featuresMap) => {
         const scopes = Object.entries(featuresMap)
-          .filter(([k, rec]) => !!k && !!(rec as any)['__ai.modelsByProvider'])
+          .filter(([k, rec]) => {
+            if (!k) return false; // exclude empty key ''
+            if (k.toLowerCase() === 'global') return false; // exclude a 'global' feature if present
+            return !!(rec as any)['__ai.modelsByProvider']; // must have AI meta
+          })
           .map(([k]) => k);
 
         this.aiScopeField.options = scopes.map((k) => {
@@ -257,7 +261,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => setKeyLabels());
 
-    // Streams by current scope
+    // 3) Streams by current scope
     const scope$ = this.aiScopeControl.valueChanges.pipe(
       startWith(this.aiScopeControl.value),
       distinctUntilChanged(),
@@ -280,22 +284,6 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       switchMap((scope) => this.store.select(VarSel.selectModelInFeature(scope || ''))),
     );
 
-    // 3) Ensure a default provider exists per scope (pick first if none/invalid)
-    combineLatest([scope$, providers$, selectedProvider$])
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(([scope, providers, sel]) => {
-        const desired = sel && providers.includes(sel) ? sel : (providers[0] ?? '');
-        if (scope && desired && sel !== desired) {
-          this.store.dispatch(
-            AppActions.AiVariantsActions.setVariant({
-              featureKey: scope,
-              path: 'ai.provider',
-              value: desired,
-            }),
-          );
-        }
-      });
-
     const key$ = this.aiKeyControl.valueChanges.pipe(
       startWith(this.aiKeyControl.value),
       distinctUntilChanged(),
@@ -311,16 +299,11 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .subscribe(([key, providers, selProvider]) => {
         if (key !== 'ai.provider') return;
 
-        // update options (even if empty)
+        // Show provider options
         this.aiValueField.options = providers.map((p) => ({ label: p, value: p }));
 
-        // pick next value
-        let next = this.aiValueControl.value;
-        if (!providers.includes(next)) {
-          next =
-            selProvider && providers.includes(selProvider) ? selProvider : (providers[0] ?? '');
-        }
-
+        // Reflect store selection; otherwise clear (do NOT default to first)
+        const next = selProvider && providers.includes(selProvider) ? selProvider : '';
         if (this.aiValueControl.value !== next) {
           this.aiValueControl.setValue(next, { emitEvent: false });
         }
@@ -337,14 +320,12 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .subscribe(([key, byProv, selProvider, selModel]) => {
         if (key !== 'ai.model') return;
 
+        // Get models for the selected provider in the CURRENT feature only
         const models = selProvider ? (byProv[selProvider] ?? []) : [];
         this.aiValueField.options = models.map((m) => ({ label: m, value: m }));
 
-        let next = this.aiValueControl.value;
-        if (!models.includes(next)) {
-          next = selModel && models.includes(selModel) ? selModel : (models[0] ?? '');
-        }
-
+        // Reflect store selection; otherwise clear (do NOT default to first)
+        const next = selModel && models.includes(selModel) ? selModel : '';
         if (this.aiValueControl.value !== next) {
           this.aiValueControl.setValue(next, { emitEvent: false });
         }
