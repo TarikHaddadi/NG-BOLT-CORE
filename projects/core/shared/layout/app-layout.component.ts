@@ -103,8 +103,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     label: 'form.labels.language',
     type: 'dropdown',
     options: [
-      { label: 'English', value: 'English' },
-      { label: 'Français', value: 'Français' },
+      { label: 'English', value: 'en' },
+      { label: 'Français', value: 'fr' },
     ],
   };
   public langControl!: FormControl<string>;
@@ -203,7 +203,11 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         filter((lang): lang is string => !!lang),
       )
       .subscribe((lang) => {
-        this.store.dispatch(AppActions.LangActions.setLang({ lang: lang as Lang }));
+        this.store.dispatch(
+          AppActions.LangActions.setLang({
+            lang: lang === 'en' ? 'English' : ('Français' as Lang),
+          }),
+        );
       });
 
     // Auth → roles/menus
