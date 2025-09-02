@@ -9,7 +9,7 @@ export interface AppState {
   lang: LangState;
 }
 
-export type Lang = 'Français' | 'English';
+export type Lang = 'fr' | 'en';
 export type ThemeMode = 'light' | 'dark';
 
 export interface ThemeState {

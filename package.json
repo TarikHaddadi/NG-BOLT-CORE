@@ -39,7 +39,8 @@
       "eslint --fix --cache"
     ],
     "*.{ts,json,md,scss,css}": [
-      "prettier --write"
+      "prettier --write",
+      "prettier projects/. --write"
     ]
   },
   "private": false,
