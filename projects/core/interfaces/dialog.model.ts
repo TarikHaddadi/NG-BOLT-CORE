@@ -5,8 +5,8 @@ export interface ConfirmDialogData<TContext = unknown> {
   message?: string;
 
   // Optional custom content/actions
-  contentTpl?: TemplateRef<any>;
-  actionsTpl?: TemplateRef<any>;
+  contentTpl?: TemplateRef<TContext>;
+  actionsTpl?: TemplateRef<TContext>;
   context?: TContext;
 
   // Button labels
