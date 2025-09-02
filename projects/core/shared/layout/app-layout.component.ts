@@ -116,7 +116,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     type: 'dropdown',
     options: [],
   };
-  public aiScopeControl!: FormControl<string>; // '' = global; else featureKey
+  public aiScopeControl!: FormControl<string>;
 
   public aiKeyField: FieldConfig = {
     name: 'aiKey',
@@ -179,9 +179,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     });
 
     // Language
-    this.langControl = new FormControl<string>(this.translate.getCurrentLang(), {
-      nonNullable: true,
-    });
+    this.langControl = new FormControl<string>('', { nonNullable: true });
 
     this.store
       .select(AppSelectors.LangSelectors.selectLang)
@@ -227,31 +225,27 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     // AI Variant selectors
     const featuresWithVariants = () =>
       Object.entries(this.cfg.features ?? {})
-        .filter(
-          ([, f]) =>
-            f?.variants && typeof f.variants === 'object' && Object.keys(f.variants).length,
-        )
+        .filter(([_, f]) => {
+          const v = f?.variants;
+          if (!v) return false;
+          return Array.isArray(v)
+            ? v.length > 0
+            : typeof v === 'object' && Object.keys(v as Record<string, unknown>).length > 0;
+        })
         .map(([k]) => k);
 
     const buildScopeOptions = () => {
       const feats = featuresWithVariants();
-      // If no features expose variants → hide everything by leaving options empty
-      if (!feats.length) {
-        this.aiScopeField.options = [];
-        this.aiKeyField.options = [];
-        this.aiValueField.options = [];
-        // also clear controls to avoid stale values
-        this.aiScopeControl.setValue('', { emitEvent: false });
-        this.aiKeyControl.setValue('', { emitEvent: false });
-        this.aiValueControl.setValue('', { emitEvent: false });
-        return;
-      }
 
-      // Otherwise include "global" + feature-scoped entries
-      this.aiScopeField.options = [
-        { label: this.translate.instant('ai.global'), value: '' },
-        ...feats.map((k) => ({ label: this.translate.instant(k), value: k })),
-      ];
+      this.aiScopeField.options = feats.map((k) => ({
+        label: this.translate.instant(k),
+        value: k,
+      }));
+
+      // ensure a real scope is selected
+      const current = this.aiScopeControl?.value;
+      const next = feats.includes(current) ? current : (feats[0] ?? '');
+      if (next !== current) this.aiScopeControl.setValue(next, { emitEvent: !!next });
     };
 
     const refreshKeys = (scope: string) => {
@@ -268,20 +262,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         // single object
         keys = Object.keys(feature.variants as Record<string, unknown>);
       } else if (!scope) {
-        // GLOBAL: union across all features, respecting array/object
-        keys = Array.from(
-          new Set(
-            Object.values(this.cfg.features ?? {}).flatMap((f: AppFeature) => {
-              if (Array.isArray(f?.variants)) {
-                return f.variants.flatMap((v) => Object.keys(v as Record<string, unknown>));
-              }
-              if (f?.variants && typeof f.variants === 'object') {
-                return Object.keys(f.variants as Record<string, unknown>);
-              }
-              return [];
-            }),
-          ),
-        );
+        return;
       }
 
       // Only show your known AI keys (optional guard)
@@ -299,7 +280,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       this.aiKeyControl.setValue(nextKey ?? '', { emitEvent: true });
     };
 
-    const refreshValues = (scope: string, key: string) => {
+    const refreshValues = (scope: string, key: string, setControl = true) => {
       if (!key) {
         this.aiValueField.options = [];
         this.aiValueControl.setValue('', { emitEvent: false });
@@ -355,6 +336,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       // push to dropdown
       this.aiValueField.options = finalValues.map((v) => ({ label: v, value: v }));
 
+      if (!setControl) return;
+
       const next =
         finalValues.includes(this.aiValueControl.value) && this.aiValueControl.value
           ? this.aiValueControl.value
@@ -380,11 +363,13 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     // React to scope/key/value changes
     this.aiScopeControl.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((scope) => refreshKeys(scope));
+      .subscribe((scope) => {
+        if (scope) refreshKeys(scope);
+      });
 
     this.aiKeyControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((key) => {
       const scope = this.aiScopeControl.value;
-      if (key) refreshValues(scope, key);
+      if (scope && key) refreshValues(scope, key, true);
     });
 
     this.aiValueControl.valueChanges
@@ -392,24 +377,17 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .subscribe((value) => {
         const scope = this.aiScopeControl.value;
         const key = this.aiKeyControl.value;
+        if (!key || !scope) return; // require a feature scope
 
-        // If the user is changing provider in the modal, refresh the models list
-        if (key === 'ai.provider') {
-          // Recompute the options for ai.model using the just-picked provider
-          refreshValues(scope, 'ai.model');
-        }
-
-        if (!key) return;
-        // Only dispatch when you actually want to persist the variant for the current key
+        // No extra refresh here! (removes the jump)
         this.store.dispatch(
           AppActions.AiVariantsActions.setVariant({
             path: key,
             value,
-            featureKey: scope || undefined,
+            featureKey: scope,
           }),
         );
       });
-
     // Seed initial selections
     buildScopeOptions();
     refreshKeys(this.aiScopeControl.value);
@@ -453,7 +431,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   resetVariant(): void {
     const scope = this.aiScopeControl.value;
     const key = this.aiKeyControl.value;
-    if (!key) return;
+    if (!key || !scope) return;
     this.store.dispatch(
       AppActions.AiVariantsActions.setVariant({
         path: key,
