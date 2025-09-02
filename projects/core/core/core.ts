@@ -97,7 +97,7 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       translate.addLangs(['en', 'fr']);
       translate.setFallbackLang('en');
 
-      if (normalized.i18n.lang) translate.use(normalized.i18n.lang);
+      translate.use('en');
     }),
 
     // Theme init

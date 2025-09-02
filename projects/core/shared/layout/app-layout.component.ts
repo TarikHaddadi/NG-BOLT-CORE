@@ -25,14 +25,7 @@ import { RouterModule, RouterOutlet } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { combineLatest, firstValueFrom, Observable } from 'rxjs';
-import {
-  distinctUntilChanged,
-  filter,
-  map,
-  startWith,
-  switchMap,
-  withLatestFrom,
-} from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, startWith, switchMap } from 'rxjs/operators';
 
 import {
   AuthProfile,
@@ -238,18 +231,13 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((featuresMap) => {
         const scopes = Object.entries(featuresMap)
-          .filter(([k, rec]) => {
-            if (!k) return false; // exclude empty key ''
-            if (k.toLowerCase() === 'global') return false; // exclude a 'global' feature if present
-            return !!(rec as any)['__ai.modelsByProvider']; // must have AI meta
-          })
+          .filter(([k, rec]) => k !== '' && !!(rec as any)['__ai.modelsByProvider'])
           .map(([k]) => k);
 
-        this.aiScopeField.options = scopes.map((k) => {
-          const label =
-            this.translate.instant(`nav.${k}`) || this.translate.instant(`ai.${k}`) || k;
-          return { label, value: k };
-        });
+        this.aiScopeField.options = scopes.map((k) => ({
+          label: this.translate.instant(`nav.${k}`) || this.translate.instant(`ai.${k}`) || k,
+          value: k,
+        }));
 
         const current = this.aiScopeControl.value;
         const next = scopes.includes(current) ? current : (scopes[0] ?? '');
@@ -274,75 +262,67 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       distinctUntilChanged(),
     );
 
+    const providers$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectFeatureRecord(scope || ''))),
+      map((rec) => (rec['__ai.providers'] as string[] | undefined) ?? []),
+    );
+
+    const modelsByProvider$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectModelsByProvider(scope || ''))),
+    );
+
+    const selectedProvider$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectProviderInFeature(scope || ''))),
+    );
+
+    const selectedModel$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectModelInFeature(scope || ''))),
+    );
+
     const key$ = this.aiKeyControl.valueChanges.pipe(
       startWith(this.aiKeyControl.value),
       distinctUntilChanged(),
     );
 
-    // modelsByProvider for current scope
-    const modelsByProvider$ = scope$.pipe(
-      switchMap((scope) => this.store.select(VarSel.selectModelsByProvider(scope || ''))),
-    );
+    // key === 'ai.provider' → just show options & mirror store; DO NOT pick a new value
+    combineLatest([
+      key$,
+      providers$,
+      selectedProvider$.pipe(startWith<string | undefined>(undefined)),
+    ])
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(([key, providers, selProvider]) => {
+        if (key !== 'ai.provider') return;
 
-    const providers$ = modelsByProvider$.pipe(
-      map((byProv) => Object.keys(byProv)),
-      distinctUntilChanged((a, b) => a.join('|') === b.join('|')),
-    );
-
-    // selected values from store (for current scope)
-    const selectedProvider$ = scope$.pipe(
-      switchMap((scope) => this.store.select(VarSel.selectProviderInFeature(scope || ''))),
-      distinctUntilChanged(),
-    );
-
-    const selectedModel$ = scope$.pipe(
-      switchMap((scope) => this.store.select(VarSel.selectModelInFeature(scope || ''))),
-      distinctUntilChanged(),
-    );
-
-    // Only refresh UI when key OR scope changes
-    const keyScope$ = combineLatest([key$, scope$]).pipe(
-      distinctUntilChanged(([k1, s1], [k2, s2]) => k1 === k2 && s1 === s2),
-    );
-
-    // --- Provider UI (key === 'ai.provider') ---
-    keyScope$
-      .pipe(
-        filter(([key]) => key === 'ai.provider'),
-        withLatestFrom(providers$, selectedProvider$),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe(([, providers, selProvider]) => {
-        // update options
         this.aiValueField.options = providers.map((p) => ({ label: p, value: p }));
 
-        // reflect persisted store value; do NOT auto-default
         const next = selProvider && providers.includes(selProvider) ? selProvider : '';
         if (this.aiValueControl.value !== next) {
           this.aiValueControl.setValue(next, { emitEvent: false });
         }
       });
 
-    // --- Model UI (key === 'ai.model') ---
-    keyScope$
-      .pipe(
-        filter(([key]) => key === 'ai.model'),
-        withLatestFrom(modelsByProvider$, selectedProvider$, selectedModel$),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe(([, byProv, selProvider, selModel]) => {
-        const models = selProvider ? (byProv[selProvider] ?? []) : [];
+    // key === 'ai.model' → show models for the currently selected provider; DO NOT pick a new value
+    combineLatest([
+      key$,
+      modelsByProvider$,
+      selectedProvider$.pipe(startWith<string | undefined>(undefined)),
+      selectedModel$.pipe(startWith<string | undefined>(undefined)),
+    ])
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(([key, byProv, selProvider, selModel]) => {
+        if (key !== 'ai.model') return;
 
+        const models = selProvider ? (byProv[selProvider] ?? []) : [];
         this.aiValueField.options = models.map((m) => ({ label: m, value: m }));
 
-        // reflect persisted store value; do NOT auto-default
         const next = selModel && models.includes(selModel) ? selModel : '';
         if (this.aiValueControl.value !== next) {
           this.aiValueControl.setValue(next, { emitEvent: false });
         }
       });
 
-    // Persist ONLY when the user picks a value for the current key
+    // When user picks a value for the CURRENT key, then persist
     this.aiValueControl.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => {
@@ -350,7 +330,11 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         const key = this.aiKeyControl.value;
         if (!scope || !key) return;
         this.store.dispatch(
-          AppActions.AiVariantsActions.setVariant({ featureKey: scope, path: key, value }),
+          AppActions.AiVariantsActions.setVariant({
+            featureKey: scope,
+            path: key,
+            value,
+          }),
         );
       });
   }
