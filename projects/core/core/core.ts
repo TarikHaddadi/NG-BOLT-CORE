@@ -97,45 +97,7 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       translate.addLangs(['en', 'fr']);
       translate.setFallbackLang('en');
 
-      // If EN table is empty, hydrate it directly from the asset
-      const currentEn = (translate as any)?.translations?.en ?? {}; // typings don't expose this
-      if (!currentEn || Object.keys(currentEn).length === 0) {
-        try {
-          const res = await fetch('assets/i18n/en.json', { cache: 'no-store' });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && typeof data === 'object' && Object.keys(data).length) {
-              translate.setTranslation('en', data, /*merge*/ true);
-            } else {
-              console.warn('[i18n] en.json parsed but produced no keys');
-            }
-          } else {
-            console.warn('[i18n] en.json fetch failed:', res.status, res.statusText);
-          }
-        } catch (e) {
-          console.warn('[i18n] en.json fetch error:', e);
-        }
-      }
-
-      // If FR table is empty, hydrate it directly from the asset
-      const currentFr = (translate as any)?.translations?.fr ?? {}; // typings don't expose this
-      if (!currentFr || Object.keys(currentFr).length === 0) {
-        try {
-          const res = await fetch('assets/i18n/fr.json', { cache: 'no-store' });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && typeof data === 'object' && Object.keys(data).length) {
-              translate.setTranslation('fr', data, /*merge*/ true);
-            } else {
-              console.warn('[i18n] fr.json parsed but produced no keys');
-            }
-          } else {
-            console.warn('[i18n] fr.json fetch failed:', res.status, res.statusText);
-          }
-        } catch (e) {
-          console.warn('[i18n] fr.json fetch error:', e);
-        }
-      }
+      if (normalized.i18n.lang) translate.use(normalized.i18n.lang);
     }),
 
     // Theme init

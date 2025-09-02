@@ -22,20 +22,14 @@ export const bootstrapLang = createEffect(
       ofType(ROOT_EFFECTS_INIT),
       switchMap(() => store.select(AppSelectors.LangSelectors.selectLang).pipe(take(1))),
       switchMap((lang) => {
-        const L = (lang ?? 'en').toLowerCase();
-
-        // ensure available languages & fallback (cheap, idempotent)
-        translate.addLangs(['en', 'fr']);
-        translate.setFallbackLang('en');
+        const L = norm(lang);
 
         return translate.use(L).pipe(
           take(1),
           map(() => {
             document.documentElement.setAttribute('lang', L);
             // If store was null, seed it now.
-            return lang
-              ? { type: '[Lang] noop' }
-              : AppActions.LangActions.setLang({ lang: L as Lang });
+            return lang ? { type: '[Lang] noop' } : AppActions.LangActions.setLang({ lang: L });
           }),
         );
       }),
