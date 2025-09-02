@@ -4,6 +4,7 @@ import { AppState } from '@cadai/pxs-ng-core/interfaces';
 
 import { variantsReducer } from './features/ai-variant/ai-variants.reducer';
 import { authReducer } from './features/auth/auth.reducer';
+import { langReducer } from './features/lang/lang.reducer';
 import { teamManagementReducer } from './features/team-management/team-management.reducer';
 import { themeReducer } from './features/theme/theme.reducer';
 import { userReducer } from './features/user/user.reducer';
@@ -16,4 +17,5 @@ export const AppReducers: ActionReducerMap<AppState> = {
   auth: authReducer,
   aiVariants: variantsReducer,
   theme: themeReducer,
+  lang: langReducer,
 };

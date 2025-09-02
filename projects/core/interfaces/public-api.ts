@@ -1,5 +1,11 @@
 export { type VariantsState, type VariantValue } from './ai-variant.interface';
-export { type AppState, type ThemeMode, type ThemeState } from './app.model';
+export {
+  type AppState,
+  type Lang,
+  type LangState,
+  type ThemeMode,
+  type ThemeState,
+} from './app.model';
 export { type AuthState, initialAuthState } from './auth.model';
 export {
   type AppFeature,

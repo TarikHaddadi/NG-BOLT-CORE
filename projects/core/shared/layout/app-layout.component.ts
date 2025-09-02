@@ -24,7 +24,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule, RouterOutlet } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { firstValueFrom, map, Observable } from 'rxjs';
+import { distinctUntilChanged, filter, firstValueFrom, map, Observable } from 'rxjs';
 
 import {
   AppFeature,
@@ -32,6 +32,7 @@ import {
   ConfirmDialogData,
   FeatureNavItem,
   FieldConfig,
+  Lang,
   RuntimeConfig,
   SwitchersResult,
 } from '@cadai/pxs-ng-core/interfaces';
@@ -181,9 +182,29 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     this.langControl = new FormControl<string>(this.translate.getCurrentLang(), {
       nonNullable: true,
     });
-    this.langControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((lang) => {
-      if (lang) this.translate.use(lang);
-    });
+
+    this.store
+      .select(AppSelectors.LangSelectors.selectLang)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        filter((lang: string | null): lang is string => !!lang),
+        distinctUntilChanged(),
+      )
+      .subscribe((lang: string) => {
+        if (this.langControl.value !== lang) {
+          this.langControl.setValue(lang, { emitEvent: false }); // avoid feedback loop
+        }
+      });
+
+    this.langControl.valueChanges
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        distinctUntilChanged(),
+        filter((lang): lang is string => !!lang),
+      )
+      .subscribe((lang) => {
+        this.store.dispatch(AppActions.LangActions.setLang({ lang: lang as Lang }));
+      });
 
     // Auth → roles/menus
     this.profile$ = this.store.select(AppSelectors.AuthSelectors.selectProfile);
@@ -230,93 +251,117 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     };
 
     const refreshKeys = (scope: string) => {
-      const keys = scope
-        ? Object.keys(this.cfg.features?.[scope]?.variants ?? {})
-        : Array.from(
-            new Set(
-              Object.values(this.cfg.features ?? {}).flatMap((f: AppFeature) =>
-                f?.variants ? Object.keys(f.variants) : [],
-              ),
-            ),
-          );
+      const feature = this.cfg.features?.[scope] as AppFeature | undefined;
 
-      // hide "key" select if no keys
-      this.aiKeyField.options = keys.map((k) => ({ label: this.translate.instant(k), value: k }));
+      let keys: string[] = [];
 
-      const nextKey = keys.includes(this.aiKeyControl.value)
+      if (Array.isArray(feature?.variants)) {
+        // array of objects → collect the object keys, not array indexes
+        keys = Array.from(
+          new Set(feature!.variants.flatMap((v) => Object.keys(v as Record<string, unknown>))),
+        );
+      } else if (feature?.variants && typeof feature.variants === 'object') {
+        // single object
+        keys = Object.keys(feature.variants as Record<string, unknown>);
+      } else if (!scope) {
+        // GLOBAL: union across all features, respecting array/object
+        keys = Array.from(
+          new Set(
+            Object.values(this.cfg.features ?? {}).flatMap((f: AppFeature) => {
+              if (Array.isArray(f?.variants)) {
+                return f.variants.flatMap((v) => Object.keys(v as Record<string, unknown>));
+              }
+              if (f?.variants && typeof f.variants === 'object') {
+                return Object.keys(f.variants as Record<string, unknown>);
+              }
+              return [];
+            }),
+          ),
+        );
+      }
+
+      // Only show your known AI keys (optional guard)
+      const allowed = new Set(['ai.provider', 'ai.model']);
+      const filtered = keys.filter((k) => allowed.has(k));
+
+      this.aiKeyField.options = filtered.map((k) => ({
+        label: this.translate.instant(k), // you have i18n keys for labels
+        value: k,
+      }));
+
+      const nextKey = filtered.includes(this.aiKeyControl.value)
         ? this.aiKeyControl.value
-        : (keys[0] ?? '');
+        : (filtered[0] ?? '');
       this.aiKeyControl.setValue(nextKey ?? '', { emitEvent: true });
     };
 
     const refreshValues = (scope: string, key: string) => {
+      const feature = this.cfg.features?.[scope] as AppFeature | undefined;
+      let finalValues: string[] = [];
+
       if (!key) {
         this.aiValueField.options = [];
         this.aiValueControl.setValue('', { emitEvent: false });
         return;
       }
 
-      // determine current provider if relevant
-      const effectiveProvider =
-        (this.features.variant<string>('ai.provider', undefined, scope || undefined) as
-          | string
-          | undefined) || '';
-
-      let finalValues: string[] = [];
-
-      const feature = this.cfg.features?.[scope];
       if (Array.isArray(feature?.variants)) {
         if (key === 'ai.provider') {
-          // unique list of providers across groups
           finalValues = Array.from(
             new Set(
-              feature.variants
-                .map((g) => g['ai.provider'])
+              feature!.variants
+                .map((g) => (g as any)['ai.provider'])
                 .filter((p): p is string => typeof p === 'string' && !!p),
             ),
           );
         } else if (key === 'ai.model') {
-          if (effectiveProvider) {
-            // only models for the currently selected provider
-            const modelsForProvider = feature.variants
-              .filter((g) => g['ai.provider'] === effectiveProvider)
-              .flatMap((g) =>
-                Array.isArray(g['ai.model']) ? g['ai.model'] : g['ai.model'] ? [g['ai.model']] : [],
-              );
-            finalValues = Array.from(new Set(modelsForProvider));
-          } else {
-            // all models across all groups
-            const allModels = feature.variants.flatMap((g) =>
-              Array.isArray(g['ai.model']) ? g['ai.model'] : g['ai.model'] ? [g['ai.model']] : [],
-            );
-            finalValues = Array.from(new Set(allModels));
-          }
-        } else {
-          // any other keys you may add later
-          const vals = feature.variants.flatMap((g) => {
-            const v = g[key as keyof typeof g];
-            return Array.isArray(v) ? v : v ? [v] : [];
+          // infer currently effective provider
+          const effectiveProvider =
+            (this.features.variant<string>('ai.provider', undefined, scope || undefined) as
+              | string
+              | undefined) || '';
+
+          const modelsAcross = feature!.variants.flatMap((g) => {
+            const models = (g as any)['ai.model'];
+            if (Array.isArray(models)) return models;
+            if (typeof models === 'string') return [models];
+            return [];
           });
-          finalValues = Array.from(new Set(vals));
+
+          const models = effectiveProvider
+            ? feature!.variants
+                .filter((g) => (g as any)['ai.provider'] === effectiveProvider)
+                .flatMap((g) => {
+                  const m = (g as any)['ai.model'];
+                  return Array.isArray(m) ? m : typeof m === 'string' ? [m] : [];
+                })
+            : modelsAcross;
+
+          finalValues = Array.from(new Set(models.map(String)));
+        } else {
+          // generic key
+          finalValues = Array.from(
+            new Set(
+              feature!.variants.flatMap((g) => {
+                const v = (g as any)[key];
+                if (Array.isArray(v)) return v.map(String);
+                if (v != null) return [String(v)];
+                return [];
+              }),
+            ),
+          );
         }
       } else if (feature?.variants && typeof feature.variants === 'object') {
-        // legacy: single object
         const v = (feature.variants as Record<string, unknown>)[key];
-        finalValues = Array.isArray(v) ? (v as string[]) : v != null ? [String(v)] : [];
+        finalValues = Array.isArray(v) ? v.map(String) : v != null ? [String(v)] : [];
       }
 
-      // keep effective value even if it’s not in list
+      // keep effective value even if not in list
       const effective = this.features.variant<unknown>(key, undefined, scope || undefined);
       const effStr = effective != null ? String(effective) : '';
-      if (effStr && !finalValues.includes(effStr)) {
-        finalValues.unshift(effStr);
-      }
+      if (effStr && !finalValues.includes(effStr)) finalValues.unshift(effStr);
 
-      // push to form field + control
-      this.aiValueField.options = finalValues.map((v) => ({
-        label: this.translate.instant(v) || v,
-        value: v,
-      }));
+      this.aiValueField.options = finalValues.map((v) => ({ label: v, value: v }));
 
       const nextVal =
         finalValues.includes(this.aiValueControl.value) && this.aiValueControl.value

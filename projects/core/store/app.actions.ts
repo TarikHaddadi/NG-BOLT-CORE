@@ -1,5 +1,6 @@
 import * as AiVariantsActions from './features/ai-variant/ai-variants.actions';
 import * as AuthActions from './features/auth/auth.actions';
+import * as LangActions from './features/lang/lang.actions';
 import * as TeamActions from './features/team-management/team-management.actions';
 import * as ThemeActions from './features/theme/theme.actions';
 import * as UserActions from './features/user/user.actions';
@@ -12,4 +13,5 @@ export const AppActions = {
   TeamActions,
   AuthActions,
   AiVariantsActions,
+  LangActions,
 };

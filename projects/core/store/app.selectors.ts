@@ -1,5 +1,6 @@
 import * as AiVariantsSelectors from './features/ai-variant/ai-variants.selectors';
 import * as AuthSelectors from './features/auth/auth.selectors';
+import * as LangSelectors from './features/lang/lang.selectors';
 import * as TeamSelectors from './features/team-management/team-management.selectors';
 import * as ThemeSelectors from './features/theme/theme.selectors';
 import * as UserSelectors from './features/user/user.selectors';
@@ -12,4 +13,5 @@ export const AppSelectors = {
   AiVariantsSelectors,
   TeamSelectors,
   AuthSelectors,
+  LangSelectors,
 };
