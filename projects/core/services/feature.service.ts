@@ -15,14 +15,14 @@ import { ConfigService } from './config.service';
 
 export const VARIANTS_SLICE_KEY = 'variants' as const;
 const selectVariantsUnsafe = (root: unknown): VariantsState =>
-  ((root as any)?.[VARIANTS_SLICE_KEY] as VariantsState) ?? { global: {}, features: {} };
+  ((root as any)?.[VARIANTS_SLICE_KEY] as VariantsState) ?? { features: {} };
 
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
   public cfg?: RuntimeConfig; // ← may be undefined until config is loaded
   private readonly store = inject(Store, { optional: true });
 
-  private variantCache: VariantsState = { global: {}, features: {} };
+  private variantCache: VariantsState = { features: {} };
   private userSig = signal<UserCtx | null>(null);
 
   constructor(private readonly config: ConfigService) {
@@ -51,7 +51,7 @@ export class FeatureService {
 
     // Only seed if there is no store keeping this up to date
     if (!this.store) {
-      this.variantCache = { global: {}, features };
+      this.variantCache = { features };
     }
   }
 
@@ -80,12 +80,11 @@ export class FeatureService {
   }
 
   /**
-   * Get a variant value (global or feature-scoped).
+   * Get a variant value (feature-scoped).
    * Resolution order:
    *  1) featureKey scope → variants[path]
-   *  2) global variants[path]
-   *  3) first feature that defines variants[path]
-   *  4) fallback
+   *  2) first feature that defines variants[path]
+   *  3) fallback
    */
   variant<T = unknown>(path: string, fallback?: T, featureKey?: string): T | undefined {
     const fromFeature = (fk?: string) =>
@@ -96,9 +95,6 @@ export class FeatureService {
       if (hit !== undefined) return hit;
       return fallback;
     }
-
-    const globalHit = this.variantCache.global[path];
-    if (globalHit !== undefined) return globalHit as T;
 
     for (const rec of Object.values(this.variantCache.features)) {
       const v = rec?.[path];

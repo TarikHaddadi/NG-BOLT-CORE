@@ -5,7 +5,6 @@ import { VariantsState, VariantValue } from '@cadai/pxs-ng-core/interfaces';
 import * as VariantsActions from './ai-variants.actions';
 
 export const initialVariantsState: VariantsState = {
-  global: {},
   features: {},
 };
 
@@ -33,8 +32,7 @@ function mergeFeatureMaps<
 export const variantsReducer = createReducer(
   initialVariantsState,
 
-  on(VariantsActions.hydrateSuccess, (state, { global, features }) => ({
-    global: mergeRecords(global ?? {}, state.global),
+  on(VariantsActions.hydrateSuccess, (state, { features }) => ({
     features: mergeFeatureMaps(features ?? {}, state.features),
   })),
 
@@ -54,11 +52,21 @@ export const variantsReducer = createReducer(
     }
 
     if (value === undefined) {
-      const { [path]: _omit, ...rest } = state.global;
-      return { ...state, global: rest };
+      return { ...state };
     }
-    return { ...state, global: { ...state.global, [path]: value } };
+    return { ...state };
   }),
+
+  on(VariantsActions.setModelsByProvider, (state, { featureKey, map }) => ({
+    ...state,
+    features: {
+      ...state.features,
+      [featureKey]: {
+        ...(state.features[featureKey] ?? {}),
+        ['__ai.modelsByProvider']: map,
+      },
+    },
+  })),
 
   on(VariantsActions.reset, () => initialVariantsState),
 );

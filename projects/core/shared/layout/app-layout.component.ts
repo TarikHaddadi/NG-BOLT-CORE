@@ -237,10 +237,13 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     const buildScopeOptions = () => {
       const feats = featuresWithVariants();
 
-      this.aiScopeField.options = feats.map((k) => ({
-        label: this.translate.instant(k),
-        value: k,
-      }));
+      this.aiScopeField.options = feats.map((k) => {
+        // try ai.<key>, then nav.<key>, else prettify(k)
+        const aiKey = `ai.${k}`;
+        const navKey = `nav.${k}`;
+        const label = this.translate.instant(aiKey) || this.translate.instant(navKey) || k; // "genai-chat" -> "Genai Chat"
+        return { label, value: k };
+      });
 
       // ensure a real scope is selected
       const current = this.aiScopeControl?.value;
