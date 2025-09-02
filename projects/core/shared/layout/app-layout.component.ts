@@ -296,14 +296,14 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     };
 
     const refreshValues = (scope: string, key: string) => {
-      const feature = this.cfg.features?.[scope] as AppFeature | undefined;
-      let finalValues: string[] = [];
-
       if (!key) {
         this.aiValueField.options = [];
         this.aiValueControl.setValue('', { emitEvent: false });
         return;
       }
+
+      const feature = this.cfg.features?.[scope] as AppFeature | undefined;
+      let finalValues: string[] = [];
 
       if (Array.isArray(feature?.variants)) {
         if (key === 'ai.provider') {
@@ -315,31 +315,23 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
             ),
           );
         } else if (key === 'ai.model') {
-          // infer currently effective provider
-          const effectiveProvider =
-            (this.features.variant<string>('ai.provider', undefined, scope || undefined) as
-              | string
-              | undefined) || '';
-
-          const modelsAcross = feature!.variants.flatMap((g) => {
-            const models = (g as any)['ai.model'];
-            if (Array.isArray(models)) return models;
-            if (typeof models === 'string') return [models];
-            return [];
+          const provider = this.getCurrentProvider(scope); // <-- form-first provider
+          const allModels = feature!.variants.flatMap((g) => {
+            const m = (g as any)['ai.model'];
+            return Array.isArray(m) ? m : typeof m === 'string' ? [m] : [];
           });
 
-          const models = effectiveProvider
+          const models = provider
             ? feature!.variants
-                .filter((g) => (g as any)['ai.provider'] === effectiveProvider)
+                .filter((g) => (g as any)['ai.provider'] === provider)
                 .flatMap((g) => {
                   const m = (g as any)['ai.model'];
                   return Array.isArray(m) ? m : typeof m === 'string' ? [m] : [];
                 })
-            : modelsAcross;
+            : allModels;
 
           finalValues = Array.from(new Set(models.map(String)));
         } else {
-          // generic key
           finalValues = Array.from(
             new Set(
               feature!.variants.flatMap((g) => {
@@ -356,18 +348,14 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         finalValues = Array.isArray(v) ? v.map(String) : v != null ? [String(v)] : [];
       }
 
-      // keep effective value even if not in list
-      const effective = this.features.variant<unknown>(key, undefined, scope || undefined);
-      const effStr = effective != null ? String(effective) : '';
-      if (effStr && !finalValues.includes(effStr)) finalValues.unshift(effStr);
-
+      // push to dropdown
       this.aiValueField.options = finalValues.map((v) => ({ label: v, value: v }));
 
-      const nextVal =
+      const next =
         finalValues.includes(this.aiValueControl.value) && this.aiValueControl.value
           ? this.aiValueControl.value
           : (finalValues[0] ?? '');
-      this.aiValueControl.setValue(nextVal, { emitEvent: false });
+      this.aiValueControl.setValue(next, { emitEvent: false });
     };
 
     // Controls
@@ -400,7 +388,15 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       .subscribe((value) => {
         const scope = this.aiScopeControl.value;
         const key = this.aiKeyControl.value;
+
+        // If the user is changing provider in the modal, refresh the models list
+        if (key === 'ai.provider') {
+          // Recompute the options for ai.model using the just-picked provider
+          refreshValues(scope, 'ai.model');
+        }
+
         if (!key) return;
+        // Only dispatch when you actually want to persist the variant for the current key
         this.store.dispatch(
           AppActions.AiVariantsActions.setVariant({
             path: key,
@@ -416,6 +412,24 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     if (this.aiKeyControl.value) {
       refreshValues(this.aiScopeControl.value, this.aiKeyControl.value);
     }
+  }
+
+  private getCurrentProvider(scope: string): string {
+    // If the user is currently editing ai.provider in the modal,
+    // prefer that unsaved selection over the store value.
+    const editingKey = this.aiKeyControl?.value;
+    const editingVal = this.aiValueControl?.value;
+
+    if (editingKey === 'ai.provider' && editingVal) {
+      return String(editingVal);
+    }
+
+    // else use the effective value from your features service / store
+    return (
+      (this.features.variant<string>('ai.provider', undefined, scope || undefined) as
+        | string
+        | undefined) || ''
+    );
   }
 
   displayName(p: AuthProfile | null): string {
