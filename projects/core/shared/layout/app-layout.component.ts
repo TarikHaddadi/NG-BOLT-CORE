@@ -25,7 +25,14 @@ import { RouterModule, RouterOutlet } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { combineLatest, firstValueFrom, Observable } from 'rxjs';
-import { distinctUntilChanged, filter, map, startWith, switchMap } from 'rxjs/operators';
+import {
+  distinctUntilChanged,
+  filter,
+  map,
+  startWith,
+  switchMap,
+  withLatestFrom,
+} from 'rxjs/operators';
 
 import {
   AuthProfile,
@@ -267,71 +274,75 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       distinctUntilChanged(),
     );
 
-    const providers$ = scope$.pipe(
-      switchMap((scope) => this.store.select(VarSel.selectFeatureRecord(scope || ''))),
-      map((rec) => (rec['__ai.providers'] as string[] | undefined) ?? []),
-    );
-
-    const modelsByProvider$ = scope$.pipe(
-      switchMap((scope) => this.store.select(VarSel.selectModelsByProvider(scope || ''))),
-    );
-
-    const selectedProvider$ = scope$.pipe(
-      switchMap((scope) => this.store.select(VarSel.selectProviderInFeature(scope || ''))),
-    );
-
-    const selectedModel$ = scope$.pipe(
-      switchMap((scope) => this.store.select(VarSel.selectModelInFeature(scope || ''))),
-    );
-
     const key$ = this.aiKeyControl.valueChanges.pipe(
       startWith(this.aiKeyControl.value),
       distinctUntilChanged(),
     );
 
-    // 4) When key === 'ai.provider' → show provider options and reflect selected provider
-    combineLatest([
-      key$,
-      providers$, // string[]
-      selectedProvider$.pipe(startWith<string | undefined>(undefined)), // string | undefined
-    ])
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(([key, providers, selProvider]) => {
-        if (key !== 'ai.provider') return;
+    // modelsByProvider for current scope
+    const modelsByProvider$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectModelsByProvider(scope || ''))),
+    );
 
-        // Show provider options
+    const providers$ = modelsByProvider$.pipe(
+      map((byProv) => Object.keys(byProv)),
+      distinctUntilChanged((a, b) => a.join('|') === b.join('|')),
+    );
+
+    // selected values from store (for current scope)
+    const selectedProvider$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectProviderInFeature(scope || ''))),
+      distinctUntilChanged(),
+    );
+
+    const selectedModel$ = scope$.pipe(
+      switchMap((scope) => this.store.select(VarSel.selectModelInFeature(scope || ''))),
+      distinctUntilChanged(),
+    );
+
+    // Only refresh UI when key OR scope changes
+    const keyScope$ = combineLatest([key$, scope$]).pipe(
+      distinctUntilChanged(([k1, s1], [k2, s2]) => k1 === k2 && s1 === s2),
+    );
+
+    // --- Provider UI (key === 'ai.provider') ---
+    keyScope$
+      .pipe(
+        filter(([key]) => key === 'ai.provider'),
+        withLatestFrom(providers$, selectedProvider$),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(([, providers, selProvider]) => {
+        // update options
         this.aiValueField.options = providers.map((p) => ({ label: p, value: p }));
 
-        // Reflect store selection; otherwise clear (do NOT default to first)
+        // reflect persisted store value; do NOT auto-default
         const next = selProvider && providers.includes(selProvider) ? selProvider : '';
         if (this.aiValueControl.value !== next) {
           this.aiValueControl.setValue(next, { emitEvent: false });
         }
       });
 
-    // 5) When key === 'ai.model' → show models for the selected provider (feature-only)
-    combineLatest([
-      key$,
-      modelsByProvider$, // Record<string, string[]>
-      selectedProvider$.pipe(startWith<string | undefined>(undefined)), // string | undefined
-      selectedModel$.pipe(startWith<string | undefined>(undefined)), // string | undefined
-    ])
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(([key, byProv, selProvider, selModel]) => {
-        if (key !== 'ai.model') return;
-
-        // Get models for the selected provider in the CURRENT feature only
+    // --- Model UI (key === 'ai.model') ---
+    keyScope$
+      .pipe(
+        filter(([key]) => key === 'ai.model'),
+        withLatestFrom(modelsByProvider$, selectedProvider$, selectedModel$),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(([, byProv, selProvider, selModel]) => {
         const models = selProvider ? (byProv[selProvider] ?? []) : [];
+
         this.aiValueField.options = models.map((m) => ({ label: m, value: m }));
 
-        // Reflect store selection; otherwise clear (do NOT default to first)
+        // reflect persisted store value; do NOT auto-default
         const next = selModel && models.includes(selModel) ? selModel : '';
         if (this.aiValueControl.value !== next) {
           this.aiValueControl.setValue(next, { emitEvent: false });
         }
       });
 
-    // 6) Dispatch when the user picks a value for the current key
+    // Persist ONLY when the user picks a value for the current key
     this.aiValueControl.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => {
@@ -339,11 +350,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
         const key = this.aiKeyControl.value;
         if (!scope || !key) return;
         this.store.dispatch(
-          AppActions.AiVariantsActions.setVariant({
-            featureKey: scope,
-            path: key,
-            value,
-          }),
+          AppActions.AiVariantsActions.setVariant({ featureKey: scope, path: key, value }),
         );
       });
   }
@@ -360,19 +367,6 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
 
   logout(): void {
     this.store.dispatch(AppActions.AuthActions.logout());
-  }
-
-  resetVariant(): void {
-    const scope = this.aiScopeControl.value;
-    const key = this.aiKeyControl.value;
-    if (!key || !scope) return;
-    this.store.dispatch(
-      AppActions.AiVariantsActions.setVariant({
-        featureKey: scope,
-        path: key,
-        value: undefined,
-      }),
-    );
   }
 
   async openSwitchers(): Promise<void> {

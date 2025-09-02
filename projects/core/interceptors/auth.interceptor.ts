@@ -6,12 +6,15 @@ import { catchError, switchMap } from 'rxjs/operators';
 import { ConfigService, KeycloakService } from '@cadai/pxs-ng-core/services';
 
 const toAbs = (url: string) => new URL(url, document.baseURI).href;
-const ASSETS_PREFIX = new URL('./assets/', document.baseURI).href;
+// base-href aware absolute prefix for /assets/
+const ASSETS_PREFIX_ABS = new URL('assets/', document.baseURI).href;
 
 const isAssetsUrl = (url: string) => {
+  // covers relative and root-relative quickly
+  if (url.startsWith('assets/') || url.startsWith('/assets/')) return true;
+  // also cover absolute under current base-href
   const abs = toAbs(url);
-  // match ".../assets/..." under current base href, keep it simple & robust
-  return abs.startsWith(ASSETS_PREFIX);
+  return abs.startsWith(ASSETS_PREFIX_ABS);
 };
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
@@ -20,24 +23,26 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'OPTIONS') return next(req);
 
-  // ✅ skip static assets and Keycloak endpoints entirely
   const reqAbs = toAbs(req.url);
   const kcBase = kc.instance?.authServerUrl ?? '';
   const isKeycloakUrl = kcBase && reqAbs.toLowerCase().startsWith(kcBase.toLowerCase());
 
+  // ✅ never touch static assets or KC endpoints
   if (isAssetsUrl(req.url) || isKeycloakUrl) {
     return next(req);
   }
 
-  // API origin check (handles sub-paths too)
+  // limit auth header + 401 handling to your API only
   const apiBase = conf.getAll()?.apiUrl;
   const isApiUrl = apiBase
     ? reqAbs.toLowerCase().startsWith(apiBase.toLowerCase())
-    : new URL(reqAbs).origin === new URL(document.baseURI).origin;
+    : new URL(reqAbs).origin === new URL(document.baseURI).origin; // fallback: same-origin
 
   return from(kc.ensureFreshToken(60)).pipe(
     switchMap((token) => {
-      const authReq = token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
+      // attach header only for API requests
+      const authReq =
+        isApiUrl && token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
       return next(authReq);
     }),
     catchError((err) => {
