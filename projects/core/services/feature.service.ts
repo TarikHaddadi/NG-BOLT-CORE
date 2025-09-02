@@ -14,24 +14,19 @@ import {
 import { ConfigService } from './config.service';
 
 export const VARIANTS_SLICE_KEY = 'variants' as const;
-const selectVariantsUnsafe = (root: unknown): VariantsState =>
-  ((root as any)?.[VARIANTS_SLICE_KEY] as VariantsState) ?? { features: {} };
 
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
   public cfg?: RuntimeConfig; // ← may be undefined until config is loaded
   private readonly store = inject(Store, { optional: true });
 
-  private variantCache: VariantsState = { features: {} };
   private userSig = signal<UserCtx | null>(null);
 
   constructor(private readonly config: ConfigService) {
     // Try to grab whatever is available now (may be undefined before loadConfig)
     this.cfg = (this.config.getAll?.() as RuntimeConfig | undefined) ?? undefined;
 
-    if (this.store) {
-      this.store.select(selectVariantsUnsafe).subscribe((s) => (this.variantCache = s));
-    } else {
+    if (!this.store) {
       // No store: seed lazily from cfgSafe (empty until config is available)
       this.reseedFromConfig();
     }
@@ -47,11 +42,6 @@ export class FeatureService {
       if (Object.keys(normalized).length) {
         features[key] = normalized;
       }
-    }
-
-    // Only seed if there is no store keeping this up to date
-    if (!this.store) {
-      this.variantCache = { features };
     }
   }
 
@@ -77,38 +67,6 @@ export class FeatureService {
       out.push({ key, label: af.label, icon: af.icon, route: af.route });
     }
     return out;
-  }
-
-  /**
-   * Get a variant value (feature-scoped).
-   * Resolution order:
-   *  1) featureKey scope → variants[path]
-   *  2) first feature that defines variants[path]
-   *  3) fallback
-   */
-  variant<T = unknown>(path: string, fallback?: T, featureKey?: string): T | undefined {
-    const fromFeature = (fk?: string) =>
-      fk ? (this.variantCache.features[fk]?.[path] as T | undefined) : undefined;
-
-    if (featureKey) {
-      const hit = fromFeature(featureKey);
-      if (hit !== undefined) return hit;
-      return fallback;
-    }
-
-    for (const rec of Object.values(this.variantCache.features)) {
-      const v = rec?.[path];
-      if (v !== undefined) return v as T;
-    }
-
-    // As last resort, peek config (covers no-store + early phase)
-    const feats = this.cfgSafe().features ?? {};
-    for (const f of Object.values(feats)) {
-      const v = (f as AppFeature)?.variants?.[path];
-      if (v !== undefined) return v as T;
-    }
-
-    return fallback;
   }
 
   list(): string[] {
