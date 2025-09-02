@@ -22,3 +22,25 @@ export const selectVariantResolved = (path: string) =>
     }
     return undefined;
   });
+
+export const selectFeatureRecord = (featureKey: string) =>
+  createSelector(selectFeatureVariants, (f) => f[featureKey] ?? {});
+
+export const selectModelsByProvider = (featureKey: string) =>
+  createSelector(selectFeatureRecord(featureKey), (rec) => {
+    const meta = rec['__ai.modelsByProvider'] as Record<string, string[]> | undefined;
+    return meta ?? {};
+  });
+
+/** Return resolved value(s) always as array of strings */
+export const selectVariantResolvedArray = (path: string) =>
+  createSelector(selectVariants, (s) => {
+    const v =
+      s.global[path] !== undefined
+        ? s.global[path]
+        : Object.values(s.features).find((rec) => rec?.[path] !== undefined)?.[path];
+
+    if (Array.isArray(v)) return v as string[];
+    if (v == null) return [];
+    return [String(v)];
+  });

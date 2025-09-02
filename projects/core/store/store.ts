@@ -9,7 +9,11 @@ import { AppEffects } from './app.effects';
 import { AppReducers } from './app.reducer';
 
 const localStorageSyncReducer = (reducer: ActionReducer<AppState>): ActionReducer<AppState> =>
-  localStorageSync({ keys: ['teamManagement'], rehydrate: true })(reducer);
+  localStorageSync({
+    keys: ['teamManagement', 'variants', 'theme'],
+    rehydrate: true,
+    storageKeySerializer: (k) => `pxs:${k}`,
+  })(reducer);
 
 export const metaReducers: MetaReducer<AppState>[] = [localStorageSyncReducer];
 

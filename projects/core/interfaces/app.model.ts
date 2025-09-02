@@ -5,4 +5,11 @@ export interface AppState {
   teamManagement: TeamManagementState;
   auth: AuthState;
   aiVariants: VariantsState;
+  theme: ThemeState;
+}
+
+export type ThemeMode = 'light' | 'dark';
+
+export interface ThemeState {
+  mode: ThemeMode;
 }

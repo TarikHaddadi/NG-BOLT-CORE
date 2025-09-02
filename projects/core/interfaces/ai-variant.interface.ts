@@ -1,8 +1,8 @@
-export type VariantRecord = Record<string, unknown>;
+export type VariantValue = string | string[] | Record<string, unknown> | undefined;
 
 export interface VariantsState {
   /** Global variants (keep empty unless you introduce a top-level variants bag) */
-  global: VariantRecord;
+  global: Record<string, VariantValue>;
   /** Per-feature variants */
-  features: Record<string, VariantRecord>;
+  features: Record<string, Record<string, VariantValue>>;
 }

@@ -8,6 +8,7 @@ import {
   RuntimeConfig,
   UserCtx,
   VariantsState,
+  VariantValue,
 } from '@cadai/pxs-ng-core/interfaces';
 
 import { ConfigService } from './config.service';
@@ -38,15 +39,20 @@ export class FeatureService {
 
   /** Call this after ConfigService.loadConfig() if you don’t use the store. */
   reseedFromConfig(): void {
-    const features: Record<string, Record<string, unknown>> = {};
-    const cfg = this.cfgSafe(); // guarantees an object with features:{}
-    Object.entries(cfg.features ?? {}).forEach(([k, f]) => {
-      if (f?.variants && typeof f.variants === 'object') {
-        features[k] = f.variants as Record<string, unknown>;
+    const cfg = this.cfgSafe(); // returns a RuntimeConfig with features: {}
+    const features: VariantsState['features'] = {};
+
+    for (const [key, feat] of Object.entries(cfg.features ?? {})) {
+      const normalized = normalizeFeatureVariants((feat as any)?.variants);
+      if (Object.keys(normalized).length) {
+        features[key] = normalized;
       }
-    });
+    }
+
     // Only seed if there is no store keeping this up to date
-    if (!this.store) this.variantCache = { global: {}, features };
+    if (!this.store) {
+      this.variantCache = { global: {}, features };
+    }
   }
 
   /** Optional: set a global user context once (e.g., after KC init). */
@@ -149,4 +155,57 @@ export class FeatureService {
     }
     return true;
   }
+}
+
+type VariantGroup = Record<string, string | string[]>;
+
+function isVariantArray(v: unknown): v is VariantGroup[] {
+  return Array.isArray(v);
+}
+function isVariantMap(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Normalize a feature's variants (array-of-groups or legacy object) into your VariantsState shape. */
+function normalizeFeatureVariants(variants: unknown): Record<string, VariantValue> {
+  if (!variants) return {};
+
+  // New shape: array of groups
+  if (isVariantArray(variants)) {
+    const out: Record<string, string[]> = {};
+    const modelsByProvider: Record<string, string[]> = {};
+    const add = (k: string, vals: string[]) => {
+      out[k] = Array.from(new Set([...(out[k] ?? []), ...vals]));
+    };
+
+    for (const group of variants) {
+      for (const [k, raw] of Object.entries(group)) {
+        const vals = Array.isArray(raw) ? raw : raw != null ? [raw] : [];
+        add(k, vals);
+
+        // keep models grouped by provider (optional but handy)
+        if (k === 'ai.model') {
+          const provider = typeof group['ai.provider'] === 'string' ? group['ai.provider'] : '';
+          if (provider) {
+            modelsByProvider[provider] = Array.from(
+              new Set([...(modelsByProvider[provider] ?? []), ...vals]),
+            );
+          }
+        }
+      }
+    }
+
+    // Cast to VariantValue map (arrays of strings + optional meta object)
+    return {
+      ...out,
+      __ai_modelsByProvider: modelsByProvider, // VariantValue allows Record<string, unknown>
+    } as Record<string, VariantValue>;
+  }
+
+  // Legacy shape: simple object map
+  if (isVariantMap(variants)) {
+    return variants as Record<string, VariantValue>;
+  }
+
+  return {};
 }

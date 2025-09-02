@@ -5,9 +5,7 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
-  effect,
   inject,
-  Injector,
   OnInit,
   TemplateRef,
   ViewChild,
@@ -79,6 +77,7 @@ import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
 export class AppLayoutComponent implements OnInit, AfterViewInit {
   @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<unknown>;
 
+  public isDark$!: Observable<boolean>;
   // Sidebar + header
   public isOpen = true;
   public title$!: Observable<string>;
@@ -142,7 +141,6 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   // inject()
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
-  private injector = inject(Injector);
   private layoutService = inject(LayoutService);
   private configService = inject(ConfigService);
   public translate = inject(TranslateService);
@@ -162,24 +160,22 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     this.cfg = this.configService.getAll() as RuntimeConfig;
     this.version = this.cfg.version || '0.0.0';
 
-    // Theme toggle
-    this.themeControl = new FormControl<boolean>(this.theme.isDark(), { nonNullable: true });
-    this.themeControl.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((wantDark) => {
-        if (wantDark !== this.theme.isDark()) this.theme.toggleTheme();
-      });
+    this.isDark$ = this.store.select(AppSelectors.ThemeSelectors.selectIsDark);
 
-    // Mirror theme -> control via effect (no loops)
-    effect(
-      () => {
-        const isDark = this.theme.isDark();
+    // Theme toggle
+    this.themeControl = new FormControl<boolean>(false, { nonNullable: true });
+    this.store
+      .select(AppSelectors.ThemeSelectors.selectIsDark)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((isDark) => {
         if (this.themeControl.value !== isDark) {
           this.themeControl.setValue(isDark, { emitEvent: false });
         }
-      },
-      { injector: this.injector },
-    );
+      });
+
+    this.themeControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((isDark) => {
+      this.store.dispatch(AppActions.ThemeActions.setTheme({ mode: isDark ? 'dark' : 'light' }));
+    });
 
     // Language
     this.langControl = new FormControl<string>(this.translate.getCurrentLang(), {
@@ -206,13 +202,30 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     // AI Variant selectors
     const featuresWithVariants = () =>
       Object.entries(this.cfg.features ?? {})
-        .filter(([, f]) => f?.variants && typeof f.variants === 'object')
+        .filter(
+          ([, f]) =>
+            f?.variants && typeof f.variants === 'object' && Object.keys(f.variants).length,
+        )
         .map(([k]) => k);
 
     const buildScopeOptions = () => {
+      const feats = featuresWithVariants();
+      // If no features expose variants → hide everything by leaving options empty
+      if (!feats.length) {
+        this.aiScopeField.options = [];
+        this.aiKeyField.options = [];
+        this.aiValueField.options = [];
+        // also clear controls to avoid stale values
+        this.aiScopeControl.setValue('', { emitEvent: false });
+        this.aiKeyControl.setValue('', { emitEvent: false });
+        this.aiValueControl.setValue('', { emitEvent: false });
+        return;
+      }
+
+      // Otherwise include "global" + feature-scoped entries
       this.aiScopeField.options = [
         { label: this.translate.instant('ai.global'), value: '' },
-        ...featuresWithVariants().map((k) => ({ label: this.translate.instant(k), value: k })),
+        ...feats.map((k) => ({ label: this.translate.instant(k), value: k })),
       ];
     };
 
@@ -227,6 +240,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
             ),
           );
 
+      // hide "key" select if no keys
       this.aiKeyField.options = keys.map((k) => ({ label: this.translate.instant(k), value: k }));
 
       const nextKey = keys.includes(this.aiKeyControl.value)
@@ -236,33 +250,78 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     };
 
     const refreshValues = (scope: string, key: string) => {
-      const valuesFromConfig: unknown[] = scope
-        ? [this.cfg.features?.[scope]?.variants?.[key]].filter((v) => v !== undefined)
-        : Array.from(
+      if (!key) {
+        this.aiValueField.options = [];
+        this.aiValueControl.setValue('', { emitEvent: false });
+        return;
+      }
+
+      // determine current provider if relevant
+      const effectiveProvider =
+        (this.features.variant<string>('ai.provider', undefined, scope || undefined) as
+          | string
+          | undefined) || '';
+
+      let finalValues: string[] = [];
+
+      const feature = this.cfg.features?.[scope];
+      if (Array.isArray(feature?.variants)) {
+        if (key === 'ai.provider') {
+          // unique list of providers across groups
+          finalValues = Array.from(
             new Set(
-              Object.values(this.cfg.features ?? {})
-                .map((f: AppFeature) => f?.variants?.[key])
-                .filter((v) => v !== undefined),
+              feature.variants
+                .map((g) => g['ai.provider'])
+                .filter((p): p is string => typeof p === 'string' && !!p),
             ),
           );
+        } else if (key === 'ai.model') {
+          if (effectiveProvider) {
+            // only models for the currently selected provider
+            const modelsForProvider = feature.variants
+              .filter((g) => g['ai.provider'] === effectiveProvider)
+              .flatMap((g) =>
+                Array.isArray(g['ai.model']) ? g['ai.model'] : g['ai.model'] ? [g['ai.model']] : [],
+              );
+            finalValues = Array.from(new Set(modelsForProvider));
+          } else {
+            // all models across all groups
+            const allModels = feature.variants.flatMap((g) =>
+              Array.isArray(g['ai.model']) ? g['ai.model'] : g['ai.model'] ? [g['ai.model']] : [],
+            );
+            finalValues = Array.from(new Set(allModels));
+          }
+        } else {
+          // any other keys you may add later
+          const vals = feature.variants.flatMap((g) => {
+            const v = g[key as keyof typeof g];
+            return Array.isArray(v) ? v : v ? [v] : [];
+          });
+          finalValues = Array.from(new Set(vals));
+        }
+      } else if (feature?.variants && typeof feature.variants === 'object') {
+        // legacy: single object
+        const v = (feature.variants as Record<string, unknown>)[key];
+        finalValues = Array.isArray(v) ? (v as string[]) : v != null ? [String(v)] : [];
+      }
 
+      // keep effective value even if it’s not in list
       const effective = this.features.variant<unknown>(key, undefined, scope || undefined);
-      const asString = (v: unknown) => (v == null ? '' : String(v));
+      const effStr = effective != null ? String(effective) : '';
+      if (effStr && !finalValues.includes(effStr)) {
+        finalValues.unshift(effStr);
+      }
 
-      const optionValues = [...valuesFromConfig.map(asString)];
-      const effStr = asString(effective);
-      if (effStr && !optionValues.includes(effStr)) optionValues.unshift(effStr);
-
-      const finalValues = optionValues.length ? optionValues : [''];
-
+      // push to form field + control
       this.aiValueField.options = finalValues.map((v) => ({
-        label: this.translate.instant(v) || '(empty)',
+        label: this.translate.instant(v) || v,
         value: v,
       }));
 
-      const nextVal = finalValues.includes(this.aiValueControl.value)
-        ? this.aiValueControl.value
-        : finalValues[0];
+      const nextVal =
+        finalValues.includes(this.aiValueControl.value) && this.aiValueControl.value
+          ? this.aiValueControl.value
+          : (finalValues[0] ?? '');
       this.aiValueControl.setValue(nextVal, { emitEvent: false });
     };
 
@@ -366,5 +425,15 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     const result = await firstValueFrom(ref.afterClosed());
     if (!result) return;
     // You can handle persisted quick-settings here if needed
+  }
+
+  get showAiScope(): boolean {
+    return (this.aiScopeField.options?.length ?? 0) > 0;
+  }
+  get showAiKey(): boolean {
+    return (this.aiKeyField.options?.length ?? 0) > 0;
+  }
+  get showAiValue(): boolean {
+    return (this.aiValueField.options?.length ?? 0) > 0;
   }
 }

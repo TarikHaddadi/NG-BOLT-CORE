@@ -1,5 +1,5 @@
-export { type VariantsState } from './ai-variant.interface';
-export { type AppState } from './app.model';
+export { type VariantsState, type VariantValue } from './ai-variant.interface';
+export { type AppState, type ThemeMode, type ThemeState } from './app.model';
 export { type AuthState, initialAuthState } from './auth.model';
 export {
   type AppFeature,

@@ -1,6 +1,6 @@
 import { createReducer, on } from '@ngrx/store';
 
-import { VariantsState } from '@cadai/pxs-ng-core/interfaces';
+import { VariantsState, VariantValue } from '@cadai/pxs-ng-core/interfaces';
 
 import * as VariantsActions from './ai-variants.actions';
 
@@ -9,30 +9,43 @@ export const initialVariantsState: VariantsState = {
   features: {},
 };
 
+// helper: shallow merge of records
+function mergeRecords<
+  T extends Record<string, VariantValue>,
+  U extends Record<string, VariantValue>,
+>(base: T, override: U): Record<string, VariantValue> {
+  return { ...base, ...override };
+}
+
+// helper: merge nested feature maps
+function mergeFeatureMaps<
+  T extends Record<string, Record<string, VariantValue>>,
+  U extends Record<string, Record<string, VariantValue>>,
+>(base: T, override: U): Record<string, Record<string, VariantValue>> {
+  const allKeys = new Set([...Object.keys(base), ...Object.keys(override)]);
+  const out: Record<string, Record<string, VariantValue>> = {};
+  for (const k of allKeys) {
+    out[k] = mergeRecords(base[k] ?? {}, override[k] ?? {});
+  }
+  return out;
+}
+
 export const variantsReducer = createReducer(
   initialVariantsState,
 
-  // Replace state with the hydrated maps from RuntimeConfig
-  on(VariantsActions.hydrateSuccess, (_state, { global, features }) => ({
-    global: global ?? {},
-    features: features ?? {},
+  on(VariantsActions.hydrateSuccess, (state, { global, features }) => ({
+    global: mergeRecords(global ?? {}, state.global),
+    features: mergeFeatureMaps(features ?? {}, state.features),
   })),
 
-  // No state change on failure (you can add an error field if desired)
   on(VariantsActions.hydrateFailure, (state) => state),
 
-  // Upsert or clear a variant (global or feature-scoped)
   on(VariantsActions.setVariant, (state, { path, value, featureKey }) => {
-    // If feature-scoped
     if (featureKey) {
       const current = state.features[featureKey] ?? {};
-      // Support "remove" when value is undefined
       if (value === undefined) {
         const { [path]: _omit, ...rest } = current;
-        return {
-          ...state,
-          features: { ...state.features, [featureKey]: rest },
-        };
+        return { ...state, features: { ...state.features, [featureKey]: rest } };
       }
       return {
         ...state,
@@ -40,7 +53,6 @@ export const variantsReducer = createReducer(
       };
     }
 
-    // Global scope
     if (value === undefined) {
       const { [path]: _omit, ...rest } = state.global;
       return { ...state, global: rest };
@@ -48,6 +60,5 @@ export const variantsReducer = createReducer(
     return { ...state, global: { ...state.global, [path]: value } };
   }),
 
-  // Reset to initial empty maps
   on(VariantsActions.reset, () => initialVariantsState),
 );

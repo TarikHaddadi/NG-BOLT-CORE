@@ -6,7 +6,7 @@
       @for (item of menuItems; track item.route) {
         <a
           mat-list-item
-          [class.isDark]="theme.isDark()"
+          [class.isDark]="isDark$ | async"
           class="menu-link"
           [routerLink]="item.route"
           routerLinkActive="active"
@@ -45,9 +45,17 @@
         <app-select [field]="langField" [control]="langControl"></app-select>
 
         <!-- AI Scope / Key / Value -->
-        <app-select [field]="aiScopeField" [control]="aiScopeControl"></app-select>
-        <app-select [field]="aiKeyField" [control]="aiKeyControl"></app-select>
-        <app-select [field]="aiValueField" [control]="aiValueControl"></app-select>
+        <ng-container *ngIf="showAiScope">
+          <app-select [field]="aiScopeField" [control]="aiScopeControl"></app-select>
+        </ng-container>
+
+        <ng-container *ngIf="showAiKey">
+          <app-select [field]="aiKeyField" [control]="aiKeyControl"></app-select>
+        </ng-container>
+
+        <ng-container *ngIf="showAiValue">
+          <app-select [field]="aiValueField" [control]="aiValueControl"></app-select>
+        </ng-container>
       </div>
     </ng-template>
 
