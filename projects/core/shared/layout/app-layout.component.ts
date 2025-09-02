@@ -103,8 +103,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     label: 'form.labels.language',
     type: 'dropdown',
     options: [
-      { label: 'English', value: 'en' },
-      { label: 'Français', value: 'fr' },
+      { label: 'English', value: 'English' },
+      { label: 'Français', value: 'Français' },
     ],
   };
   public langControl!: FormControl<string>;
