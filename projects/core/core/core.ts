@@ -10,8 +10,9 @@ import { provideAppInitializer } from '@angular/core';
 import { MatNativeDateModule } from '@angular/material/core';
 import { provideAnimations, provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Store } from '@ngrx/store';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateService, TranslateModule, TranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
+import { firstValueFrom } from 'rxjs';
 
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
 import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
@@ -76,6 +77,7 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     },
 
     // Angular Material date providers
+    importProvidersFrom(TranslateModule),
     importProvidersFrom(MatNativeDateModule),
     ...APP_DATE_PROVIDERS,
 
@@ -91,7 +93,6 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         suffix: normalized.i18n.suffix,
       }),
       fallbackLang: normalized.i18n.fallbackLang,
-      lang: normalized.i18n.lang,
     }),
 
     // Theme init
@@ -105,31 +106,34 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       const env = inject(EnvironmentInjector);
       const config = env.get(ConfigService);
       const kc = env.get(KeycloakService);
+      const translate = env.get(TranslateService);
+      const features = env.get(FeatureService);
 
       let store: Store | undefined;
       try {
         store = env.get(Store);
       } catch {}
 
+      const { lang, fallbackLang } = normalized.i18n;
+
       return (async () => {
-        // 1) Load runtime config and init auth
+        // 1) Load runtime config (see step 3 to avoid HttpClient here)
         await config.loadConfig();
+
+        // 2) Keycloak first
         await kc.init();
 
-        const features = env.get(FeatureService);
+        // 3) Feature & store hydration
         features.reseedFromConfig();
-
-        // 2) Hydrate Auth slice if present
         if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
-
-        // 3) Set user for FeatureService (menus/guards)
         const { isAuthenticated, roles, tenant } = kc.getUserCtx();
         features.setUser({ isAuthenticated, roles, tenant });
+        if (store) store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
 
-        // 4) Hydrate Variants from RuntimeConfig.features[*].variants (if Store is available)
-        if (store) {
-          store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
-        }
+        // 4) i18n last (now it’s safe to hit HttpClient)
+        translate.addLangs(['en', 'fr']);
+        translate.setFallbackLang(fallbackLang!);
+        await firstValueFrom(translate.use(lang!));
       })();
     }),
   ]);
