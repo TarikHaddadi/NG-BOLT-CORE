@@ -13,8 +13,6 @@ import {
 
 import { ConfigService } from './config.service';
 
-export const VARIANTS_SLICE_KEY = 'variants' as const;
-
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
   public cfg?: RuntimeConfig; // ← may be undefined until config is loaded

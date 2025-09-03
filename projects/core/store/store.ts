@@ -10,7 +10,7 @@ import { AppReducers } from './app.reducer';
 
 const localStorageSyncReducer = (reducer: ActionReducer<AppState>): ActionReducer<AppState> =>
   localStorageSync({
-    keys: ['teamManagement', 'variants', 'theme', 'lang'],
+    keys: ['teamManagement', 'aiVariants', 'theme', 'lang'],
     rehydrate: true,
     storageKeySerializer: (k) => `pxs:${k}`,
   })(reducer);

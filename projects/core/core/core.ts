@@ -10,9 +10,8 @@ import { provideAppInitializer } from '@angular/core';
 import { MatNativeDateModule } from '@angular/material/core';
 import { provideAnimations, provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Store } from '@ngrx/store';
-import { provideTranslateService, TranslateService } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
-import { firstValueFrom } from 'rxjs';
 
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
 import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
@@ -42,7 +41,7 @@ function normalize(opts: CoreOptions): Required<CoreOptions> {
   return {
     theme: opts.theme ?? 'light',
     i18n: {
-      prefix: opts.i18n?.prefix ?? 'assets/i18n/',
+      prefix: opts.i18n?.prefix ?? '/assets/i18n/',
       suffix: opts.i18n?.suffix ?? '.json',
       fallbackLang: opts.i18n?.fallbackLang ?? 'en',
       lang: opts.i18n?.lang ?? 'en',
@@ -92,6 +91,7 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         suffix: normalized.i18n.suffix,
       }),
       fallbackLang: normalized.i18n.fallbackLang,
+      lang: normalized.i18n.lang,
     }),
 
     // Theme init
@@ -103,10 +103,8 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     // Async boot: config -> keycloak -> hydrate store (if present) -> feature user -> variants
     provideAppInitializer(() => {
       const env = inject(EnvironmentInjector);
-      const translate = inject(TranslateService);
       const config = env.get(ConfigService);
       const kc = env.get(KeycloakService);
-      const { lang, fallbackLang } = normalized.i18n;
 
       let store: Store | undefined;
       try {
@@ -131,15 +129,6 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         // 4) Hydrate Variants from RuntimeConfig.features[*].variants (if Store is available)
         if (store) {
           store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
-        }
-
-        // 5) init translates
-        if (fallbackLang && lang) {
-          translate.addLangs(['en', 'fr']);
-          translate.setFallbackLang(fallbackLang);
-          console.log('Core Init FALLBACK LANG: -->', fallbackLang);
-          console.log('Core Init LANG: -->', lang);
-          await firstValueFrom(translate.use(lang));
         }
       })();
     }),

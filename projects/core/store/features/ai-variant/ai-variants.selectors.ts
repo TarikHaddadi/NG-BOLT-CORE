@@ -2,7 +2,7 @@ import { createFeatureSelector, createSelector, MemoizedSelector } from '@ngrx/s
 
 import { VariantsState, VariantValue } from '@cadai/pxs-ng-core/interfaces';
 
-export const selectVariants = createFeatureSelector<VariantsState>('variants');
+export const selectVariants = createFeatureSelector<VariantsState>('aiVariants');
 export const selectFeatureVariants = createSelector(selectVariants, (s) => s.features);
 export const selectFeatureRecord = (featureKey: string) =>
   createSelector(selectFeatureVariants, (f) => f[featureKey] ?? {});
