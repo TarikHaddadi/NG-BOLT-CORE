@@ -20,12 +20,13 @@ export const applyLang = createEffect(
       withLatestFrom(store.select(AppSelectors.LangSelectors.selectLang)),
       map(([, l]) => (l ?? 'en').toLowerCase() as Lang),
       distinctUntilChanged(),
-      switchMap((L) =>
-        translate.use(L).pipe(
+      switchMap((L) => {
+        console.log('ROOT_EFFECTS_INIT LANG: -->', L);
+        return translate.use(L).pipe(
           take(1),
           tap(() => document.documentElement.setAttribute('lang', L)),
-        ),
-      ),
+        );
+      }),
     );
   },
   { functional: true, dispatch: false },

@@ -12,6 +12,7 @@ import { provideAnimations, provideNoopAnimations } from '@angular/platform-brow
 import { Store } from '@ngrx/store';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
+import { firstValueFrom } from 'rxjs';
 
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
 import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
@@ -92,13 +93,6 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       }),
       fallbackLang: normalized.i18n.fallbackLang,
     }),
-    provideAppInitializer(async () => {
-      const translate = inject(TranslateService);
-      translate.addLangs(['en', 'fr']);
-      translate.setFallbackLang('en');
-
-      translate.use('en');
-    }),
 
     // Theme init
     provideAppInitializer(() => loadTheme(normalized.theme)),
@@ -143,7 +137,9 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         if (fallbackLang && lang) {
           translate.addLangs(['en', 'fr']);
           translate.setFallbackLang(fallbackLang);
-          translate.use(lang);
+          console.log('Core Init FALLBACK LANG: -->', fallbackLang);
+          console.log('Core Init LANG: -->', lang);
+          await firstValueFrom(translate.use(lang));
         }
       })();
     }),
