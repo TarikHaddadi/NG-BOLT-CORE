@@ -126,6 +126,7 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       return (async () => {
         // 1) runtime config (already seeded from CORE_OPTIONS)
         await config.loadConfig();
+        const runtime = config.getAll();
 
         // 2) Keycloak (only if enabled)
         if (hasKeycloak) {
@@ -152,6 +153,7 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         document.documentElement.setAttribute('lang', selectedLang);
 
         // 4) Features + user (guest when Keycloak disabled)
+        features.updateConfig(runtime); // ✅ <-- refresh FeatureService with the real config
         features.reseedFromConfig();
         const user = hasKeycloak
           ? kc.getUserCtx()

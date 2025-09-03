@@ -87,15 +87,19 @@ export class FeatureService {
   // ---- internals (unchanged except for tiny safety)
 
   private cfgSafe(): RuntimeConfig & { features: Record<string, AppFeature> } {
+    // Always try to refresh from ConfigService first
+    const latest = this.config.getAll?.() as RuntimeConfig | undefined;
+    if (latest) this.cfg = latest;
+
     if (!this.cfg) {
-      this.cfg = ((this.config.getAll?.() as RuntimeConfig | undefined) ?? {
+      this.cfg = {
         name: 'unknown',
         production: false,
         apiUrl: '',
         version: '0.0.0',
         auth: {} as AuthRuntimeConfig,
         features: {},
-      }) as RuntimeConfig;
+      } as RuntimeConfig;
     }
     if (!this.cfg.features) this.cfg.features = {};
     return this.cfg as RuntimeConfig & { features: Record<string, AppFeature> };
