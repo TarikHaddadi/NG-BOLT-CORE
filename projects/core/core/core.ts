@@ -109,8 +109,10 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     // Async boot: config -> keycloak -> hydrate store (if present) -> feature user -> variants
     provideAppInitializer(() => {
       const env = inject(EnvironmentInjector);
+      const translate = inject(TranslateService);
       const config = env.get(ConfigService);
       const kc = env.get(KeycloakService);
+      const { lang, fallbackLang } = normalized.i18n;
 
       let store: Store | undefined;
       try {
@@ -135,6 +137,13 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         // 4) Hydrate Variants from RuntimeConfig.features[*].variants (if Store is available)
         if (store) {
           store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
+        }
+
+        // 5) init translates
+        if (fallbackLang && lang) {
+          translate.addLangs(['en', 'fr']);
+          translate.setFallbackLang(fallbackLang);
+          translate.use(lang);
         }
       })();
     }),
