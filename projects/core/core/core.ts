@@ -117,16 +117,7 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         await config.loadConfig();
         await kc.init();
 
-        // 2) feature/store hydration (your existing code)
-        const features = env.get(FeatureService);
-        features.reseedFromConfig();
-        if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
-
-        const { isAuthenticated, roles, tenant } = kc.getUserCtx();
-        features.setUser({ isAuthenticated, roles, tenant });
-        if (store) store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
-
-        // 3) resolve selected language from store (fallback to opts)
+        // 2) resolve selected language from store (fallback to opts)
         const selectedLang$ = store
           ? store.select(AppSelectors.LangSelectors.selectLang)
           : of<string | undefined>(undefined);
@@ -138,12 +129,20 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
           ),
         );
 
-        // 4) init i18n with the resolved language
+        // 3) init i18n with the resolved language
         translate.addLangs(['en', 'fr']); // or drive from config
         translate.setFallbackLang(normalized.i18n.fallbackLang!);
-        await firstValueFrom(translate.use(selectedLang!));
-
+        translate.use(selectedLang!);
         document.documentElement.setAttribute('lang', selectedLang!);
+
+        // 4) feature/store hydration
+        const features = env.get(FeatureService);
+        features.reseedFromConfig();
+        if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
+
+        const { isAuthenticated, roles, tenant } = kc.getUserCtx();
+        features.setUser({ isAuthenticated, roles, tenant });
+        if (store) store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
       })();
     }),
   ]);
