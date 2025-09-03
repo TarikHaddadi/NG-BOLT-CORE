@@ -21,7 +21,7 @@ export const applyLang = createEffect(
       map(([, l]) => (l ?? 'en').toLowerCase() as Lang),
       distinctUntilChanged(),
       switchMap((L) => {
-        console.log('ROOT_EFFECTS_INIT');
+        console.log('ROOT_EFFECTS_INIT -->', L!);
         translate.addLangs(['en', 'fr']);
         translate.setFallbackLang(L!);
         translate.use(L!);

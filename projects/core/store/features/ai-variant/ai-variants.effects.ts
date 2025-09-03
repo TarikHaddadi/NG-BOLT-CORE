@@ -1,11 +1,17 @@
 import { inject } from '@angular/core';
 import { Actions, createEffect, ofType, ROOT_EFFECTS_INIT } from '@ngrx/effects';
-import { of } from 'rxjs';
+import { from, of } from 'rxjs';
 import { catchError, map, mergeMap } from 'rxjs/operators';
 
-import { AppFeature, RuntimeConfig, VariantValue } from '@cadai/pxs-ng-core/interfaces';
-import { ConfigService } from '@cadai/pxs-ng-core/services';
+import {
+  AppFeature,
+  CoreOptions,
+  RuntimeConfig,
+  VariantValue,
+} from '@cadai/pxs-ng-core/interfaces';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
+import { AppActions } from '../../app.actions';
 import * as VariantsActions from './ai-variants.actions';
 
 type ModelsByProvider = Record<string, string[]>;
@@ -24,16 +30,94 @@ const normModels = (m: unknown): string[] => {
   );
 };
 
+const META_MODELS_BY_PROVIDER = '__ai.modelsByProvider';
+
+// Keep this aligned with your FeatureService version.
+function normalizeFeatureVariants(v: unknown): Record<string, VariantValue> {
+  if (!v) return {};
+  if (Array.isArray(v)) {
+    const out: Record<string, string[]> = {};
+    const modelsByProvider: Record<string, string[]> = {};
+    const add = (k: string, vals: string[]) =>
+      (out[k] = Array.from(new Set([...(out[k] ?? []), ...vals])));
+
+    for (const group of v as Array<Record<string, string | string[]>>) {
+      for (const [k, raw] of Object.entries(group)) {
+        const vals = Array.isArray(raw) ? raw : raw != null ? [raw] : [];
+        add(k, vals);
+        if (k === 'ai.model') {
+          const provider = typeof group['ai.provider'] === 'string' ? group['ai.provider'] : '';
+          if (provider) {
+            modelsByProvider[provider] = Array.from(
+              new Set([...(modelsByProvider[provider] ?? []), ...vals]),
+            );
+          }
+        }
+      }
+    }
+    return { ...out, [META_MODELS_BY_PROVIDER]: modelsByProvider } as Record<string, VariantValue>;
+  }
+  if (v && typeof v === 'object') return v as Record<string, VariantValue>;
+  return {};
+}
+
+export const hydrateVariants = createEffect(
+  () => {
+    const actions$ = inject(Actions);
+    const opts = inject(CORE_OPTIONS) as Required<CoreOptions>;
+
+    return actions$.pipe(
+      ofType(AppActions.AiVariantsActions.hydrateFromConfig),
+      mergeMap(() => {
+        try {
+          const cfg = opts.environments as RuntimeConfig;
+          const src = (cfg?.features ?? {}) as Record<string, AppFeature>;
+          const features: Record<string, Record<string, VariantValue>> = {};
+          const modelDispatches: Array<
+            ReturnType<typeof AppActions.AiVariantsActions.setModelsByProvider>
+          > = [];
+
+          for (const [featureKey, f] of Object.entries(src)) {
+            const vmap = normalizeFeatureVariants((f as any).variants);
+            // capture and strip meta if you want it stored separately
+            const meta = (vmap[META_MODELS_BY_PROVIDER] as Record<string, string[]>) || {};
+            if (META_MODELS_BY_PROVIDER in vmap) {
+              delete (vmap as any)[META_MODELS_BY_PROVIDER];
+            }
+            features[featureKey] = vmap;
+
+            // queue a modelsByProvider action (optional but matches your API)
+            if (Object.keys(meta).length) {
+              modelDispatches.push(
+                AppActions.AiVariantsActions.setModelsByProvider({ featureKey, map: meta }),
+              );
+            }
+          }
+
+          // Dispatch hydrateSuccess + any per-feature meta actions
+          return from([
+            AppActions.AiVariantsActions.hydrateSuccess({ features }),
+            ...modelDispatches,
+          ]);
+        } catch (error) {
+          return of(AppActions.AiVariantsActions.hydrateFailure({ error }));
+        }
+      }),
+    );
+  },
+  { functional: true },
+);
+
 export const hydrateFromConfigEffect = createEffect(
   () => {
     const actions$ = inject(Actions);
-    const config = inject(ConfigService);
+    const opts = inject(CORE_OPTIONS) as Required<CoreOptions>;
 
     return actions$.pipe(
       ofType(VariantsActions.hydrateFromConfig, ROOT_EFFECTS_INIT),
       map(() => {
         try {
-          const cfg = (config.getAll?.() ?? {}) as RuntimeConfig;
+          const cfg = opts.environments as RuntimeConfig;
           const featuresCfg = (cfg.features ?? {}) as Record<string, AppFeature>;
 
           const features: Record<string, Record<string, VariantValue>> = {};

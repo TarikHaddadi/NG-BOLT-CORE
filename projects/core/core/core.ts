@@ -12,7 +12,7 @@ import { provideAnimations, provideNoopAnimations } from '@angular/platform-brow
 import { Store } from '@ngrx/store';
 import { provideTranslateService, TranslateModule, TranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, map, of, take } from 'rxjs';
 
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
 import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
@@ -22,7 +22,7 @@ import {
   FeatureService,
   KeycloakService,
 } from '@cadai/pxs-ng-core/services';
-import { AppActions } from '@cadai/pxs-ng-core/store';
+import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
 import { CORE_GET_USER_CTX, CORE_OPTIONS, GetUserCtx } from '@cadai/pxs-ng-core/tokens';
 
 function loadTheme(theme: 'light' | 'dark' = 'light') {
@@ -45,7 +45,6 @@ function normalize(opts: CoreOptions): Required<CoreOptions> {
       prefix: opts.i18n?.prefix ?? '/assets/i18n/',
       suffix: opts.i18n?.suffix ?? '.json',
       fallbackLang: opts.i18n?.fallbackLang ?? 'en',
-      lang: opts.i18n?.lang ?? 'en',
     },
     interceptors: opts.interceptors ?? [],
     animations: opts.animations ?? true,
@@ -104,32 +103,47 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     // Async boot: config -> keycloak -> hydrate store (if present) -> feature user -> variants
     provideAppInitializer(() => {
       const env = inject(EnvironmentInjector);
+      const config = env.get(ConfigService);
       const kc = env.get(KeycloakService);
       const translate = env.get(TranslateService);
-      const features = env.get(FeatureService);
 
       let store: Store | undefined;
       try {
         store = env.get(Store);
       } catch {}
 
-      const { lang, fallbackLang } = normalized.i18n;
-
       return (async () => {
-        // 1) Keycloak first
+        // 1) runtime config + keycloak
+        await config.loadConfig();
         await kc.init();
 
-        // 2) Feature & store hydration
+        // 2) feature/store hydration (your existing code)
+        const features = env.get(FeatureService);
         features.reseedFromConfig();
         if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
+
         const { isAuthenticated, roles, tenant } = kc.getUserCtx();
         features.setUser({ isAuthenticated, roles, tenant });
         if (store) store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
 
-        // 3) i18n last (now it’s safe to hit HttpClient)
-        translate.addLangs(['en', 'fr']);
-        translate.setFallbackLang(fallbackLang!);
-        await firstValueFrom(translate.use(lang!));
+        // 3) resolve selected language from store (fallback to opts)
+        const selectedLang$ = store
+          ? store.select(AppSelectors.LangSelectors.selectLang)
+          : of<string | undefined>(undefined);
+
+        const selectedLang = await firstValueFrom(
+          selectedLang$.pipe(
+            take(1),
+            map((l) => (l && l.trim()) || normalized.i18n.lang),
+          ),
+        );
+
+        // 4) init i18n with the resolved language
+        translate.addLangs(['en', 'fr']); // or drive from config
+        translate.setFallbackLang(normalized.i18n.fallbackLang!);
+        await firstValueFrom(translate.use(selectedLang!));
+
+        document.documentElement.setAttribute('lang', selectedLang!);
       })();
     }),
   ]);

@@ -3,4 +3,6 @@ export type VariantValue = string | string[] | Record<string, unknown> | undefin
 export interface VariantsState {
   /** Per-feature variants */
   features: Record<string, Record<string, VariantValue>>;
+  modelsByProvider: Record<string, Record<string, string[]>>;
+  error?: unknown;
 }

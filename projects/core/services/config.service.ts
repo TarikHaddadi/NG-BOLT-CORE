@@ -7,7 +7,9 @@ import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 export class ConfigService {
   private config!: RuntimeConfig;
 
-  constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {
+  constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {}
+
+  async loadConfig(): Promise<void> {
     const appEnvVars = this.coreOpts.environments;
 
     if (!appEnvVars) throw new Error('Failed to load config: No environment variables found');

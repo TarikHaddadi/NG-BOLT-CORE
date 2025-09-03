@@ -1,4 +1,4 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { Store } from '@ngrx/store';
 
 import {
@@ -7,43 +7,67 @@ import {
   FeatureNavItem,
   RuntimeConfig,
   UserCtx,
-  VariantsState,
   VariantValue,
 } from '@cadai/pxs-ng-core/interfaces';
 
 import { ConfigService } from './config.service';
 
+const META_MODELS_BY_PROVIDER = '__ai.modelsByProvider';
+
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
-  public cfg?: RuntimeConfig; // ← may be undefined until config is loaded
+  public cfg?: RuntimeConfig;
   private readonly store = inject(Store, { optional: true });
 
   private userSig = signal<UserCtx | null>(null);
 
+  // keep normalized variants locally if there’s no store
+  private variantsSig = signal<Record<string, VariantValue>>({});
+
+  // expose a reactive list of visible features
+  public readonly visibleFeaturesSig = computed<FeatureNavItem[]>(() => {
+    const u = this.userSig() ?? undefined;
+    const feats = this.cfgSafe().features ?? {};
+    const out: FeatureNavItem[] = [];
+    for (const [key, f] of Object.entries(feats)) {
+      if (!this.passes(f as AppFeature, u)) continue;
+      const af = f as AppFeature;
+      if (!af.label) continue;
+      out.push({ key, label: af.label, icon: af.icon, route: af.route });
+    }
+    return out;
+  });
+
   constructor(private readonly config: ConfigService) {
-    // Try to grab whatever is available now (may be undefined before loadConfig)
+    // seed sync from whatever is already available
     this.cfg = (this.config.getAll?.() as RuntimeConfig | undefined) ?? undefined;
 
-    if (!this.store) {
-      // No store: seed lazily from cfgSafe (empty until config is available)
-      this.reseedFromConfig();
-    }
+    // if config is already present, normalize variants now
+    this.reseedFromConfig();
   }
 
-  /** Call this after ConfigService.loadConfig() if you don’t use the store. */
   reseedFromConfig(): void {
-    const cfg = this.cfgSafe(); // returns a RuntimeConfig with features: {}
-    const features: VariantsState['features'] = {};
-
-    for (const [key, feat] of Object.entries(cfg.features ?? {})) {
-      const normalized = normalizeFeatureVariants((feat as any)?.variants);
-      if (Object.keys(normalized).length) {
-        features[key] = normalized;
-      }
+    // no NgRx available: compute locally so the app still works
+    const cfg = this.cfgSafe();
+    const local: Record<string, Record<string, VariantValue>> = {};
+    for (const [featureKey, feat] of Object.entries(cfg.features ?? {})) {
+      const vmap = normalizeFeatureVariants((feat as any)?.variants);
+      if (Object.keys(vmap).length) local[featureKey] = vmap;
     }
+    this.variantsSig.set(local as unknown as Record<string, VariantValue>);
   }
 
-  /** Optional: set a global user context once (e.g., after KC init). */
+  /** Optional: let ConfigService push updates here when it finishes loading/refreshing. */
+  updateConfig(next: RuntimeConfig) {
+    this.cfg = next;
+    this.reseedFromConfig();
+  }
+
+  /** Read normalized variants (works with or without NgRx). */
+  getLocalVariants(): Record<string, VariantValue> {
+    return this.variantsSig();
+  }
+
   setUser(user: UserCtx | null) {
     this.userSig.set(user);
   }
@@ -54,30 +78,16 @@ export class FeatureService {
     return this.passes(f, user ?? this.userSig() ?? undefined);
   }
 
-  visibleFeatures(user?: UserCtx): FeatureNavItem[] {
-    const u = user ?? this.userSig() ?? undefined;
-    const out: FeatureNavItem[] = [];
-    const feats = this.cfgSafe().features ?? {};
-    for (const [key, f] of Object.entries(feats)) {
-      if (!this.passes(f as AppFeature, u)) continue;
-      const af = f as AppFeature;
-      if (!af.label) continue;
-      out.push({ key, label: af.label, icon: af.icon, route: af.route });
-    }
-    return out;
-  }
-
+  // keep your existing list() if you need it
   list(): string[] {
     return Object.keys(this.cfgSafe().features ?? {});
   }
 
-  // ---- internals
+  // ---- internals (unchanged except for tiny safety)
 
-  /** Always returns a safe config object with at least `features: {}`. */
   private cfgSafe(): RuntimeConfig & { features: Record<string, AppFeature> } {
     if (!this.cfg) {
       this.cfg = ((this.config.getAll?.() as RuntimeConfig | undefined) ?? {
-        // minimal shape so consumers don’t explode
         name: 'unknown',
         production: false,
         apiUrl: '',
@@ -86,7 +96,6 @@ export class FeatureService {
         features: {},
       }) as RuntimeConfig;
     }
-    // Ensure features bag exists
     if (!this.cfg.features) this.cfg.features = {};
     return this.cfg as RuntimeConfig & { features: Record<string, AppFeature> };
   }
@@ -94,48 +103,30 @@ export class FeatureService {
   private passes(f: AppFeature, user?: UserCtx): boolean {
     if (!f.enabled) return false;
     if (f.requireAuth && !user?.isAuthenticated) return false;
-
-    if (f.roles?.length) {
-      const ok = !!user?.roles?.some((r) => f.roles!.includes(r));
-      if (!ok) return false;
-    }
+    if (f.roles?.length && !user?.roles?.some((r) => f.roles!.includes(r))) return false;
 
     const tenants = f.allow?.tenants;
-    if (tenants?.length) {
-      const ok = !!user?.tenant && tenants.includes(user.tenant);
-      if (!ok) return false;
-    }
+    if (tenants?.length && !(user?.tenant && tenants.includes(user.tenant))) return false;
+
+    // (optional) add deny lists in future
     return true;
   }
 }
 
 type VariantGroup = Record<string, string | string[]>;
-
-function isVariantArray(v: unknown): v is VariantGroup[] {
-  return Array.isArray(v);
-}
-function isVariantMap(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === 'object' && !Array.isArray(v);
-}
-
-/** Normalize a feature's variants (array-of-groups or legacy object) into your VariantsState shape. */
-function normalizeFeatureVariants(variants: unknown): Record<string, VariantValue> {
-  if (!variants) return {};
-
-  // New shape: array of groups
-  if (isVariantArray(variants)) {
+// … keep your normalizeFeatureVariants, but hoist the meta key constant:
+function normalizeFeatureVariants(v: unknown): Record<string, VariantValue> {
+  if (!v) return {};
+  if (Array.isArray(v)) {
     const out: Record<string, string[]> = {};
     const modelsByProvider: Record<string, string[]> = {};
-    const add = (k: string, vals: string[]) => {
-      out[k] = Array.from(new Set([...(out[k] ?? []), ...vals]));
-    };
+    const add = (k: string, vals: string[]) =>
+      (out[k] = Array.from(new Set([...(out[k] ?? []), ...vals])));
 
-    for (const group of variants) {
+    for (const group of v as VariantGroup[]) {
       for (const [k, raw] of Object.entries(group)) {
         const vals = Array.isArray(raw) ? raw : raw != null ? [raw] : [];
         add(k, vals);
-
-        // keep models grouped by provider (optional but handy)
         if (k === 'ai.model') {
           const provider = typeof group['ai.provider'] === 'string' ? group['ai.provider'] : '';
           if (provider) {
@@ -146,18 +137,8 @@ function normalizeFeatureVariants(variants: unknown): Record<string, VariantValu
         }
       }
     }
-
-    // Cast to VariantValue map (arrays of strings + optional meta object)
-    return {
-      ...out,
-      '__ai.modelsByProvider': modelsByProvider, // VariantValue allows Record<string, unknown>
-    } as Record<string, VariantValue>;
+    return { ...out, [META_MODELS_BY_PROVIDER]: modelsByProvider } as Record<string, VariantValue>;
   }
-
-  // Legacy shape: simple object map
-  if (isVariantMap(variants)) {
-    return variants as Record<string, VariantValue>;
-  }
-
+  if (v && typeof v === 'object') return v as Record<string, VariantValue>;
   return {};
 }

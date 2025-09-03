@@ -162,7 +162,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     this.title$ = this.layoutService.title$;
     this.cfg = this.configService.getAll() as RuntimeConfig;
     this.version = this.cfg.version || '0.0.0';
-    this.menuItems = this.features.visibleFeatures();
+    this.menuItems = this.features.visibleFeaturesSig();
 
     // ----- Theme (store ↔ control) -----
     this.isDark$ = this.store.select(AppSelectors.ThemeSelectors.selectIsDark);
@@ -214,7 +214,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       const roles = p?.authorization ?? [];
       const { isAuthenticated, tenant } = this.keycloak.getUserCtx();
       this.features.setUser({ isAuthenticated, roles, tenant });
-      this.menuItems = this.features.visibleFeatures();
+      this.menuItems = this.features.visibleFeaturesSig();
       this.cdr.markForCheck();
     });
 
