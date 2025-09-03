@@ -1,14 +1,14 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 
-import { RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
-import { ConfigService, FeatureService, KeycloakService } from '@cadai/pxs-ng-core/services';
-import { CORE_GET_USER_CTX, GetUserCtx } from '@cadai/pxs-ng-core/tokens';
+import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
+import { FeatureService, KeycloakService } from '@cadai/pxs-ng-core/services';
+import { CORE_GET_USER_CTX, CORE_OPTIONS,GetUserCtx } from '@cadai/pxs-ng-core/tokens';
 
 export function featureGuard(key: string, opts?: { forbid?: string }): CanActivateFn {
   return (route, state) => {
-    const config = inject(ConfigService);
-    const hasKeycloak = !!(config.getAll() as RuntimeConfig).auth?.hasKeycloak;
+    const { environments } = inject(CORE_OPTIONS) as Required<CoreOptions>;
+    const hasKeycloak = !!(environments as RuntimeConfig).auth?.hasKeycloak;
 
     if (!hasKeycloak) return true; // ✅ allow all features/routes when KC is off
 
@@ -23,9 +23,17 @@ export function featureGuard(key: string, opts?: { forbid?: string }): CanActiva
     const needsAuth = !!f?.requireAuth;
 
     const routeRoles = (route.data?.['roles'] as string[] | undefined) ?? [];
-    const hasRouteRole = routeRoles.length
-      ? routeRoles.some((r) => (user.roles as string[]).includes(r))
-      : true;
+
+    const hasRouteRole =
+      routeRoles.length === 0
+        ? true
+        : (() => {
+            const need = new Set(routeRoles.map((r) => (r.startsWith('ROLE_') ? r : `ROLE_${r}`)));
+            const have = (user.roles as string[]).map((r) =>
+              r.startsWith('ROLE_') ? r : `ROLE_${r}`,
+            );
+            return have.some((r) => need.has(r));
+          })();
 
     const featureAllows = features.isEnabled(key, user);
 

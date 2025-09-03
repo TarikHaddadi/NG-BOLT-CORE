@@ -106,22 +106,38 @@ export class FeatureService {
   }
 
   private passes(f: AppFeature, user?: UserCtx): boolean {
-    // KC off → allow all
+    const why: string[] = [];
     if (!this.hasKeycloak) return true;
 
-    if (!f.enabled) return false;
-    if (f.requireAuth && !user?.isAuthenticated) return false;
+    if (!f.enabled) {
+      why.push('disabled');
+      return false;
+    }
+    if (f.requireAuth && !user?.isAuthenticated) {
+      why.push('auth');
+      return false;
+    }
 
-    // 🔧 normalize roles both sides to the same shape
     if (f.roles?.length) {
       const need = new Set(f.roles.map((r) => (r.startsWith('ROLE_') ? r : `ROLE_${r}`)));
       const have = (user?.roles ?? []).map((r) => (r.startsWith('ROLE_') ? r : `ROLE_${r}`));
-      if (!have.some((r) => need.has(r))) return false;
+      if (!have.some((r) => need.has(r))) {
+        why.push('roles');
+        return false;
+      }
     }
 
     const tenants = f.allow?.tenants;
-    if (tenants?.length && !(user?.tenant && tenants.includes(user.tenant))) return false;
+    if (tenants?.length) {
+      if (!user?.tenant) {
+        /* allow by policy */
+      } else if (!tenants.includes(user.tenant)) {
+        why.push('tenant');
+        return false;
+      }
+    }
 
+    if (why.length) console.warn('[feature blocked]', f, { user, why });
     return true;
   }
 }

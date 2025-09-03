@@ -1,6 +1,5 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
-  EnvironmentInjector,
   EnvironmentProviders,
   importProvidersFrom,
   inject,
@@ -111,16 +110,15 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
 
     // 🔄 Async boot (config → KC? → i18n → features → NgRx hydration?)
     provideAppInitializer(() => {
-      const env = inject(EnvironmentInjector);
-      const config = env.get(ConfigService);
-      const kc = env.get(KeycloakService);
-      const translate = env.get(TranslateService);
-      const features = env.get(FeatureService);
+      const config = inject(ConfigService);
+      const kc = inject(KeycloakService);
+      const translate = inject(TranslateService);
+      const features = inject(FeatureService);
 
       // Store is optional (and also gated by hasNgrx)
       let store: Store | undefined;
       try {
-        store = env.get(Store);
+        store = inject(Store);
       } catch {}
 
       return (async () => {
