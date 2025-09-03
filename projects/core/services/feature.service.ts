@@ -1,14 +1,15 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { Store } from '@ngrx/store';
 
 import {
   AppFeature,
   AuthRuntimeConfig,
+  CoreOptions,
   FeatureNavItem,
   RuntimeConfig,
   UserCtx,
   VariantValue,
 } from '@cadai/pxs-ng-core/interfaces';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 import { ConfigService } from './config.service';
 
@@ -17,7 +18,9 @@ const META_MODELS_BY_PROVIDER = '__ai.modelsByProvider';
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
   public cfg?: RuntimeConfig;
-  private readonly store = inject(Store, { optional: true });
+  private readonly hasKeycloak = !!(
+    (inject(CORE_OPTIONS) as Required<CoreOptions>).environments as RuntimeConfig
+  ).auth?.hasKeycloak;
 
   private userSig = signal<UserCtx | null>(null);
 
@@ -101,6 +104,8 @@ export class FeatureService {
   }
 
   private passes(f: AppFeature, user?: UserCtx): boolean {
+    if (!this.hasKeycloak) return true; // ✅ KC off → everything enabled
+
     if (!f.enabled) return false;
     if (f.requireAuth && !user?.isAuthenticated) return false;
     if (f.roles?.length && !user?.roles?.some((r) => f.roles!.includes(r))) return false;

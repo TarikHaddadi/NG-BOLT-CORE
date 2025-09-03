@@ -6,6 +6,7 @@ export interface AuthRuntimeConfig {
   url: string;
   realm: string;
   clientId: string;
+  hasKeycloak?: boolean;
   init?: Partial<KeycloakInitOptions>; // onLoad, pkceMethod, checkLoginIframe, ...
 }
 

@@ -52,6 +52,7 @@ export interface RuntimeConfig {
   features: Record<string, AppFeature>;
   version: string;
   auth: AuthRuntimeConfig;
+  hasNgrx?: boolean;
 }
 
 export interface CoreI18nOptions {

@@ -45,11 +45,11 @@ function normalize(opts: CoreOptions): Required<CoreOptions> {
       prefix: opts.i18n?.prefix ?? '/assets/i18n/',
       suffix: opts.i18n?.suffix ?? '.json',
       fallbackLang: opts.i18n?.fallbackLang ?? 'en',
+      // (no 'lang' here on purpose; we’ll resolve later)
     },
     interceptors: opts.interceptors ?? [],
     animations: opts.animations ?? true,
     appVersion: opts.appVersion ?? '0.0.0',
-    // If environments is optional in CoreOptions, prefer: environments: opts.environments as RuntimeConfig
     environments: (opts.environments as RuntimeConfig) ?? ({} as RuntimeConfig),
   } as Required<CoreOptions>;
 }
@@ -57,35 +57,46 @@ function normalize(opts: CoreOptions): Required<CoreOptions> {
 export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
   const normalized = normalize(opts);
 
+  // 🔎 Flags resolved synchronously from host-provided runtimeConfig
+  const cfg = normalized.environments as RuntimeConfig;
+  const hasNgrx = !!cfg.hasNgrx;
+  const hasKeycloak = !!cfg.auth?.hasKeycloak;
+
+  // 🧰 Build interceptors conditionally (KC auth only if enabled)
+  const httpInterceptors = [
+    ...(hasKeycloak ? [authInterceptor] : []),
+    ...normalized.interceptors,
+    httpErrorInterceptor,
+  ];
+
   return makeEnvironmentProviders([
-    // Options
     { provide: CORE_OPTIONS, useValue: normalized },
 
     // Singletons
     ConfigService,
-    KeycloakService,
+    KeycloakService, // safe to provide even if disabled; we simply won't init it
 
-    // Expose user context for guards
+    // Expose user context for guards (guest when KC disabled)
     {
       provide: CORE_GET_USER_CTX,
-      deps: [KeycloakService],
-      useFactory:
-        (kc: KeycloakService): GetUserCtx =>
-        () =>
-          kc.getUserCtx(),
+      useFactory: () => {
+        const kc = inject(KeycloakService);
+        const opts = inject(CORE_OPTIONS) as Required<CoreOptions>;
+        const enabled = !!(opts.environments as RuntimeConfig).auth?.hasKeycloak;
+        const guest = { isAuthenticated: true, roles: [], tenant: null } as const;
+        return (() => (enabled ? kc.getUserCtx() : guest)) as GetUserCtx;
+      },
     },
 
-    // Angular Material date providers
+    // Angular Material date providers + translate pipe/directive
     importProvidersFrom(TranslateModule),
     importProvidersFrom(MatNativeDateModule),
     ...APP_DATE_PROVIDERS,
 
-    // HttpClient with curated interceptor order: auth -> (extras) -> error
-    provideHttpClient(
-      withInterceptors([authInterceptor, ...normalized.interceptors, httpErrorInterceptor]),
-    ),
+    // HttpClient with curated interceptor order
+    provideHttpClient(withInterceptors(httpInterceptors)),
 
-    // i18n
+    // i18n service (do NOT eager-load a lang here)
     provideTranslateService({
       loader: provideTranslateHttpLoader({
         prefix: normalized.i18n.prefix,
@@ -97,52 +108,63 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     // Theme init
     provideAppInitializer(() => loadTheme(normalized.theme)),
 
-    // Animations (ON/OFF)
+    // Animations
     ...(normalized.animations === false ? [provideNoopAnimations()] : [provideAnimations()]),
 
-    // Async boot: config -> keycloak -> hydrate store (if present) -> feature user -> variants
+    // 🔄 Async boot (config → KC? → i18n → features → NgRx hydration?)
     provideAppInitializer(() => {
       const env = inject(EnvironmentInjector);
       const config = env.get(ConfigService);
       const kc = env.get(KeycloakService);
       const translate = env.get(TranslateService);
+      const features = env.get(FeatureService);
 
+      // Store is optional (and also gated by hasNgrx)
       let store: Store | undefined;
       try {
         store = env.get(Store);
       } catch {}
 
       return (async () => {
-        // 1) runtime config + keycloak
+        // 1) runtime config (already seeded from CORE_OPTIONS)
         await config.loadConfig();
-        await kc.init();
 
-        // 2) resolve selected language from store (fallback to opts)
-        const selectedLang$ = store
-          ? store.select(AppSelectors.LangSelectors.selectLang)
-          : of<string | undefined>(undefined);
+        // 2) Keycloak (only if enabled)
+        if (hasKeycloak) {
+          await kc.init();
+        }
+
+        // 3) Resolve selected language (from NgRx if enabled, else fallback)
+        const fallback = normalized.i18n.fallbackLang || 'en';
+        const selectedLang$ =
+          hasNgrx && store
+            ? store.select(AppSelectors.LangSelectors.selectLang)
+            : of<string | undefined>(undefined);
 
         const selectedLang = await firstValueFrom(
           selectedLang$.pipe(
             take(1),
-            map((l) => (l && l.trim()) || normalized.i18n.lang),
+            map((l) => (l && l.trim()) || fallback),
           ),
         );
 
-        // 3) init i18n with the resolved language
-        translate.addLangs(['en', 'fr']); // or drive from config
-        translate.setFallbackLang(normalized.i18n.fallbackLang!);
-        translate.use(selectedLang!);
-        document.documentElement.setAttribute('lang', selectedLang!);
+        translate.addLangs(['en', 'fr']);
+        translate.setFallbackLang(fallback);
+        translate.use(selectedLang);
+        document.documentElement.setAttribute('lang', selectedLang);
 
-        // 4) feature/store hydration
-        const features = env.get(FeatureService);
+        // 4) Features + user (guest when Keycloak disabled)
         features.reseedFromConfig();
-        if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
+        const user = hasKeycloak
+          ? kc.getUserCtx()
+          : { isAuthenticated: true, roles: [], tenant: null };
+        features.setUser(user);
 
-        const { isAuthenticated, roles, tenant } = kc.getUserCtx();
-        features.setUser({ isAuthenticated, roles, tenant });
-        if (store) store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
+        // 5) NgRx hydration (only if enabled & store present)
+        if (hasNgrx && store) {
+          if (hasKeycloak) store.dispatch(AppActions.AuthActions.hydrateFromKc());
+          store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
+        }
       })();
     }),
   ]);
