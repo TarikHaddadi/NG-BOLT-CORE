@@ -102,16 +102,22 @@ export class FeatureService {
   }
 
   private passes(f: AppFeature, user?: UserCtx): boolean {
-    if (!this.hasKeycloak) return true; // ✅ KC off → everything enabled
+    // KC off → allow all
+    if (!this.hasKeycloak) return true;
 
     if (!f.enabled) return false;
     if (f.requireAuth && !user?.isAuthenticated) return false;
-    if (f.roles?.length && !user?.roles?.some((r) => f.roles!.includes(r))) return false;
+
+    // 🔧 normalize roles both sides to the same shape
+    if (f.roles?.length) {
+      const need = new Set(f.roles.map((r) => (r.startsWith('ROLE_') ? r : `ROLE_${r}`)));
+      const have = (user?.roles ?? []).map((r) => (r.startsWith('ROLE_') ? r : `ROLE_${r}`));
+      if (!have.some((r) => need.has(r))) return false;
+    }
 
     const tenants = f.allow?.tenants;
     if (tenants?.length && !(user?.tenant && tenants.includes(user.tenant))) return false;
 
-    // (optional) add deny lists in future
     return true;
   }
 }

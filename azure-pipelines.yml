@@ -53,7 +53,7 @@ stages:
 - stage: publish
   displayName: Publish
   dependsOn: build_test
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
   variables:
     FEED_URL: "https://pkgs.dev.azure.com/cadai/Socle/_packaging/PXS-NG-CORE/npm/registry/"
     # If your package is scoped like @cadai/core, set the scope to "cadai"
@@ -126,7 +126,7 @@ stages:
   dependsOn: 
     - build_test
     - publish
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
   jobs:
     - job: tag_job
       displayName: "Tag repo with v<version>"

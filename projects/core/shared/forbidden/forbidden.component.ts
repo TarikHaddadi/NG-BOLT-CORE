@@ -8,7 +8,7 @@ import { TranslateModule } from '@ngx-translate/core';
 
 import { KeycloakService, LayoutService } from '@cadai/pxs-ng-core/services';
 
-import { SeoComponent } from '../public-api';
+import { SeoComponent } from '../seo/seo.component';
 
 @Component({
   selector: 'app-forbidden',
