@@ -155,8 +155,14 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
     <div class="my-custom">
       <label [attr.for]="field.name">{{ field.label }}</label>
       <input [id]="field.name" [formControl]="control" (blur)="control.markAsTouched()" />
-      <div class="hint" *ngIf="field.helperText && !showError">{{ field.helperText }}</div>
-      <div class="error" *ngIf="showError">{{ errorText }}</div>
+
+      @if (field.helperText && !showError) {
+        <div class="hint">{{ field.helperText }}</div>
+      }
+
+      @if (showError) {
+        <div class="error" role="alert" aria-live="polite">{{ errorText }}</div>
+      }
     </div>
   `,
 })

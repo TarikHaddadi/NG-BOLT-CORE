@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Router, RouterModule } from '@angular/router';
@@ -28,7 +29,9 @@ export class ForbiddenComponent {
   private readonly kc = inject(KeycloakService);
   private readonly layoutService = inject(LayoutService);
 
-  isAuth = computed(() => this.kc.isAuthenticated);
+  readonly isAuthenticated = toSignal(this.kc.isAuthenticated$(), {
+    initialValue: this.kc.isAuthenticated, // current sync snapshot
+  });
 
   goHome() {
     // adjust if your host uses a different landing route

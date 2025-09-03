@@ -20,9 +20,11 @@
       <button mat-flat-button color="primary" (click)="goHome()">
         {{ 'common.home' | translate: { default: 'Home' } }}
       </button>
-      <button *ngIf="!isAuth()" mat-button (click)="login()">
-        {{ 'common.signIn' | translate: { default: 'Sign in' } }}
-      </button>
+      @if (!isAuthenticated()) {
+        <button mat-button (click)="login()">
+          {{ 'common.signIn' | translate: { default: 'Sign in' } }}
+        </button>
+      }
     </div>
   </div>
 </div>

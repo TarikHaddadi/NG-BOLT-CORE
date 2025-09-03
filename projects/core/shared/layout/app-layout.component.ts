@@ -379,14 +379,4 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     if (!result) return;
     // Persist quick-settings if desired
   }
-
-  get showAiScope(): boolean {
-    return (this.aiScopeField.options?.length ?? 0) > 0;
-  }
-  get showAiKey(): boolean {
-    return (this.aiKeyField.options?.length ?? 0) > 0;
-  }
-  get showAiValue(): boolean {
-    return (this.aiValueField.options?.length ?? 0) > 0;
-  }
 }

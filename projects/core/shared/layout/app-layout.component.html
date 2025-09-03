@@ -45,17 +45,15 @@
         <app-select [field]="langField" [control]="langControl"></app-select>
 
         <!-- AI Scope / Key / Value -->
-        <ng-container *ngIf="showAiScope">
+        @if ((aiScopeField.options?.length ?? 0) > 0) {
           <app-select [field]="aiScopeField" [control]="aiScopeControl"></app-select>
-        </ng-container>
-
-        <ng-container *ngIf="showAiKey">
+        }
+        @if ((aiKeyField.options?.length ?? 0) > 0) {
           <app-select [field]="aiKeyField" [control]="aiKeyControl"></app-select>
-        </ng-container>
-
-        <ng-container *ngIf="showAiValue">
+        }
+        @if ((aiValueField.options?.length ?? 0) > 0) {
           <app-select [field]="aiValueField" [control]="aiValueControl"></app-select>
-        </ng-container>
+        }
       </div>
     </ng-template>
 
