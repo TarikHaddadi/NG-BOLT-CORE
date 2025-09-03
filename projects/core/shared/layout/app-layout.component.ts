@@ -235,7 +235,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
           .map(([k]) => k);
 
         this.aiScopeField.options = scopes.map((k) => ({
-          label: this.translate.instant(`nav.${k}`) || this.translate.instant(`ai.${k}`) || k,
+          label: this.translate.instant(`${k}`) || k,
           value: k,
         }));
 
