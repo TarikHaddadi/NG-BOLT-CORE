@@ -208,4 +208,11 @@ export class KeycloakService implements OnDestroy {
     if (!v) return null;
     return Array.isArray(v) ? v[0] : v;
   }
+
+  get isReady(): boolean {
+    return !!this.kc;
+  } // KC constructed
+  get tokenUnsafe(): string | null {
+    return this.kc?.token ?? null;
+  } // no assert
 }

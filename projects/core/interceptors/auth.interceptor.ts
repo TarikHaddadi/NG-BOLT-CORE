@@ -1,55 +1,31 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { from, throwError } from 'rxjs';
-import { catchError, switchMap } from 'rxjs/operators';
+import { from } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 
 import { ConfigService, KeycloakService } from '@cadai/pxs-ng-core/services';
 
-const toAbs = (url: string) => new URL(url, document.baseURI).href;
-// base-href aware absolute prefix for /assets/
-const ASSETS_PREFIX_ABS = new URL('assets/', document.baseURI).href;
-
-const isAssetsUrl = (url: string) => {
-  // covers relative and root-relative quickly
-  if (url.startsWith('assets/') || url.startsWith('/assets/')) return true;
-  // also cover absolute under current base-href
-  const abs = toAbs(url);
-  return abs.startsWith(ASSETS_PREFIX_ABS);
-};
-
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const kc = inject(KeycloakService);
-  const conf = inject(ConfigService);
+  const cfg = inject(ConfigService);
 
-  if (req.method === 'OPTIONS') return next(req);
+  // 1) Never touch static files or explicit opt-out
+  const isAsset =
+    req.url.startsWith('/assets/') || req.url.startsWith('assets/') || req.url.endsWith('.json'); // keeps i18n/env safe
+  const skip = isAsset || req.headers.has('X-Skip-Auth');
 
-  const reqAbs = toAbs(req.url);
-  const kcBase = kc.instance?.authServerUrl ?? '';
-  const isKeycloakUrl = kcBase && reqAbs.toLowerCase().startsWith(kcBase.toLowerCase());
+  // 2) Optionally, restrict to your API base (recommended)
+  const apiBase = cfg.getAll().apiUrl; // adapt to your config accessor
+  const isApi = apiBase ? req.url.startsWith(apiBase) : !isAsset;
 
-  // ✅ never touch static assets or KC endpoints
-  if (isAssetsUrl(req.url) || isKeycloakUrl) {
+  if (skip || !isApi || !kc.isReady || !kc.isAuthenticated) {
     return next(req);
   }
 
-  // limit auth header + 401 handling to your API only
-  const apiBase = conf.getAll()?.apiUrl;
-  const isApiUrl = apiBase
-    ? reqAbs.toLowerCase().startsWith(apiBase.toLowerCase())
-    : new URL(reqAbs).origin === new URL(document.baseURI).origin; // fallback: same-origin
-
+  // 3) Refresh token just-in-time, then attach if we have it
   return from(kc.ensureFreshToken(60)).pipe(
-    switchMap((token) => {
-      // attach header only for API requests
-      const authReq =
-        isApiUrl && token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
-      return next(authReq);
-    }),
-    catchError((err) => {
-      if (isApiUrl && (err?.status === 401 || err?.status === 403)) {
-        void kc.login({ redirectUri: window.location.href });
-      }
-      return throwError(() => err);
-    }),
+    map((tok) => tok ?? kc.tokenUnsafe),
+    map((token) => (token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req)),
+    switchMap((cloned) => next(cloned)),
   );
 };
