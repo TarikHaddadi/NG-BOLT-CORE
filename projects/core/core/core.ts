@@ -104,7 +104,6 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     // Async boot: config -> keycloak -> hydrate store (if present) -> feature user -> variants
     provideAppInitializer(() => {
       const env = inject(EnvironmentInjector);
-      const config = env.get(ConfigService);
       const kc = env.get(KeycloakService);
       const translate = env.get(TranslateService);
       const features = env.get(FeatureService);
@@ -117,20 +116,17 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       const { lang, fallbackLang } = normalized.i18n;
 
       return (async () => {
-        // 1) Load runtime config (see step 3 to avoid HttpClient here)
-        await config.loadConfig();
-
-        // 2) Keycloak first
+        // 1) Keycloak first
         await kc.init();
 
-        // 3) Feature & store hydration
+        // 2) Feature & store hydration
         features.reseedFromConfig();
         if (store) store.dispatch(AppActions.AuthActions.hydrateFromKc());
         const { isAuthenticated, roles, tenant } = kc.getUserCtx();
         features.setUser({ isAuthenticated, roles, tenant });
         if (store) store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
 
-        // 4) i18n last (now it’s safe to hit HttpClient)
+        // 3) i18n last (now it’s safe to hit HttpClient)
         translate.addLangs(['en', 'fr']);
         translate.setFallbackLang(fallbackLang!);
         await firstValueFrom(translate.use(lang!));
