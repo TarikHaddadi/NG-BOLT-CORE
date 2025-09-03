@@ -120,7 +120,9 @@ Place presets in `public/assets/config.*.json`, then CI copies/merges into `/ass
   "name": "dev",
   "production": false,
   "apiUrl": "https://dev.api.yourdomain.com",
+  "hasNgrx": true,
   "auth": {
+    "hasKeycloak": true,
     "url": "http://localhost:8080/",
     "realm": "my-realm",
     "clientId": "eportal_chatbot",
@@ -130,7 +132,6 @@ Place presets in `public/assets/config.*.json`, then CI copies/merges into `/ass
       "pkceMethod": "S256"
     }
   },
-
   "realtime": {
     "enabled": false,
     "order": ["sse", "websocket", "push"],
@@ -153,75 +154,135 @@ Place presets in `public/assets/config.*.json`, then CI copies/merges into `/ass
   },
 
   "features": {
+    "dashboard": {
+      "enabled": true,
+      "roles": ["ROLE_user", "ROLE_admin"],
+
+      "key": "dashboard",
+      "label": "nav.dashboard",
+      "icon": "dashboard",
+      "route": "/dashboard",
+      "requireAuth": true
+    },
+    "team": {
+      "enabled": true,
+      "roles": ["ROLE_user", "ROLE_admin"],
+      "allow": {
+        "tenants": ["clarence", "other_tenant"]
+      },
+      "key": "team",
+      "label": "nav.team",
+      "icon": "group",
+      "route": "/team",
+      "requireAuth": true
+    },
     "ai.chat": {
       "enabled": true,
-      "variants": {
-        "ai.provider": "openai",
-        "ai.model": "gpt-4o-mini"
-      },
+      "variants": [
+        {
+          "ai.provider": "openai",
+          "ai.model": ["gpt-4o-mini"]
+        },
+        {
+          "ai.provider": "azure",
+          "ai.model": ["az-4o", "az8-4o", "az-4o-large"]
+        },
+        {
+          "ai.provider": "deepseek",
+          "ai.model": ["deep-4o-large", "deep-4o", "deep-4o5-large"]
+        }
+      ],
       "roles": ["ROLE_user", "ROLE_admin"],
-      "allow": { "tenants": ["clarence", "other_tenant"] },
+      "allow": {
+        "tenants": ["clarence", "other_tenant"]
+      },
       "key": "genai-chat",
       "label": "nav.genai-chat",
-      "icon": "genai-chat",
+      "icon": "chat",
       "route": "/genai-chat",
       "requireAuth": true
     },
     "ai.compare": {
       "enabled": true,
-      "variants": {
-        "ai.provider": "openai",
-        "ai.model": "gpt-4o-mini"
-      },
+      "variants": [
+        {
+          "ai.provider": "openai",
+          "ai.model": ["gpt-4o-mini"]
+        },
+        {
+          "ai.provider": "azure",
+          "ai.model": ["az-4o", "az-4o3", "az-4o-large"]
+        },
+        {
+          "ai.provider": "google3",
+          "ai.model": ["google-4o-large", "google-4o", "google-43o-large"]
+        }
+      ],
       "roles": ["ROLE_admin", "ROLE_user"],
-      "allow": { "tenants": ["clarence", "other_tenant"] },
+      "allow": {
+        "tenants": ["clarence", "other_tenant"]
+      },
       "key": "genai-compare",
       "label": "nav.genai-compare",
-      "icon": "genai-compare",
+      "icon": "compare",
       "route": "/genai-compare",
       "requireAuth": true
     },
     "ai.workflows": {
       "enabled": true,
-      "variants": {
-        "ai.provider": "openai",
-        "ai.model": "gpt-4o-mini"
-      },
+      "variants": [
+        {
+          "ai.provider": "openai",
+          "ai.model": ["gpt-4o-mini", "gpt-4o"]
+        },
+        {
+          "ai.provider": "amazon",
+          "ai.model": ["aws-4o6", "aws-4o", "aws-4o-large"]
+        }
+      ],
       "roles": ["ROLE_admin", "ROLE_user"],
-      "allow": { "tenants": ["clarence", "other_tenant"] },
+      "allow": {
+        "tenants": ["clarence", "other_tenant"]
+      },
       "key": "genai-workflows",
       "label": "nav.genai-workflows",
-      "icon": "genai-workflows",
+      "icon": "schema",
       "route": "/genai-workflows",
       "requireAuth": true
     },
     "ai.projects": {
       "enabled": true,
       "roles": ["ROLE_admin", "ROLE_user", "ROLE_owner"],
-      "allow": { "tenants": ["clarence", "other_tenant"] },
+      "allow": {
+        "tenants": ["clarence", "other_tenant"]
+      },
       "key": "genai-projects",
       "label": "nav.genai-projects",
-      "icon": "genai-projects",
+      "icon": "source",
       "route": "/genai-projects",
       "requireAuth": true
     },
     "ai.admin": {
       "enabled": true,
       "roles": ["ROLE_admin"],
-      "allow": { "tenants": ["clarence", "other_tenant"] },
+      "allow": {
+        "tenants": ["clarence", "other_tenant"]
+      },
       "key": "genai-admin",
       "label": "nav.genai-admin",
-      "icon": "genai-admin",
+      "icon": "psychology",
       "route": "/genai-admin",
       "requireAuth": true
     },
     "admin": {
-      "enabled": false,
+      "enabled": true,
       "roles": ["ROLE_admin"],
-      "allow": { "tenants": ["clarence", "other_tenant"] },
+      "allow": {
+        "tenants": ["clarence", "other_tenant"]
+      },
       "key": "admin",
       "label": "nav.admin",
-      "icon": "admin",
+      "icon": "tune",
       "route": "/admin",
       "requireAuth": true
     }
@@ -236,6 +297,7 @@ Place presets in `public/assets/config.*.json`, then CI copies/merges into `/ass
 - `allow.tenants` → tenant allow-list (omit/empty to allow all).
 - `requireAuth: true` → hidden & route-guarded if unauthenticated.
 - `variants` → knobs your components/services can read at runtime.
+- if `hasNgrx` and / or `hasKeycloak` are set to false , Keycloack will not be isntanciated and NGRX also , Guards will allow access to all menues and pages as an Authorized guest
 
 ---
 

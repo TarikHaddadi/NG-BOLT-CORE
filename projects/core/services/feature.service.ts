@@ -1,15 +1,13 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, Injectable, signal } from '@angular/core';
 
 import {
   AppFeature,
   AuthRuntimeConfig,
-  CoreOptions,
   FeatureNavItem,
   RuntimeConfig,
   UserCtx,
   VariantValue,
 } from '@cadai/pxs-ng-core/interfaces';
-import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 import { ConfigService } from './config.service';
 
@@ -18,9 +16,7 @@ const META_MODELS_BY_PROVIDER = '__ai.modelsByProvider';
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
   public cfg?: RuntimeConfig;
-  private readonly hasKeycloak = !!(
-    (inject(CORE_OPTIONS) as Required<CoreOptions>).environments as RuntimeConfig
-  ).auth?.hasKeycloak;
+  private readonly hasKeycloak: boolean = false;
 
   private userSig = signal<UserCtx | null>(null);
 
@@ -44,7 +40,7 @@ export class FeatureService {
   constructor(private readonly config: ConfigService) {
     // seed sync from whatever is already available
     this.cfg = (this.config.getAll?.() as RuntimeConfig | undefined) ?? undefined;
-
+    this.hasKeycloak = !!this.cfg?.auth?.hasKeycloak;
     // if config is already present, normalize variants now
     this.reseedFromConfig();
   }

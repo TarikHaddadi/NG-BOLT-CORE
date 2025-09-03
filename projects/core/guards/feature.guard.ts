@@ -1,14 +1,14 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 
-import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
-import { FeatureService, KeycloakService } from '@cadai/pxs-ng-core/services';
-import { CORE_GET_USER_CTX, CORE_OPTIONS, GetUserCtx } from '@cadai/pxs-ng-core/tokens';
+import { RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
+import { ConfigService, FeatureService, KeycloakService } from '@cadai/pxs-ng-core/services';
+import { CORE_GET_USER_CTX, GetUserCtx } from '@cadai/pxs-ng-core/tokens';
 
 export function featureGuard(key: string, opts?: { forbid?: string }): CanActivateFn {
   return (route, state) => {
-    const { environments } = inject(CORE_OPTIONS) as Required<CoreOptions>;
-    const hasKeycloak = !!(environments as RuntimeConfig).auth?.hasKeycloak;
+    const config = inject(ConfigService);
+    const hasKeycloak = !!(config.getAll() as RuntimeConfig).auth?.hasKeycloak;
 
     if (!hasKeycloak) return true; // ✅ allow all features/routes when KC is off
 

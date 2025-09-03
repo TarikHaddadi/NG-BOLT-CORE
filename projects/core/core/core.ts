@@ -81,10 +81,11 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       provide: CORE_GET_USER_CTX,
       useFactory: () => {
         const kc = inject(KeycloakService);
-        const opts = inject(CORE_OPTIONS) as Required<CoreOptions>;
-        const enabled = !!(opts.environments as RuntimeConfig).auth?.hasKeycloak;
+        const config = inject(ConfigService);
+        const hasKeycloak = !!(config.getAll() as RuntimeConfig).auth?.hasKeycloak;
+
         const guest = { isAuthenticated: true, roles: [], tenant: null } as const;
-        return (() => (enabled ? kc.getUserCtx() : guest)) as GetUserCtx;
+        return (() => (hasKeycloak ? kc.getUserCtx() : guest)) as GetUserCtx;
       },
     },
 

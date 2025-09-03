@@ -3,13 +3,8 @@ import { Actions, createEffect, ofType, ROOT_EFFECTS_INIT } from '@ngrx/effects'
 import { from, of } from 'rxjs';
 import { catchError, map, mergeMap } from 'rxjs/operators';
 
-import {
-  AppFeature,
-  CoreOptions,
-  RuntimeConfig,
-  VariantValue,
-} from '@cadai/pxs-ng-core/interfaces';
-import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
+import { AppFeature, RuntimeConfig, VariantValue } from '@cadai/pxs-ng-core/interfaces';
+import { ConfigService } from '@cadai/pxs-ng-core/services';
 
 import { AppActions } from '../../app.actions';
 import * as VariantsActions from './ai-variants.actions';
@@ -64,13 +59,13 @@ function normalizeFeatureVariants(v: unknown): Record<string, VariantValue> {
 export const hydrateVariants = createEffect(
   () => {
     const actions$ = inject(Actions);
-    const opts = inject(CORE_OPTIONS) as Required<CoreOptions>;
+    const config = inject(ConfigService);
 
     return actions$.pipe(
       ofType(AppActions.AiVariantsActions.hydrateFromConfig),
       mergeMap(() => {
         try {
-          const cfg = opts.environments as RuntimeConfig;
+          const cfg = config.getAll() as RuntimeConfig;
           const src = (cfg?.features ?? {}) as Record<string, AppFeature>;
           const features: Record<string, Record<string, VariantValue>> = {};
           const modelDispatches: Array<
@@ -111,13 +106,14 @@ export const hydrateVariants = createEffect(
 export const hydrateFromConfigEffect = createEffect(
   () => {
     const actions$ = inject(Actions);
-    const opts = inject(CORE_OPTIONS) as Required<CoreOptions>;
+    const config = inject(ConfigService);
 
     return actions$.pipe(
       ofType(VariantsActions.hydrateFromConfig, ROOT_EFFECTS_INIT),
       map(() => {
         try {
-          const cfg = opts.environments as RuntimeConfig;
+          const cfg = config.getAll() as RuntimeConfig;
+
           const featuresCfg = (cfg.features ?? {}) as Record<string, AppFeature>;
 
           const features: Record<string, Record<string, VariantValue>> = {};
