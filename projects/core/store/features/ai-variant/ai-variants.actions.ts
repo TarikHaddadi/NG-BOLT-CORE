@@ -1,6 +1,6 @@
 import { createAction, props } from '@ngrx/store';
 
-import { VariantValue } from '@cadai/pxs-ng-core/interfaces';
+import { SerializedError, VariantValue } from '@cadai/pxs-ng-core/interfaces';
 
 export const hydrateFromConfig = createAction('[Variants] Hydrate From Config');
 
@@ -13,7 +13,7 @@ export const hydrateSuccess = createAction(
 
 export const hydrateFailure = createAction(
   '[Variants] Hydrate Failure',
-  props<{ error: unknown }>(),
+  props<{ error: SerializedError }>(),
 );
 
 export const setVariant = createAction(

@@ -19,3 +19,13 @@ export interface ThemeState {
 export interface LangState {
   lang: Lang;
 }
+
+export interface SerializedError {
+  message: string;
+  name?: string;
+  stack?: string;
+  status?: number;
+  statusText?: string;
+  url?: string;
+  payload?: unknown;
+}

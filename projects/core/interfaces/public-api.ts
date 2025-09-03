@@ -3,6 +3,7 @@ export {
   type AppState,
   type Lang,
   type LangState,
+  type SerializedError,
   type ThemeMode,
   type ThemeState,
 } from './app.model';

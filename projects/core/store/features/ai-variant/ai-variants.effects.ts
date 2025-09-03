@@ -5,6 +5,7 @@ import { catchError, map, mergeMap } from 'rxjs/operators';
 
 import { AppFeature, RuntimeConfig, VariantValue } from '@cadai/pxs-ng-core/interfaces';
 import { ConfigService } from '@cadai/pxs-ng-core/services';
+import { serializeError } from '@cadai/pxs-ng-core/utils';
 
 import { AppActions } from '../../app.actions';
 import * as VariantsActions from './ai-variants.actions';
@@ -95,7 +96,7 @@ export const hydrateVariants = createEffect(
             ...modelDispatches,
           ]);
         } catch (error) {
-          return of(AppActions.AiVariantsActions.hydrateFailure({ error }));
+          return of(AppActions.AiVariantsActions.hydrateFailure({ error: serializeError(error) }));
         }
       }),
     );
@@ -154,7 +155,7 @@ export const hydrateFromConfigEffect = createEffect(
 
           return VariantsActions.hydrateSuccess({ features });
         } catch (error) {
-          return VariantsActions.hydrateFailure({ error });
+          return VariantsActions.hydrateFailure({ error: serializeError(error) });
         }
       }),
       catchError((error) => of(VariantsActions.hydrateFailure({ error }))),

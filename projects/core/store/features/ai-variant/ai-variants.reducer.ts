@@ -7,6 +7,7 @@ import * as VariantsActions from './ai-variants.actions';
 export const initialVariantsState: VariantsState = {
   features: {},
   modelsByProvider: {},
+  error: null,
 };
 
 // helper: shallow merge of records
@@ -36,7 +37,7 @@ export const variantsReducer = createReducer(
   on(VariantsActions.hydrateSuccess, (state, { features }) => ({
     ...state,
     features: mergeFeatureMaps(features ?? {}, state.features),
-    error: undefined,
+    error: null,
   })),
   on(VariantsActions.hydrateFailure, (state, { error }) => ({ ...state, error })),
   on(VariantsActions.setVariant, (state, { featureKey, path, value }) => {

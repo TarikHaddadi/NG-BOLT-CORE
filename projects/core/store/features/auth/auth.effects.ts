@@ -5,6 +5,7 @@ import { catchError, filter, map, mergeMap, tap } from 'rxjs/operators';
 
 import { AuthProfile } from '@cadai/pxs-ng-core/interfaces';
 import { KeycloakService } from '@cadai/pxs-ng-core/services';
+import { serializeError } from '@cadai/pxs-ng-core/utils';
 
 import * as AuthActions from './auth.actions';
 
@@ -79,14 +80,14 @@ export const refreshLoop = createEffect(
               expiresAt: ((kc.instance.tokenParsed?.exp as number) || 0) * 1000,
             };
           }),
-          catchError((err) => of({ error: err })),
+          catchError((err) => of(AuthActions.authError({ error: serializeError(err) }))),
         ),
       ),
       filter(
         (v): v is { refreshToken: string | null; expiresAt: number } => !!v && !('error' in v),
       ),
       map((v) => AuthActions.tokenRefreshed(v)),
-      catchError((err) => of(AuthActions.authError({ error: err }))),
+      catchError((err) => of(AuthActions.authError({ error: serializeError(err) }))),
     );
   },
   { functional: true },
