@@ -16,7 +16,6 @@ const META_MODELS_BY_PROVIDER = '__ai.modelsByProvider';
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
   public cfg?: RuntimeConfig;
-  private readonly hasKeycloak: boolean = false;
 
   private userSig = signal<UserCtx | null>(null);
 
@@ -37,10 +36,13 @@ export class FeatureService {
     return out;
   });
 
+  private get hasKeycloak(): boolean {
+    return !!(this.cfg as RuntimeConfig).auth?.hasKeycloak;
+  }
+
   constructor(private readonly config: ConfigService) {
     // seed sync from whatever is already available
     this.cfg = (this.config.getAll?.() as RuntimeConfig | undefined) ?? undefined;
-    this.hasKeycloak = !!this.cfg?.auth?.hasKeycloak;
     // if config is already present, normalize variants now
     this.reseedFromConfig();
   }
