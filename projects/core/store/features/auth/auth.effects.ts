@@ -17,12 +17,14 @@ export const hydrateFromKc = createEffect(
     return actions$.pipe(
       ofType(AuthActions.hydrateFromKc),
       map(() => {
-        const inst = kc.instance;
-        if (!inst?.authenticated) return AuthActions.authError({ error: 'not_authenticated' });
-
+        if (!kc.isReady || !kc.isAuthenticated) {
+          return AuthActions.authError({ error: 'not_authenticated' });
+        }
+        const parsed = kc.tokenParsed;
+        const expMs = ((parsed?.exp as number) || 0) * 1000;
         return AuthActions.loginSuccess({
-          profile: (inst.tokenParsed as AuthProfile) || null,
-          expiresAt: ((inst.tokenParsed?.exp as number) || 0) * 1000,
+          profile: parsed as AuthProfile,
+          expiresAt: expMs,
         });
       }),
     );
