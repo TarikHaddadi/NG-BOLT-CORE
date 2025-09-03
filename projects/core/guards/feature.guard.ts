@@ -3,7 +3,7 @@ import { CanActivateFn, Router } from '@angular/router';
 
 import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
 import { FeatureService, KeycloakService } from '@cadai/pxs-ng-core/services';
-import { CORE_GET_USER_CTX, CORE_OPTIONS,GetUserCtx } from '@cadai/pxs-ng-core/tokens';
+import { CORE_GET_USER_CTX, CORE_OPTIONS, GetUserCtx } from '@cadai/pxs-ng-core/tokens';
 
 export function featureGuard(key: string, opts?: { forbid?: string }): CanActivateFn {
   return (route, state) => {
