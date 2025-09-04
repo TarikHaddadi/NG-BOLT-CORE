@@ -48,7 +48,7 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
 
   // Required
   @Input({ required: true }) type!: TType;
-  @Input({ required: true }) data!: ChartData<TType>;
+  @Input({ required: true }) data!: ChartData<TType, any>;
 
   // Optional
   @Input() options?: ChartOptions<TType>;
@@ -115,7 +115,7 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
     const ctx = this.canvas.nativeElement.getContext('2d')!;
     this.chart = new Chart<TType>(ctx, {
       type: this.type,
-      data: this.normalizeTimeDataIfNeeded(this.data),
+      data: this.normalizeTimeDataIfNeeded(this.data) as any,
       options: this.mergedOptions(),
       plugins: [
         ...(this.plugins as unknown as Plugin<TType>[]),
