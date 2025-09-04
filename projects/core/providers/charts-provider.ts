@@ -3,7 +3,7 @@
  * Registers controllers/elements and sets optional global defaults/plugins.
  */
 import { InjectionToken, Provider } from '@angular/core';
-import { Chart, ChartOptions,Plugin, registerables } from 'chart.js';
+import { Chart, ChartOptions, Plugin, registerables } from 'chart.js';
 
 export const PXS_CHART_DEFAULTS = new InjectionToken<ChartOptions>('PXS_CHART_DEFAULTS');
 export const PXS_CHART_PLUGINS = new InjectionToken<Plugin[]>('PXS_CHART_PLUGINS');
