@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { ValidatorFn,Validators } from '@angular/forms';
+import { ValidatorFn, Validators } from '@angular/forms';
 
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 import {
