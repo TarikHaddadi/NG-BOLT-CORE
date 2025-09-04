@@ -1,6 +1,6 @@
 import 'chartjs-adapter-luxon';
-import { InjectionToken } from '@angular/core';
-import { _adapters,Chart, ChartOptions, Plugin } from 'chart.js';
+import { InjectionToken, Provider } from '@angular/core';
+import { _adapters, Chart, ChartOptions, Plugin, registerables } from 'chart.js';
 
 export const PXS_CHART_DEFAULTS = new InjectionToken<ChartOptions>('PXS_CHART_DEFAULTS');
 export const PXS_CHART_PLUGINS = new InjectionToken<Plugin[]>('PXS_CHART_PLUGINS');
@@ -8,7 +8,6 @@ export const PXS_CHART_PLUGINS = new InjectionToken<Plugin[]>('PXS_CHART_PLUGINS
 const EnsureTimeAdapterPlugin: Plugin = {
   id: 'pxsEnsureTimeAdapter',
   beforeInit(chart) {
-    // Ensure root adapters exists
     const date = (_adapters as any)?._date;
     (chart.options as any).adapters = (chart.options as any).adapters ?? {};
     (chart.options as any).adapters.date = (chart.options as any).adapters.date ?? date;
@@ -27,14 +26,20 @@ const EnsureTimeAdapterPlugin: Plugin = {
   },
 };
 
-// Call once at app bootstrap (keep your provideCharts; just also register this)
-export function provideCharts(opts?: { defaults?: any; plugins?: any[] }) {
-  // register controllers/elements
-  Chart.register(...((Chart as any).registerables ?? []));
-  // set global defaults/plugins
+/** Call once at Host bootstrap */
+export function provideCharts(opts?: { defaults?: ChartOptions; plugins?: Plugin[] }): Provider[] {
+  // Register all controllers/elements/scales once (idempotent)
+  Chart.register(...registerables);
+
+  // Global defaults (merged shallowly)
   if (opts?.defaults) Object.assign(Chart.defaults, opts.defaults);
-  Chart.register(EnsureTimeAdapterPlugin); // <<< add this line
+
+  // Our safety net for Luxon adapter on time scales
+  Chart.register(EnsureTimeAdapterPlugin);
+
+  // Optional host-supplied global plugins
   if (opts?.plugins?.length) Chart.register(...opts.plugins);
+
   return [
     { provide: PXS_CHART_DEFAULTS, useValue: opts?.defaults ?? {} },
     { provide: PXS_CHART_PLUGINS, useValue: opts?.plugins ?? [] },
