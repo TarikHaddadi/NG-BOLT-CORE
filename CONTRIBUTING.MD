@@ -258,11 +258,11 @@ This document explains **how CI/CD works** for the Core SDK and **what contribut
 
 ## 8. 🚀 CI/CD Overview (Azure Pipelines)
 
-| Stage            | When it runs                                   | What it does                                                                                                 |
-|------------------|--------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| **Build & Test** | On any commit/PR that matches the path filters  | Uses Node `20.x`, `npm ci`, runs `npm run lint:ci`, builds the library (`npm run build:core`). Publishes `dist/core` as artifact `pxs-ng-core`. |
-| **Publish**      | **Only** on `main` after a successful build     | Downloads artifact. Creates `.npmrc` for the artifact. Authenticates with **NpmAuthenticate**. Skips if the version already exists. Otherwise **publishes** to Azure Artifacts feed. |
-| **Tag**          | **Only** on `main` after publish                | Reads version from `projects/core/package.json`, creates git tag `PXS-NG-CORE@<version>` and pushes it to origin. |
+| Stage            | When it runs                                   | What it does                                                                                                                                              |
+|------------------|------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Build & Test** | On any commit/PR that matches the path filters | Uses Node `20.x`, `npm ci`, runs `npm run lint:ci`, builds the library (`npm run build:core`). Publishes `dist/core` as artifact `pxs-ng-core`.          |
+| **Publish**      | **Only** on `main` after a successful build    | Downloads artifact. Creates `.npmrc` for the artifact. Authenticates with **NpmAuthenticate**. Skips if the version already exists; otherwise publishes. |
+| **Tag**          | **Only** on `main` after publish               | Reads version from `projects/core/package.json`, creates git tag `PXS-NG-CORE@<version>` and pushes it to origin.                                         |
 
 ### Environments / Variables
 - Node version: `20.x`

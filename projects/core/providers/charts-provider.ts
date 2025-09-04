@@ -1,6 +1,6 @@
 import 'chartjs-adapter-luxon';
 import { InjectionToken, Provider } from '@angular/core';
-import { _adapters, Chart, ChartOptions, Plugin, registerables } from 'chart.js';
+import { _adapters, Chart, ChartOptions, Colors,Plugin, registerables } from 'chart.js';
 
 export const PXS_CHART_DEFAULTS = new InjectionToken<ChartOptions>('PXS_CHART_DEFAULTS');
 export const PXS_CHART_PLUGINS = new InjectionToken<Plugin[]>('PXS_CHART_PLUGINS');
@@ -26,18 +26,15 @@ const EnsureTimeAdapterPlugin: Plugin = {
   },
 };
 
-/** Call once at Host bootstrap */
 export function provideCharts(opts?: { defaults?: ChartOptions; plugins?: Plugin[] }): Provider[] {
-  // Register all controllers/elements/scales once (idempotent)
-  Chart.register(...registerables);
+  // ✅ register everything you need
+  Chart.register(...registerables, Colors, EnsureTimeAdapterPlugin);
 
-  // Global defaults (merged shallowly)
+  // Optional: set some sane element defaults (helps hover hitboxes)
+  Chart.defaults.elements.point.radius = 3;
+  Chart.defaults.elements.point.hitRadius = 6;
+
   if (opts?.defaults) Object.assign(Chart.defaults, opts.defaults);
-
-  // Our safety net for Luxon adapter on time scales
-  Chart.register(EnsureTimeAdapterPlugin);
-
-  // Optional host-supplied global plugins
   if (opts?.plugins?.length) Chart.register(...opts.plugins);
 
   return [
