@@ -2,6 +2,7 @@
  * Call once at app bootstrap (Host or Core provideAppStore-style)
  * Registers controllers/elements and sets optional global defaults/plugins.
  */
+import 'chartjs-adapter-luxon';
 import { InjectionToken, Provider } from '@angular/core';
 import { Chart, ChartOptions, Plugin, registerables } from 'chart.js';
 
