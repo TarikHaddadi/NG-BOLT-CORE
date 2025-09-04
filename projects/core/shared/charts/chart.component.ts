@@ -12,6 +12,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import {
+  _adapters,
   ActiveElement,
   Chart,
   ChartData,
@@ -182,18 +183,26 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
 
   /** Ensure x scale is 'time' and pick unit automatically if not provided */
   private buildOptionsWithTimeDefaults(opts?: ChartOptions<TType>): ChartOptions<TType> {
-    if (!this.autoTime) return (opts ?? {}) as ChartOptions<TType>;
-
     const out: any = { ...(opts ?? {}) };
 
-    // Ensure scales object exists
+    // 1) Ensure global adapters exists
+    const dateAdapter = (_adapters as any)._date;
+    out.adapters = out.adapters ?? {};
+    out.adapters.date = out.adapters.date ?? dateAdapter;
+
+    if (!this.autoTime) return out as ChartOptions<TType>;
+
+    // 2) Ensure x scale exists and is time
     out.scales = out.scales ?? {};
     const x = out.scales.x ?? {};
 
-    // Make it a time scale if not already declared
     if (!x.type) x.type = 'time';
 
-    // Decide unit if 'auto'
+    // 3) Ensure scale-level adapters exists (this is what TimeScale reads!)
+    x.adapters = x.adapters ?? {};
+    x.adapters.date = x.adapters.date ?? dateAdapter;
+
+    // 4) Pick time unit automatically (or use provided)
     if (this.timeUnit === 'auto') {
       const span = this.estimateSpanMs(this.data);
       if (span != null) {
