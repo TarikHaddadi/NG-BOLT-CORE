@@ -1,20 +1,20 @@
-import { Injectable } from '@angular/core';
+import { Inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { CreateUserDto, UpdateUserDto, User } from '@cadai/pxs-ng-core/interfaces';
+import { CoreOptions, CreateUserDto, UpdateUserDto, User } from '@cadai/pxs-ng-core/interfaces';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 import { HttpService } from './http.service';
-import { ConfigService } from './public-api';
 
 @Injectable({ providedIn: 'root' })
 export class UserService {
   constructor(
     private http: HttpService,
-    private config: ConfigService,
+    @Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>,
   ) {}
 
   private get base(): string {
-    const apiUrl = this.config.get('apiUrl');
+    const apiUrl = this.coreOpts.environments.apiUrl;
     if (!apiUrl) throw new Error('Runtime config missing: apiUrl');
     return `${apiUrl}/users`;
   }

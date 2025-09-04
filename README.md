@@ -40,7 +40,6 @@ This repository provides a scalable, production-ready **Angular 19** setup using
 ## 📐 Features Used
 
 - ✅ **Angular 19 Standalone APIs**
-- ✅ **Runtime config injection** via `ConfigService`
 - ✅ **NgRx** for scalable and reactive global state
 - ✅ **Reactive Forms** with dynamic schema rendering
 - ✅ **Internationalization (i18n)** via `@ngx-translate`

@@ -3,8 +3,8 @@ import { Actions, createEffect, ofType, ROOT_EFFECTS_INIT } from '@ngrx/effects'
 import { from, of } from 'rxjs';
 import { catchError, map, mergeMap } from 'rxjs/operators';
 
-import { AppFeature, RuntimeConfig, VariantValue } from '@cadai/pxs-ng-core/interfaces';
-import { ConfigService } from '@cadai/pxs-ng-core/services';
+import { AppFeature, CoreOptions, VariantValue } from '@cadai/pxs-ng-core/interfaces';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 import { serializeError } from '@cadai/pxs-ng-core/utils';
 
 import { AppActions } from '../../app.actions';
@@ -60,13 +60,13 @@ function normalizeFeatureVariants(v: unknown): Record<string, VariantValue> {
 export const hydrateVariants = createEffect(
   () => {
     const actions$ = inject(Actions);
-    const config = inject(ConfigService);
+    const { environments } = inject(CORE_OPTIONS) as Required<CoreOptions>;
 
     return actions$.pipe(
       ofType(AppActions.AiVariantsActions.hydrateFromConfig),
       mergeMap(() => {
         try {
-          const cfg = config.getAll() as RuntimeConfig;
+          const cfg = environments;
           const src = (cfg?.features ?? {}) as Record<string, AppFeature>;
           const features: Record<string, Record<string, VariantValue>> = {};
           const modelDispatches: Array<
@@ -107,13 +107,13 @@ export const hydrateVariants = createEffect(
 export const hydrateFromConfigEffect = createEffect(
   () => {
     const actions$ = inject(Actions);
-    const config = inject(ConfigService);
+    const { environments } = inject(CORE_OPTIONS) as Required<CoreOptions>;
 
     return actions$.pipe(
       ofType(VariantsActions.hydrateFromConfig, ROOT_EFFECTS_INIT),
       map(() => {
         try {
-          const cfg = config.getAll() as RuntimeConfig;
+          const cfg = environments;
 
           const featuresCfg = (cfg.features ?? {}) as Record<string, AppFeature>;
 

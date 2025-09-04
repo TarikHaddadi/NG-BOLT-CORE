@@ -5,7 +5,8 @@ import { Router } from '@angular/router';
 import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
-import { ConfigService } from '@cadai/pxs-ng-core/services';
+import { CoreOptions } from '@cadai/pxs-ng-core/interfaces';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 const toAbs = (url: string) => new URL(url, document.baseURI).href;
 const ASSETS_PREFIX_ABS = new URL('assets/', document.baseURI).href;
@@ -18,7 +19,7 @@ const isAssetsUrl = (url: string) => {
 export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const snack = inject(MatSnackBar);
   const router = inject(Router);
-  const conf = inject(ConfigService);
+  const { environments } = inject(CORE_OPTIONS) as Required<CoreOptions>;
 
   // 1) Assets: never handle/snackbar/redirect
   if (isAssetsUrl(req.url)) {
@@ -27,14 +28,14 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
 
   // 2) Keycloak endpoints: detect via config (no kc.instance!)
   const reqAbs = toAbs(req.url);
-  const kcBase = conf.getAll()?.auth?.url; // e.g. https://auth.example.com
+  const kcBase = environments.auth.url; // e.g. https://auth.example.com
   const isKeycloakUrl = !!kcBase && reqAbs.toLowerCase().startsWith(kcBase.toLowerCase());
   if (isKeycloakUrl) {
     return next(req).pipe(catchError((err) => throwError(() => err)));
   }
 
   // 3) Your API origin/base
-  const apiBase = conf.getAll()?.apiUrl;
+  const apiBase = environments.apiUrl;
   const isApiUrl = apiBase
     ? reqAbs.toLowerCase().startsWith(apiBase.toLowerCase())
     : new URL(reqAbs).origin === new URL(document.baseURI).origin;

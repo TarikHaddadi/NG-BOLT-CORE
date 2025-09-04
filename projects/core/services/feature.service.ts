@@ -1,21 +1,22 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, Inject, Injectable, signal } from '@angular/core';
 
 import {
   AppFeature,
-  AuthRuntimeConfig,
+  CoreOptions,
   FeatureNavItem,
-  RuntimeConfig,
   UserCtx,
   VariantValue,
 } from '@cadai/pxs-ng-core/interfaces';
-
-import { ConfigService } from './config.service';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 const META_MODELS_BY_PROVIDER = '__ai.modelsByProvider';
 
 @Injectable({ providedIn: 'root' })
 export class FeatureService {
-  public cfg?: RuntimeConfig;
+  constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {
+    // if config is already present, normalize variants now
+    this.reseedFromConfig();
+  }
 
   private userSig = signal<UserCtx | null>(null);
 
@@ -25,7 +26,7 @@ export class FeatureService {
   // expose a reactive list of visible features
   public readonly visibleFeaturesSig = computed<FeatureNavItem[]>(() => {
     const u = this.userSig() ?? undefined;
-    const feats = this.cfgSafe().features ?? {};
+    const feats = this.coreOpts.environments.features ?? {};
     const out: FeatureNavItem[] = [];
     for (const [key, f] of Object.entries(feats)) {
       if (!this.passes(f as AppFeature, u)) continue;
@@ -37,31 +38,17 @@ export class FeatureService {
   });
 
   private get hasKeycloak(): boolean {
-    return !!(this.cfg as RuntimeConfig).auth?.hasKeycloak;
-  }
-
-  constructor(private readonly config: ConfigService) {
-    // seed sync from whatever is already available
-    this.cfg = (this.config.getAll?.() as RuntimeConfig | undefined) ?? undefined;
-    // if config is already present, normalize variants now
-    this.reseedFromConfig();
+    return !!this.coreOpts.environments.auth.hasKeycloak;
   }
 
   reseedFromConfig(): void {
     // no NgRx available: compute locally so the app still works
-    const cfg = this.cfgSafe();
     const local: Record<string, Record<string, VariantValue>> = {};
-    for (const [featureKey, feat] of Object.entries(cfg.features ?? {})) {
+    for (const [featureKey, feat] of Object.entries(this.coreOpts.environments.features ?? {})) {
       const vmap = normalizeFeatureVariants((feat as any)?.variants);
       if (Object.keys(vmap).length) local[featureKey] = vmap;
     }
     this.variantsSig.set(local as unknown as Record<string, VariantValue>);
-  }
-
-  /** Optional: let ConfigService push updates here when it finishes loading/refreshing. */
-  updateConfig(next: RuntimeConfig) {
-    this.cfg = next;
-    this.reseedFromConfig();
   }
 
   /** Read normalized variants (works with or without NgRx). */
@@ -74,37 +61,17 @@ export class FeatureService {
   }
 
   isEnabled(key: string, user?: UserCtx): boolean {
-    const f = this.cfgSafe().features?.[key];
+    const f = this.coreOpts.environments.features[key];
     if (!f) return false;
     return this.passes(f, user ?? this.userSig() ?? undefined);
   }
 
   // keep your existing list() if you need it
   list(): string[] {
-    return Object.keys(this.cfgSafe().features ?? {});
+    return Object.keys(this.coreOpts.environments.features ?? {});
   }
 
   // ---- internals (unchanged except for tiny safety)
-
-  private cfgSafe(): RuntimeConfig & { features: Record<string, AppFeature> } {
-    // Always try to refresh from ConfigService first
-    const latest = this.config.getAll?.() as RuntimeConfig | undefined;
-    if (latest) this.cfg = latest;
-
-    if (!this.cfg) {
-      this.cfg = {
-        name: 'unknown',
-        production: false,
-        apiUrl: '',
-        version: '0.0.0',
-        auth: {} as AuthRuntimeConfig,
-        features: {},
-      } as RuntimeConfig;
-    }
-    if (!this.cfg.features) this.cfg.features = {};
-    return this.cfg as RuntimeConfig & { features: Record<string, AppFeature> };
-  }
-
   private passes(f: AppFeature, user?: UserCtx): boolean {
     const why: string[] = [];
     if (!this.hasKeycloak) return true;

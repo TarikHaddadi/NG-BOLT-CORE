@@ -1,4 +1,3 @@
-export { ConfigService } from './config.service';
 export { APP_DATE_PROVIDERS } from './date-formats';
 export { FeatureService } from './feature.service';
 export { FieldConfigService } from './field-config.service';

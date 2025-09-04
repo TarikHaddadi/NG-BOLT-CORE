@@ -3,18 +3,20 @@ import { inject } from '@angular/core';
 import { from } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 
-import { ConfigService, KeycloakService } from '@cadai/pxs-ng-core/services';
+import { CoreOptions } from '@cadai/pxs-ng-core/interfaces';
+import { KeycloakService } from '@cadai/pxs-ng-core/services';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const kc = inject(KeycloakService);
-  const cfg = inject(ConfigService);
+  const { environments } = inject(CORE_OPTIONS) as Required<CoreOptions>;
 
   const isAsset =
     req.url.startsWith('/assets/') || req.url.startsWith('assets/') || req.url.endsWith('.json');
 
   const skip = isAsset || req.headers.has('X-Skip-Auth');
 
-  const apiBase = (cfg.getAll?.() as any)?.apiUrl as string | undefined;
+  const apiBase = environments.apiUrl;
 
   const isApi = apiBase ? req.url.startsWith(apiBase) : !isAsset;
 

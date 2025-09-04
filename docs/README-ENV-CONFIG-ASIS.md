@@ -1,81 +1,75 @@
-# ⚙️ Feature Flags, Menus & Tenants — Installation & Operations Guide
+# ⚙️ Feature Flags, Menus, Tenants — **Installation & Operations Guide**
 
-_Last updated: 2025-08-22_
+_Last updated: 2025‑09‑03_
 
-On the Host application Instead of Angular's build-time `environment.ts`, this project loads configuration **at runtime** via:
+This skeleton loads its **runtime configuration** from `/assets/config.json` (no rebuild required):
 
 ```ts
-fetch('assets/config.json');
+// Host app bootstrap (excerpt)
+const res = await fetch('assets/config.json', { cache: 'no-store' });
+const env = await res.json();
 ```
 
-## As Is Configs
+It supports two **dynamic switches** that change how the app boots and behaves:
 
-```text
-public/assets/config.json
+- **`hasNgrx: boolean`** — toggles NgRx Store/Effects integration.
+- **`auth.hasKeycloak: boolean`** — toggles Keycloak SSO, guards, and auth interceptors.
+
+When disabled, each feature degrades gracefully (details below).
+
+---
+
+## 0) File Layout of Runtime Configs
+
+```
+public/assets/config.json        # live symlink/copy chosen at deploy time
 public/assets/config.dev.json
 public/assets/config.uat.json
 public/assets/config.prod.json
 ```
 
-**Why this setup?**
+**Why runtime configs?**
 
-- Change envs by swapping `config.json` on the server/CDN—**no rebuild**.
-- Keep assets versioned and cacheable under `/assets`.
-- Keep global styles & themes outside the bundle when needed.
-
-This guide explains how to:
-
-- Install and run the skeleton in **single-tenant** or **multi-tenant** mode
-- Configure **features** (menus are features) from **runtime config**
-- Bootstrap a **Feature Service** with the app
-- Wire **guards** and **menu rendering**
-- Prepare **CI/CD** to generate the right `config.json`
-- Add **Keycloak mappers** for tenant and roles
-- Integrate **Realtime** (SSE/WebSocket/Push) at runtime
-- Use a **pre-deployment checklist** to avoid mistakes
+- Swap `config.json` in CI/CD to flip envs **without rebuilding**.
+- Keep assets cacheable & versioned.
+- Drive features/menus/tenants at runtime.
 
 ---
 
-## 1) Concept
+## 1) Concepts (Features, Menus, Variants)
 
-- A **feature** is both a capability **and** a menu entry (same config object).
+- A **feature** is both a capability **and** a menu entry (one config object).
 - Visibility is controlled by:
-  - `enabled` (on/off)
-  - `roles` (who can see/use it)
-  - `allow.tenants` (which customers can see/use it)
-  - `requireAuth` (hide & guard if user is not authenticated)
-- Feature **variants** tune behavior (e.g., AI provider or model).
+  - `enabled` — on/off
+  - `roles` — allow‑list (user needs **any**)
+  - `allow.tenants` — tenant allow‑list (see tenant policy below)
+  - `requireAuth` — hide & guard route if unauthenticated
+- **Variants** are key/value knobs (e.g., AI provider/model) read by components/services.
 
-> **Important:** client-side flags only control **UI**. Your backend must enforce permissions/tenant constraints independently.
+> Client flags only control **UI**. Your backend must enforce authz & tenancy.
 
 ---
 
-## 2) End-to-End Flow (userCtx → features)
+## 2) End‑to‑End Flow (userCtx → features)
 
-**Where data lives**
+**Sources**
 
-- **RuntimeConfig** Hosting App provides a (`/public/assets/config.json`) file that includes : feature rules (`enabled`, `requireAuth`, `roles`, `allow.tenants`, and `key/label/icon/route` for menus).
-- **Keycloak token**: custom claims
-  - `authorization`: string array of role names (e.g., `ROLE_user`, `ROLE_admin`).
-  - `tenant`: the current tenant id (e.g., `"clarence"`).
+- **RuntimeConfig** (from `/assets/config.json`) defines feature rules & variants.
+- **Keycloak token** adds:
+  - `authorization: string[]` — role names (`ROLE_user`, `ROLE_admin`, …).
+  - `tenant: string` — tenant id (`"clarence"`).
 
-**How it works**
+**Flow**
 
-1. `KeycloakService.getUserCtx()` builds:  
-   `{ isAuthenticated, roles, tenant }`
-   - `roles` come from **`authorization`** (fallback to realm/client roles only if you choose to keep it).
-   - `tenant` comes from **`tenant`** claim.
-2. `FeatureService.isEnabled(key, userCtx)` validates:
-   - `enabled === true`
-   - If `requireAuth`, user must be authenticated
-   - If `roles` present, user must have **at least one**
-   - If `allow.tenants` present, **userCtx.tenant** must be in that list
-3. `FeatureService.visibleFeatures(userCtx?)` filters all features for menus.
-4. `featureGuard('feature.key')` applies the **same rules** to route navigation.
-   - If `requireAuth` and user is not authenticated, it **invokes Keycloak login** (no `/login` route required).
-   - If authenticated but not allowed (role/tenant), it redirects to optional `/403`.
+1. `KeycloakService.getUserCtx()` → `{ isAuthenticated, roles, tenant }`
+   - roles from `authorization` (fallback to realm/client roles if you enable it).
+2. `FeatureService.isEnabled(key, userCtx)` checks: `enabled` → `requireAuth` → `roles` → `allow.tenants`.
+3. `FeatureService.visibleFeatures(userCtx?)` filters features for **menus**.
+4. `featureGuard('key')` applies the same logic for **routes**.
+   - If `requireAuth` and unauthenticated → triggers **Keycloak login redirect** (no `/login` route needed).
+   - If authenticated but disallowed → optional redirect to `/403` (configurable).
 
-**Example: Keycloak token (excerpt)**
+**Example Access Token (excerpt)**
 
 ```json
 {
@@ -87,33 +81,112 @@ This guide explains how to:
 
 ---
 
-## 3) Keycloak Pre‑requisites (custom claims)
+## 3) Dynamic Flags — `hasNgrx` & `auth.hasKeycloak`
 
-Configure **two mappers** on the client (or realm) so they’re included in the **Access Token** (and optionally **ID Token**).
+### `auth.hasKeycloak`
 
-### A) `tenant` claim (string)
+| Flag    | What Happens                                                                                                                                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `true`  | Keycloak is **initialized** at boot, `authInterceptor` is installed, guards enforce auth/roles/tenants, `/403` redirect is active for 403s.                                                                                                 |
+| `false` | Keycloak is **not** initialized. App runs in **guest mode**: user is treated as `{ isAuthenticated: true, roles: [], tenant: null }`. Guards **allow** all, `authInterceptor` is **omitted**, and 403s do **not** redirect (snackbar only). |
 
-- **Mapper Type:** _User Attribute_
-- **User Attribute:** `tenant` (set it on user, group, or compute via script)
-- **Token Claim Name:** `tenant`
-- **Claim JSON Type:** `String`
-- **Add to access token:** ✅
-- **Add to ID token:** ✅ (optional)
-- _(Optional)_ **Add to userinfo:** ✅
+> Guest mode is useful for local demos and backends that don’t yet issue tokens.
 
-### B) `authorization` claim (array of role names)
+**Core wiring (excerpt)**
 
-You can merge realm and client roles into one claim **without scripts** using multiple mappers with the **same** claim name:
+```ts
+const cfg = normalized.environments as RuntimeConfig;
+const hasNgrx = !!cfg.hasNgrx;
+const hasKeycloak = !!cfg.auth?.hasKeycloak;
 
-- **Mapper 1:** _User Realm Role_ → Claim **`authorization`**, JSON type **String**, **Multivalued** ✅
+// Interceptors: auth only when Keycloak is ON
+provideHttpClient(withInterceptors([
+  ...(hasKeycloak ? [authInterceptor] : []),
+  ...normalized.interceptors,
+  httpErrorInterceptor,
+]));
 
-Keycloak merges values into one `authorization: [...]` array.
+// User context provider used by guards (guest when KC off)
+{ provide: CORE_GET_USER_CTX, useFactory: () => {
+    const kc = inject(KeycloakService);
+    const guest = { isAuthenticated: true, roles: [], tenant: null } as const;
+    return (() => (hasKeycloak ? kc.getUserCtx() : guest)) as GetUserCtx;
+}};
+```
+
+**Error interceptor behavior**
+
+- With KC **ON**: 403 from your API → `router.navigate(['/403'])`.
+- With KC **OFF**: 403 → **no redirect**, optional snackbar (stay on page).
+
+### `hasNgrx`
+
+| Flag    | What Happens                                                                                                                                                           |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `true`  | Store/Effects are expected. Boot dispatches hydration effects (Auth, Variants, etc.). Components can inject `Store`.                                                   |
+| `false` | Store/Effects **not required**. `FeatureService` uses internal **signals** for variants; shared components should inject `Store` **optionally** and guard their usage. |
+
+**Boot sequencing (excerpt)**
+
+```ts
+await config.loadConfig();
+const runtime = config.getAll();
+if (hasKeycloak) await kc.init();
+
+// i18n: resolve selected language (optionally from store)
+const selectedLang = ...;
+translate.addLangs(['en', 'fr']);
+translate.setFallbackLang('en');
+translate.use(selectedLang);
+
+// Features + user
+features.reseedFromConfig();
+features.setUser(hasKeycloak ? kc.getUserCtx()
+                             : { isAuthenticated: true, roles: [], tenant: null });
+
+// NgRx hydration (only if enabled & store present)
+if (hasNgrx && store) {
+  if (hasKeycloak) store.dispatch(AppActions.AuthActions.hydrateFromKc());
+  store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());
+}
+```
+
+**Component guidelines when `hasNgrx` can be false**
+
+```ts
+// Prefer optional Store
+private store = inject(Store, { optional: true });
+
+// Use defensively
+this.user$ = this.store ? this.store.select(Selectors.user) : of(null);
+if (this.store) this.store.dispatch(UserActions.load());
+```
 
 ---
 
-## 4) Runtime Config Shape
+## 4) Keycloak Token Mappers (Pre‑requisites)
 
-Place presets in `public/assets/config.*.json`, then CI copies/merges into `/assets/config.json` for the build.
+Create **two mappers** so your Access Token has the expected claims:
+
+### `tenant` (string)
+
+- Mapper Type: **User Attribute**
+- User Attribute: `tenant`
+- Token Claim Name: `tenant`
+- JSON Type: `String`
+- Add to Access Token: ✅ (ID token optional)
+
+### `authorization` (array of strings)
+
+- Mapper Type: **User Realm Role**
+- Token Claim Name: `authorization`
+- JSON Type: `String`, **Multivalued** ✅
+
+> You can add a second mapper for client roles into the same `authorization` claim if needed—Keycloak merges arrays.
+
+---
+
+## 5) Runtime Config Schema (with dynamic flags)
 
 ```json
 {
@@ -136,14 +209,8 @@ Place presets in `public/assets/config.*.json`, then CI copies/merges into `/ass
     "enabled": false,
     "order": ["sse", "websocket", "push"],
     "transports": {
-      "sse": {
-        "enabled": false,
-        "endpoint": "/rt/events"
-      },
-      "websocket": {
-        "enabled": false,
-        "url": "wss://app.example.com/rt/ws"
-      },
+      "sse": { "enabled": false, "endpoint": "/rt/events" },
+      "websocket": { "enabled": false, "url": "wss://app.example.com/rt/ws" },
       "push": {
         "enabled": false,
         "vapidPublicKey": "BPuB1c…publicKey…",
@@ -152,12 +219,10 @@ Place presets in `public/assets/config.*.json`, then CI copies/merges into `/ass
       }
     }
   },
-
   "features": {
     "dashboard": {
       "enabled": true,
       "roles": ["ROLE_user", "ROLE_admin"],
-
       "key": "dashboard",
       "label": "nav.dashboard",
       "icon": "dashboard",
@@ -167,305 +232,128 @@ Place presets in `public/assets/config.*.json`, then CI copies/merges into `/ass
     "team": {
       "enabled": true,
       "roles": ["ROLE_user", "ROLE_admin"],
-      "allow": {
-        "tenants": ["clarence", "other_tenant"]
-      },
+      "allow": { "tenants": ["clarence", "other_tenant"] },
       "key": "team",
       "label": "nav.team",
       "icon": "group",
       "route": "/team",
       "requireAuth": true
-    },
-    "ai.chat": {
-      "enabled": true,
-      "variants": [
-        {
-          "ai.provider": "openai",
-          "ai.model": ["gpt-4o-mini"]
-        },
-        {
-          "ai.provider": "azure",
-          "ai.model": ["az-4o", "az8-4o", "az-4o-large"]
-        },
-        {
-          "ai.provider": "deepseek",
-          "ai.model": ["deep-4o-large", "deep-4o", "deep-4o5-large"]
-        }
-      ],
-      "roles": ["ROLE_user", "ROLE_admin"],
-      "allow": {
-        "tenants": ["clarence", "other_tenant"]
-      },
-      "key": "genai-chat",
-      "label": "nav.genai-chat",
-      "icon": "chat",
-      "route": "/genai-chat",
-      "requireAuth": true
-    },
-    "ai.compare": {
-      "enabled": true,
-      "variants": [
-        {
-          "ai.provider": "openai",
-          "ai.model": ["gpt-4o-mini"]
-        },
-        {
-          "ai.provider": "azure",
-          "ai.model": ["az-4o", "az-4o3", "az-4o-large"]
-        },
-        {
-          "ai.provider": "google3",
-          "ai.model": ["google-4o-large", "google-4o", "google-43o-large"]
-        }
-      ],
-      "roles": ["ROLE_admin", "ROLE_user"],
-      "allow": {
-        "tenants": ["clarence", "other_tenant"]
-      },
-      "key": "genai-compare",
-      "label": "nav.genai-compare",
-      "icon": "compare",
-      "route": "/genai-compare",
-      "requireAuth": true
-    },
-    "ai.workflows": {
-      "enabled": true,
-      "variants": [
-        {
-          "ai.provider": "openai",
-          "ai.model": ["gpt-4o-mini", "gpt-4o"]
-        },
-        {
-          "ai.provider": "amazon",
-          "ai.model": ["aws-4o6", "aws-4o", "aws-4o-large"]
-        }
-      ],
-      "roles": ["ROLE_admin", "ROLE_user"],
-      "allow": {
-        "tenants": ["clarence", "other_tenant"]
-      },
-      "key": "genai-workflows",
-      "label": "nav.genai-workflows",
-      "icon": "schema",
-      "route": "/genai-workflows",
-      "requireAuth": true
-    },
-    "ai.projects": {
-      "enabled": true,
-      "roles": ["ROLE_admin", "ROLE_user", "ROLE_owner"],
-      "allow": {
-        "tenants": ["clarence", "other_tenant"]
-      },
-      "key": "genai-projects",
-      "label": "nav.genai-projects",
-      "icon": "source",
-      "route": "/genai-projects",
-      "requireAuth": true
-    },
-    "ai.admin": {
-      "enabled": true,
-      "roles": ["ROLE_admin"],
-      "allow": {
-        "tenants": ["clarence", "other_tenant"]
-      },
-      "key": "genai-admin",
-      "label": "nav.genai-admin",
-      "icon": "psychology",
-      "route": "/genai-admin",
-      "requireAuth": true
-    },
-    "admin": {
-      "enabled": true,
-      "roles": ["ROLE_admin"],
-      "allow": {
-        "tenants": ["clarence", "other_tenant"]
-      },
-      "key": "admin",
-      "label": "nav.admin",
-      "icon": "tune",
-      "route": "/admin",
-      "requireAuth": true
     }
+    // ... other features
   }
 }
 ```
 
-**Field notes**
+**Field Notes**
 
-- `key/label/icon/route` → renders as a menu item.
-- `roles` → **allow-list**: user must have at least one.
-- `allow.tenants` → tenant allow-list (omit/empty to allow all).
-- `requireAuth: true` → hidden & route-guarded if unauthenticated.
-- `variants` → knobs your components/services can read at runtime.
-- if `hasNgrx` and / or `hasKeycloak` are set to false , Keycloack will not be isntanciated and NGRX also , Guards will allow access to all menues and pages as an Authorized guest
-
----
-
-## 5) Single‑Tenant vs Multi‑Tenant
-
-**Single‑Tenant**
-
-- In CI, set `TENANT=<your-tenant>` (e.g., `TENANT=clarence`).
-- Ensure enabled features include that tenant in `allow.tenants`.
-- (Optional) strip other tenants from the merged config for clarity.
-- Token **must** include `tenant` claim equal to `TENANT`.
-
-**Multi‑Tenant**
-
-- Leave multiple tenants in `allow.tenants` arrays.
-- Token **must** include a discriminator (e.g., `"tenant": "clarence"`).
-- `FeatureService` evaluates using **roles + tenant** at runtime.
-
-> See **Section 3** to configure the mappers that produce `tenant` and `authorization` in the token.
+- `key/label/icon/route` → a menu entry.
+- `roles` → allow‑list (user needs **any**). The SDK **normalizes** both sides: `user` ↔ `ROLE_user` (either works).
+- `allow.tenants` → allow‑list by tenant. **Tenant policy**:
+  - If the claim is **missing**, default is **allow** (lenient).
+  - If present and not matched, feature is **denied**.
+- `requireAuth: true` → hidden & guarded when unauthenticated.
+- **Dynamic flags**:
+  - `hasKeycloak=false` → run as **authorized guest**; guards allow, `/403` redirect disabled.
+  - `hasNgrx=false` → SDK runs without Store; use signals fallback.
 
 ---
 
-## 6) Feature Service (bootstrapped with the app)
+## 6) FeatureService (Behavior with dynamic flags)
 
-**Responsibilities**
-
-- Load `/assets/config.json` (via `ConfigService`) and expose:
-  - `isEnabled(key, user): boolean`
-  - `visibleFeatures(user?): FeatureNavItem[]` (for menus)
-  - `variant<T>(path, fallback?): T`
-  - `list(): string[]`
-- Helpers:
-  - **Route Guard:** `featureGuard('ai.chat')`
-  - **Directive:** `*appFeature="'ai.chat'"` (optional; can use `*ngIf` + `isEnabled` instead)
-
-**Bootstrap**
-
-- In the SDK `provideCore()` initializer (after Keycloak init):
-  ```ts
-  const { isAuthenticated, roles, tenant } = kc.getUserCtx();
-  features.setUser({ isAuthenticated, roles, tenant });
-  ```
-- Keep the store **token-free**; only use `roles` (and optionally profile UI fields) from your store if you wish to display them.
-
----
-
-## 7) Menus = Features
-
-Build the sidenav/topnav from `visibleFeatures()`:
+- When **Keycloak OFF** → `isEnabled` always returns **true** (guest mode).
+- When **Keycloak ON** → checks `enabled` → `requireAuth` → roles → tenants.
+- **Role normalization**: both config and token roles are coerced to `ROLE_*` for matching.
+- **Tenant policy** (recommended): allow when tenant claim **missing**; deny when present & not listed.
+- Provides `visibleFeatures()` to render menus.
 
 ```ts
-// shell/layout component
-menu = this.features.visibleFeatures(); // items have key/label/icon/route
-```
-
-If you want the menu to react to auth/role changes:
-
-```ts
-import { combineLatest, map } from 'rxjs';
-
-combineLatest([roles$, kc.isAuthenticated$()]).subscribe(([roles]) => {
-  const { isAuthenticated, tenant } = kc.getUserCtx();
-  features.setUser({ isAuthenticated, roles, tenant });
-  this.menu = features.visibleFeatures();
-});
+// Example menu build
+menu = this.features.visibleFeatures();
 ```
 
 ---
 
-## 8) Route Guards
+## 7) Route Guards
 
-Use the guard on routes that correspond to features:
+Apply to routes that correspond to features:
 
 ```ts
 import { featureGuard } from '@cadai/pxs-ng-core/feature/feature.guard';
 
 export const routes = [
   {
-    path: 'reports',
-    canActivate: [featureGuard('reports', { forbid: '/403' })],
-    loadComponent: () => import('./features/reports.component').then((m) => m.ReportsComponent),
+    path: 'genai-chat',
+    canActivate: [featureGuard('ai.chat', { forbid: '/403' })],
+    loadComponent: () => import('./features/chat.component').then((m) => m.ChatComponent),
   },
 ];
 ```
 
-- If `requireAuth` and user is unauthenticated → guard **invokes Keycloak login** (no `/login` route).
-- If authenticated but not allowed → redirect to `/403` (configurable) or cancel navigation.
+- With KC **OFF** → guard returns **true** (guest mode).
+- With KC **ON** → if `requireAuth` and not authenticated → **Keycloak login redirect**.  
+  Otherwise uses same `isEnabled` logic as menus; on deny, navigates to `/403` if configured.
 
 ---
 
-## 9) Realtime Integration
+## 8) Interceptors
 
-**Interface**
+- **Auth** (`authInterceptor`): only registered when `auth.hasKeycloak=true`.  
+  Skips static assets & i18n JSON; refreshes token JIT and attaches `Authorization` header to API calls.
+- **Error** (`httpErrorInterceptor`): never handles assets or Keycloak endpoints.
+  - With KC **ON**: 403 → `/403` navigation (API only).
+  - With KC **OFF**: 403 → snackbar only (no redirect).
+
+---
+
+## 9) NgRx Optionality
+
+- With `hasNgrx=true`, the SDK dispatches hydration actions.
+- With `hasNgrx=false`, the SDK **does not** require Store/Effects; `FeatureService` uses signals for variants.
+- Host components should inject `Store` **optionally** and guard usage.
 
 ```ts
-export interface RealtimeClient {
-  connect(): Promise<void>;
-  disconnect(): void;
-  subscribe(channel: string, cb: (data: unknown) => void): () => void;
-  publish?(channel: string, payload: unknown): Promise<void>;
-}
+private store = inject(Store, { optional: true });
+this.user$ = this.store ? this.store.select(Selectors.user) : of(null);
+if (this.store) this.store.dispatch(UserActions.load());
 ```
 
-**Factory**
+---
+
+## 10) Realtime (Optional)
+
+A factory chooses SSE / WebSocket / Push based on runtime flags:
 
 ```ts
-export function chooseRealtimeClient<M extends RealtimeEventMap = RealtimeEventMap>(
-  cfg: RuntimeConfig,
-  deps?: { wsFactory?: (u: string) => WebSocket; sw?: ServiceWorkerContainer },
-): RealtimeClient<M> | null {
-  if (!cfg.realtime?.enabled) return null;
-
-  const order = cfg.realtime.order ?? [];
-  for (const kind of order) {
-    if (kind === 'sse') {
-      const sse = cfg.realtime.transports?.sse;
-      if (sse?.enabled && sse.endpoint) return new SseClient<M>(sse.endpoint);
-    }
-    if (kind === 'websocket') {
-      const ws = cfg.realtime.transports?.websocket;
-      if (ws?.enabled && ws.url) return new WebSocketClient<M>(ws.url, deps?.wsFactory);
-    }
-    if (kind === 'push') {
-      const push = cfg.realtime.transports?.push;
-      if (push?.enabled) return new PushClient<M>(push.vapidPublicKey, deps?.sw);
-    }
-  }
-  return null;
-}
+const client = chooseRealtimeClient(cfg);
+await client?.connect();
 ```
 
-**BFF expectations**
-
-- **SSE**: `GET /rt/events` (cookie auth)
-- **WS**: `wss://.../rt/ws` (session-auth on upgrade)
-- **Push**: `/push/subscribe|unsubscribe` VAPID flow
-
-**CSP & Security**
-
-- With SSE only: `connect-src 'self'`. For WS: include `wss://...`.
-- Push requires HTTPS + SW. Keep secrets server-side; no tokens in JS.
-- Apply CSRF to mutating endpoints; not needed for `GET /rt/events`.
-
-**CI vars**
-
-- `REALTIME_ENABLED`, `REALTIME_ORDER`
-- `REALTIME_SSE_ENABLED`, `REALTIME_SSE_ENDPOINT`
-- `REALTIME_WS_ENABLED`, `REALTIME_WS_URL`
-- `REALTIME_PUSH_ENABLED`, `REALTIME_VAPID_PUBLIC`, `REALTIME_PUSH_TOPICS`, `REALTIME_PUSH_REQUIRE_OPTIN`
+See `realtime` section in `config.json` for flags. Remember CSP (`connect-src`) and HTTPS for Push.
 
 ---
 
-## 11) Testing Plan
+## 11) Troubleshooting
 
-- **Unit (client)**: factory selection logic; SSE/WS subscriptions; Push prompts.
-- **Unit (BFF)**: SSE streams authorized channels; WS upgrade/auth; Push subscription handling.
-- **Integration**: feature route subscribes to channels; `REALTIME_ORDER` toggles selection.
-- **E2E**: Tenant A vs B → different menus; SSE fallback when WS disabled.
+- **Redirected to /403 unexpectedly**
+  - Log the decision reasons in `FeatureService.passes` (roles/tenant).
+  - Ensure token has `authorization` and (if required) `tenant`.
+  - Check role names: SDK normalizes `user` ↔ `ROLE_user`, but confirm your config matches intent.
+- **Menus empty**
+  - Verify `features.setUser(...)` is called after Keycloak init (or guest user when KC off).
+- **Blank /403 with `ɵcmp`**
+  - Avoid barrel cycles in your shared entrypoint. Import 403/SEO components **directly** inside the library; keep barrels for host imports only.
+- **NgRx serializability errors**
+  - Serialize errors before dispatch (e.g., `serializeError(err)`), or relax `strictActionSerializability` if you must.
+- **Static assets & i18n fail with 401/403**
+  - Ensure interceptors skip `/assets/**` and `*.json`.
 
 ---
 
-## 12) Troubleshooting
+## 12) CI/CD Notes
 
-- **Nothing connects** → check `realtime.enabled`, CSP `connect-src`.
-- **SSE disconnects** → proxy timeouts; add heartbeats; retry with backoff.
-- **WS 101 fails** → reverse proxy upgrade support; correct `wss://` URL.
-- **Push denied** → require user opt-in; provide settings UI to re-prompt.
-- **Wrong transport** → inspect `realtime.order` and `enabled` flags.
+- Choose and copy the right preset to `assets/config.json` at deploy time.  
+  Validate with a JSON schema.
+- For single‑tenant builds, set `TENANT=<id>` and ensure features include it in `allow.tenants`.
 
 ---
 
@@ -473,59 +361,47 @@ export function chooseRealtimeClient<M extends RealtimeEventMap = RealtimeEventM
 
 **Keycloak**
 
-- [ ] PKCE **S256**; implicit/hybrid **off**.
-- [ ] **`tenant`** mapper (User Attribute or Script) → claim `tenant` (string).
-- [ ] **`authorization`** mapper(s) → claim `authorization` (multivalued string).
-- [ ] Exact Web Origins and Redirect URIs (no wildcards).
+- [ ] PKCE **S256** enabled; implicit/hybrid off.
+- [ ] `tenant` mapper → claim **tenant** (string).
+- [ ] `authorization` mapper → claim **authorization** (multivalued string).
+- [ ] Exact Web Origins & Redirect URIs set.
 
 **Config & Tenants**
 
-- [ ] `TENANT` variable (single‑tenant) or omitted (multi‑tenant).
-- [ ] Each enabled feature’s `allow.tenants` includes the target tenant(s).
-- [ ] `roles` match values emitted in `authorization` claim.
-- [ ] `requireAuth` matches expected UX.
+- [ ] `hasKeycloak` and `hasNgrx` set as intended.
+- [ ] Enabled features list correct tenants in `allow.tenants`.
+- [ ] Role names match your policy (`ROLE_*` vs plain).
+- [ ] `requireAuth` matches UX.
 
 **App**
 
-- [ ] `provideCore` loads config, inits Keycloak, calls `features.setUser(kc.getUserCtx())`.
-- [ ] Menu built from `visibleFeatures()`; guards use `featureGuard('key')`.
-
-**CI/CD**
-
-- [ ] Merge step picked preset + overlay; applied overrides.
-- [ ] JSON Schema validation passed.
-- [ ] CSP smoke test passed.
+- [ ] `provideCore` loads config, (optionally) inits Keycloak, updates FeatureService, sets user.
+- [ ] Menus render from `visibleFeatures()`; guards use `featureGuard('key')`.
 
 **Security**
 
-- [ ] No tokens persisted in client store; token stays in memory.
-- [ ] Backend enforces authorization/tenant.
-- [ ] CSP strict; CORS restricted to app origin(s).
+- [ ] No tokens in Store; keep in memory.
+- [ ] Backend enforces authz/tenant.
+- [ ] CSP & CORS tight.
 
-**UX/i18n**
-
-- [ ] All `label` keys exist in the Hosting APP in `public/assets/i18n/*.json`.
-- [ ] All `icon` names resolve; routes/components exist.
-
-**Realtime (if used)**
+**Realtime** (if used)
 
 - [ ] Endpoints reachable; CSP updated.
-- [ ] VAPID public key set (private key server‑side only).
-- [ ] `REALTIME_*` CI vars set as intended.
+- [ ] VAPID public key set (private key server‑side).
+- [ ] `REALTIME_*` variables configured.
 
 ---
 
 ## 14) Developer Cheatsheet
 
-- Check a feature: `featureService.isEnabled('ai.chat', user)`
-- Menu model: `featureService.visibleFeatures(user)`
+- Check a feature: `features.isEnabled('ai.chat', userCtx)`
+- Menu model: `features.visibleFeatures(userCtx)`
 - Route guard: `canActivate: [featureGuard('ai.chat')]`
-- Template: `*appFeature="'ai.chat'"` (or `*ngIf="features.isEnabled('ai.chat')"` )
-- Variant: `featureService.variant('ai.model', 'gpt-4o-mini')`
+- Variant: `features.getLocalVariants()['ai.model']` (or your accessor)
 
 ---
 
 ## 🧑‍💻 Author
 
-**Angular Product Skeleton**  
-Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).
+**Angular Product Skeleton** — _Tarik Haddadi_  
+Angular 19+, standalone APIs, runtime configs, optional NgRx, optional Keycloak.

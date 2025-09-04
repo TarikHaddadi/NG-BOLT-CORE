@@ -5,6 +5,7 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  Inject,
   inject,
   OnInit,
   TemplateRef,
@@ -30,14 +31,13 @@ import { distinctUntilChanged, filter, map, startWith, switchMap } from 'rxjs/op
 import {
   AuthProfile,
   ConfirmDialogData,
+  CoreOptions,
   FeatureNavItem,
   FieldConfig,
   Lang,
-  RuntimeConfig,
   SwitchersResult,
 } from '@cadai/pxs-ng-core/interfaces';
 import {
-  ConfigService,
   FeatureService,
   KeycloakService,
   LayoutService,
@@ -46,6 +46,8 @@ import {
 import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
 
 const VarSel = AppSelectors.AiVariantsSelectors;
+
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 import { ConfirmDialogComponent } from '../dialog/dialog.component';
 import { SelectComponent } from '../forms/fields/select/select.component';
@@ -78,8 +80,9 @@ import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
   styleUrls: ['./app-layout.component.scss'],
 })
 export class AppLayoutComponent implements OnInit, AfterViewInit {
-  @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<unknown>;
+  constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {}
 
+  @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<unknown>;
   public isDark$!: Observable<boolean>;
   public isOpen = true;
   public title$!: Observable<string>;
@@ -139,13 +142,10 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   profile$!: Observable<AuthProfile | null>;
   roles$!: Observable<string[]>;
 
-  private cfg!: RuntimeConfig;
-
   // inject()
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
   private layoutService = inject(LayoutService);
-  private configService = inject(ConfigService);
   public translate = inject(TranslateService);
   public theme = inject(ThemeService);
   private store = inject(Store);
@@ -160,8 +160,7 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     // ----- App basics -----
     this.title$ = this.layoutService.title$;
-    this.cfg = this.configService.getAll() as RuntimeConfig;
-    this.version = this.cfg.version || '0.0.0';
+    this.version = this.coreOpts.appVersion || '0.0.0';
     this.menuItems = this.features.visibleFeaturesSig();
 
     // ----- Theme (store ↔ control) -----

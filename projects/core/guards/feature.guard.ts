@@ -19,7 +19,7 @@ export function featureGuard(key: string, opts?: { forbid?: string }): CanActiva
 
     const user = getUser ? getUser() : { isAuthenticated: false, roles: [], tenant: null };
 
-    const f = features?.cfg?.features?.[key];
+    const f = environments.features?.[key];
     const needsAuth = !!f?.requireAuth;
 
     const routeRoles = (route.data?.['roles'] as string[] | undefined) ?? [];

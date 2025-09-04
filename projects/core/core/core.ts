@@ -15,12 +15,7 @@ import { firstValueFrom, map, of, take } from 'rxjs';
 
 import { authInterceptor, httpErrorInterceptor } from '@cadai/pxs-ng-core/interceptors';
 import { CoreOptions, RuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
-import {
-  APP_DATE_PROVIDERS,
-  ConfigService,
-  FeatureService,
-  KeycloakService,
-} from '@cadai/pxs-ng-core/services';
+import { APP_DATE_PROVIDERS, FeatureService, KeycloakService } from '@cadai/pxs-ng-core/services';
 import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
 import { CORE_GET_USER_CTX, CORE_OPTIONS, GetUserCtx } from '@cadai/pxs-ng-core/tokens';
 
@@ -72,7 +67,6 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
     { provide: CORE_OPTIONS, useValue: normalized },
 
     // Singletons
-    ConfigService,
     KeycloakService, // safe to provide even if disabled; we simply won't init it
 
     // Expose user context for guards (guest when KC disabled)
@@ -110,7 +104,6 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
 
     // 🔄 Async boot (config → KC? → i18n → features → NgRx hydration?)
     provideAppInitializer(() => {
-      const config = inject(ConfigService);
       const kc = inject(KeycloakService);
       const translate = inject(TranslateService);
       const features = inject(FeatureService);
@@ -122,15 +115,12 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
       } catch {}
 
       return (async () => {
-        // 1) runtime config (already seeded from CORE_OPTIONS)
-        await config.loadConfig();
-
-        // 2) Keycloak (only if enabled)
+        // 1) Keycloak (only if enabled)
         if (hasKeycloak) {
           await kc.init();
         }
 
-        // 3) Resolve selected language (from NgRx if enabled, else fallback)
+        // 2) Resolve selected language (from NgRx if enabled, else fallback)
         const fallback = normalized.i18n.fallbackLang || 'en';
         const selectedLang$ =
           hasNgrx && store
@@ -149,14 +139,13 @@ export function provideCore(opts: CoreOptions = {}): EnvironmentProviders {
         translate.use(selectedLang);
         document.documentElement.setAttribute('lang', selectedLang);
 
-        // 4) Features + user (guest when Keycloak disabled)
-        features.updateConfig(cfg);
+        // 3) Features + user (guest when Keycloak disabled)
         const user = hasKeycloak
           ? kc.getUserCtx()
           : { isAuthenticated: true, roles: [], tenant: null };
         features.setUser(user);
 
-        // 5) NgRx hydration (only if enabled & store present)
+        // 4) NgRx hydration (only if enabled & store present)
         if (hasNgrx && store) {
           if (hasKeycloak) store.dispatch(AppActions.AuthActions.hydrateFromKc());
           store.dispatch(AppActions.AiVariantsActions.hydrateFromConfig());

@@ -1,14 +1,14 @@
-import { inject, Injectable } from '@angular/core';
+import { Inject, Injectable } from '@angular/core';
 
 import { chooseRealtimeClient } from '@cadai/pxs-ng-core/factories';
-import type { AppEvents, RealtimeClient } from '@cadai/pxs-ng-core/interfaces';
-
-import { ConfigService } from './config.service';
+import type { AppEvents, CoreOptions, RealtimeClient } from '@cadai/pxs-ng-core/interfaces';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 @Injectable({ providedIn: 'root' })
 export class RealtimeService {
+  constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {}
+
   private client?: RealtimeClient<AppEvents>;
-  private readonly config = inject(ConfigService);
 
   get ready(): boolean {
     return !!this.client;
@@ -17,10 +17,11 @@ export class RealtimeService {
   /** Lazily create the transport client from runtime config. */
   init(): void {
     if (this.client) return;
-    const cfg = this.config.getAll();
     // Pass service worker so Push transport can subscribe if selected
     this.client =
-      chooseRealtimeClient<AppEvents>(cfg, { sw: navigator.serviceWorker }) ?? undefined;
+      chooseRealtimeClient<AppEvents>(this.coreOpts.environments, {
+        sw: navigator.serviceWorker,
+      }) ?? undefined;
   }
 
   /** Ensure client exists and connect it. */

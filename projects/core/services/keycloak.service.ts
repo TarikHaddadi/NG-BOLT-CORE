@@ -1,4 +1,4 @@
-import { inject, Injectable, OnDestroy } from '@angular/core';
+import { Inject, Injectable, OnDestroy } from '@angular/core';
 import Keycloak, {
   KeycloakConfig,
   KeycloakInitOptions,
@@ -10,9 +10,8 @@ import { BehaviorSubject, interval, Observable, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
 import { UserRole } from '@cadai/pxs-ng-core/enums';
-import { AuthRuntimeConfig } from '@cadai/pxs-ng-core/interfaces';
-
-import { ConfigService } from './public-api';
+import { AuthRuntimeConfig, CoreOptions } from '@cadai/pxs-ng-core/interfaces';
+import { CORE_OPTIONS } from '@cadai/pxs-ng-core/tokens';
 
 interface MyToken extends KeycloakTokenParsed {
   tenant?: string | string[];
@@ -26,13 +25,11 @@ export class KeycloakService implements OnDestroy {
   private refreshSub?: Subscription;
   private initPromise?: Promise<void>; // ← idempotent init
 
-  private config = inject(ConfigService);
-
   ngOnDestroy() {
     this.refreshSub?.unsubscribe();
   }
 
-  constructor() {
+  constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {
     window.addEventListener('beforeunload', () => this.refreshSub?.unsubscribe());
   }
 
@@ -41,7 +38,7 @@ export class KeycloakService implements OnDestroy {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      const cfgAll = this.config.getAll?.();
+      const cfgAll = this.coreOpts.environments;
       if (!cfgAll?.auth) throw new Error('[KeycloakService] Missing auth config');
       const cfg: AuthRuntimeConfig = cfgAll.auth;
 
