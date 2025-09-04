@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Validators } from '@angular/forms';
+import { ValidatorFn,Validators } from '@angular/forms';
 
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 import {
@@ -12,22 +12,51 @@ import {
   phoneDigitCount,
 } from '@cadai/pxs-ng-core/utils';
 
+type ErrMap = FieldConfig['errorMessages'];
+
+/** Merge helper: scalar spread, errorMessages shallow-merge, arrays replaced only if provided. */
+function mergeField<T extends FieldConfig>(base: T, over?: Partial<T>): T {
+  if (!over) return base;
+
+  const merged = {
+    ...base,
+    ...over,
+  } as T;
+
+  // errorMessages: merge map
+  const baseErr = (base.errorMessages ?? {}) as ErrMap;
+  const overErr = (over.errorMessages ?? {}) as ErrMap;
+  merged.errorMessages = { ...baseErr, ...overErr };
+
+  // Arrays: only replace if explicitly provided, otherwise keep defaults
+  // (so you can clear by passing [])
+  const maybeReplace = (key: keyof T) => {
+    if (key in over) {
+      (merged as any)[key] = (over as any)[key];
+    } else {
+      (merged as any)[key] = (base as any)[key];
+    }
+  };
+
+  (
+    ['validators', 'children', 'options', 'chipOptions', 'autocompleteOptions'] as (keyof T)[]
+  ).forEach(maybeReplace);
+
+  return merged;
+}
+
 @Injectable({ providedIn: 'root' })
 export class FieldConfigService {
-  getTextAreaField(
-    label = 'textarea',
-    placeholder = 'Write your text',
-    maxLength = 500,
-  ): FieldConfig {
-    return {
+  getTextAreaField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const defaults: FieldConfig = {
       type: 'textarea',
       name: 'textarea',
-      label,
-      placeholder,
+      label: 'textarea',
+      placeholder: 'Write your text',
       helperText: 'form.hints.textarea',
       required: false,
       minLength: 0,
-      maxLength,
+      maxLength: 500,
       autoResize: true,
       rows: 3,
       maxRows: 10,
@@ -39,50 +68,49 @@ export class FieldConfigService {
       },
       layoutClass: 'col-12',
     };
+    return mergeField(defaults, { ...overrides, type: 'textarea' });
   }
 
-  getTextField(label = 'Username', placeholder = 'Enter username'): FieldConfig {
-    // Disallow anything *not* in the set (Unicode letters, digits, _, -, ., space)
+  getTextField(overrides: Partial<FieldConfig> = {}): FieldConfig {
     const disallowed = new RegExp('[^\\p{L}0-9_\\-. ]', 'u');
 
-    return {
+    const defaults: FieldConfig = {
       type: 'text',
       name: 'input',
-      label,
-      placeholder,
+      label: 'Username',
+      placeholder: 'Enter username',
       required: true,
       helperText: 'form.hints.input',
       minLength: 3,
       maxLength: 50,
-      // keep pattern only for the HTML attribute if you want; validation is granular now
-      //pattern: '^[\\p{L}0-9_\\-\\. ]{3,50}$',
       validators: [
         Validators.required,
         Validators.minLength(3),
         Validators.maxLength(50),
-        allowedCharsValidator(disallowed), // <- activate this for granular invalidChars
+        allowedCharsValidator(disallowed),
       ],
       disabled: false,
       hidden: false,
       children: [],
       errorMessages: {
         required: 'form.errors.input.required',
-        minlength: 'form.errors.input.minlength', // uses {{requiredLength}}, {{actualLength}}
+        minlength: 'form.errors.input.minlength',
         maxlength: 'form.errors.input.maxlength',
-        invalidChars: 'form.errors.input.invalidChars', // uses {{char}}
+        invalidChars: 'form.errors.input.invalidChars',
       },
       layoutClass: 'col-12',
       chipOptions: [],
       autocompleteOptions: [],
     };
+    return mergeField(defaults, { ...overrides, type: 'text' });
   }
 
-  getEmailField(label = 'Email', placeholder = 'Enter your email'): FieldConfig {
-    return {
+  getEmailField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const defaults: FieldConfig = {
       type: 'email',
       name: 'email',
-      label,
-      placeholder,
+      label: 'Email',
+      placeholder: 'Enter your email',
       required: true,
       helperText: 'form.hints.email',
       maxLength: 254,
@@ -90,78 +118,69 @@ export class FieldConfigService {
         Validators.required,
         Validators.email,
         Validators.maxLength(254),
-        emailTldValidator(2), // <— flags 1-char TLDs
+        emailTldValidator(2),
       ],
       errorMessages: {
         required: 'form.errors.email.required',
         email: 'form.errors.email.invalid',
-        emailTld: 'form.errors.email.tld', // add this in i18n
-        emailDomain: 'form.errors.email.domain', // optional (no dot)
+        emailTld: 'form.errors.email.tld',
+        emailDomain: 'form.errors.email.domain',
         maxlength: 'form.errors.email.maxlength',
       },
       disabled: false,
       hidden: false,
       children: [],
-
       layoutClass: 'col-12',
       chipOptions: [],
       autocompleteOptions: [],
     };
+    return mergeField(defaults, { ...overrides, type: 'email' });
   }
 
-  getPasswordField(label = 'Password', placeholder = 'Enter password'): FieldConfig {
+  getPasswordField(overrides: Partial<FieldConfig> = {}): FieldConfig {
     const minLength = 8;
-    return {
+    const defaults: FieldConfig = {
       type: 'password',
       name: 'password',
-      label,
-      placeholder,
+      label: 'Password',
+      placeholder: 'Enter password',
       required: true,
       helperText: 'form.hints.password',
       minLength,
       maxLength: 128,
-      // no big regex here; use granular rules:
       validators: [
         Validators.required,
         Validators.maxLength(128),
         passwordStrengthValidator({ minLength, minUpper: 1, minDigits: 1 }),
-        // add { minSpecial: 1 } if you want a special char rule
       ],
       disabled: false,
       hidden: false,
       children: [],
       errorMessages: {
         required: 'form.errors.password.required',
-        minlength: 'form.errors.password.minlength', // {{requiredLength}}, {{actualLength}}
+        minlength: 'form.errors.password.minlength',
         maxlength: 'form.errors.password.maxlength',
-        uppercase: 'form.errors.password.uppercase', // e.g. “At least one uppercase letter”
-        digit: 'form.errors.password.digit', // e.g. “At least one number”
-        special: 'form.errors.password.special', // (only if you enable minSpecial)
+        uppercase: 'form.errors.password.uppercase',
+        digit: 'form.errors.password.digit',
+        special: 'form.errors.password.special',
       },
       layoutClass: 'col-12',
       chipOptions: [],
       autocompleteOptions: [],
     };
+    return mergeField(defaults, { ...overrides, type: 'password' });
   }
 
-  getPhoneField(label = 'Phone Number', placeholder = '+35212345678'): FieldConfig {
-    //const phoneRegex = '^\\+[1-9][0-9]{7,14}$'; // or the "spaces/dashes" one above
+  getPhoneField(overrides: Partial<FieldConfig> = {}): FieldConfig {
     const phoneRegex = '^\\+?[1-9][0-9 \\-]{7,14}$';
-    return {
+    const defaults: FieldConfig = {
       type: 'phone',
       name: 'phone',
-      label,
-      placeholder,
+      label: 'Phone Number',
+      placeholder: '+35212345678',
       required: true,
       pattern: phoneRegex,
-      validators: [
-        // for strict E.164 this is enough:
-        Validators.required,
-        Validators.pattern(phoneRegex),
-
-        // if you used the "spaces/dashes" pattern, also add:
-        phoneDigitCount(8, 15),
-      ],
+      validators: [Validators.required, Validators.pattern(phoneRegex), phoneDigitCount(8, 15)],
       errorMessages: {
         required: 'form.errors.phone.required',
         pattern: 'form.errors.phone.invalid',
@@ -170,23 +189,17 @@ export class FieldConfigService {
       layoutClass: 'col-md-6',
       defaultValue: '+352',
     };
+    return mergeField(defaults, { ...overrides, type: 'phone' });
   }
 
-  getToggleField(label = 'Enable notifications'): FieldConfig {
-    return {
+  getToggleField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const defaults: FieldConfig = {
       type: 'toggle',
       name: 'notify',
-      label,
+      label: 'Enable notifications',
       placeholder: '',
       required: false,
       helperText: 'form.hints.notify',
-      options: undefined,
-      min: undefined,
-      max: undefined,
-      step: undefined,
-      minLength: undefined,
-      maxLength: undefined,
-      pattern: undefined,
       validators: [],
       disabled: false,
       hidden: false,
@@ -198,33 +211,24 @@ export class FieldConfigService {
       chipOptions: [],
       autocompleteOptions: [],
     };
+    return mergeField(defaults, { ...overrides, type: 'toggle' });
   }
 
-  getDropdownField(
-    label = 'Role',
-    options = [
-      { label: 'Admin', value: 'admin' },
-      { label: 'User', value: 'user' },
-      { label: 'Manager', value: 'manager' },
-    ],
-    multiple = false,
-  ): FieldConfig {
-    return {
+  getDropdownField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const defaults: FieldConfig = {
       type: 'dropdown',
       name: 'role',
-      label,
+      label: 'Role',
       placeholder: 'Select a role',
       required: true,
       helperText: 'form.hints.role',
-      options,
-      min: undefined,
-      max: undefined,
-      step: undefined,
-      minLength: undefined,
-      maxLength: undefined,
-      pattern: undefined,
-      multiple,
-      validators: [Validators.required],
+      options: [
+        { label: 'Admin', value: 'admin' },
+        { label: 'User', value: 'user' },
+        { label: 'Manager', value: 'manager' },
+      ],
+      multiple: false,
+      validators: [Validators.required as unknown as ValidatorFn],
       disabled: false,
       hidden: false,
       children: [],
@@ -235,23 +239,23 @@ export class FieldConfigService {
       chipOptions: [],
       autocompleteOptions: [],
     };
+    return mergeField(defaults, { ...overrides, type: 'dropdown' });
   }
 
-  getRangeField(label = 'Notification Volume', min = 0, max = 100, step = 5): FieldConfig {
-    return {
+  getRangeField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const min = overrides.min ?? 0;
+    const max = overrides.max ?? 100;
+
+    const defaults: FieldConfig = {
       type: 'range',
       name: 'volume',
-      label,
+      label: 'Notification Volume',
       placeholder: '',
       required: true,
       helperText: 'form.hints.volume',
-      options: undefined,
       min,
       max,
-      step,
-      minLength: undefined,
-      maxLength: undefined,
-      pattern: undefined,
+      step: overrides.step ?? 5,
       validators: [Validators.required, Validators.min(min), Validators.max(max)],
       disabled: false,
       hidden: false,
@@ -266,21 +270,21 @@ export class FieldConfigService {
       autocompleteOptions: [],
       defaultValue: 20,
     };
+    return mergeField(defaults, { ...overrides, type: 'range' });
   }
 
-  getDatepickerField(label = 'Date of Birth'): FieldConfig {
-    const placeholder = 'YYYY-MM-DD'; // UI text
-    const pattern = datePatternFromPlaceholder(placeholder); // strict regex
+  getDatepickerField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const placeholder = overrides.placeholder ?? 'YYYY-MM-DD';
+    const pattern = datePatternFromPlaceholder(placeholder);
 
-    return {
+    const defaults: FieldConfig = {
       type: 'datepicker',
       name: 'dob',
-      label,
-      placeholder, // shown to user
-      pattern, // consumed by DatepickerComponent's onRawInput()
+      label: 'Date of Birth',
+      placeholder,
+      pattern,
       required: true,
       helperText: 'form.hints.dob',
-      // DO NOT add Validators.pattern here; control value is Date|null
       validators: [Validators.required],
       errorMessages: {
         required: 'form.errors.dob.required',
@@ -292,60 +296,44 @@ export class FieldConfigService {
       },
       layoutClass: 'col-md-6',
     };
+    return mergeField(defaults, { ...overrides, type: 'datepicker' });
   }
 
-  getChipsField(
-    label = 'Tags',
-    chipOptions = ['Angular', 'React', 'Vue'],
-    multiple = false,
-  ): FieldConfig {
-    return {
+  getChipsField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const defaults: FieldConfig = {
       type: 'chips',
       name: 'tags',
-      label,
+      label: 'Tags',
       placeholder: 'Add tags',
       required: true,
       helperText: 'form.hints.tags',
-      options: undefined,
-      min: undefined,
-      max: undefined,
-      step: undefined,
-      minLength: undefined,
-      maxLength: undefined,
-      pattern: undefined,
       validators: [minArrayLength(1)],
       disabled: false,
       hidden: false,
-      multiple,
+      multiple: false,
       children: [],
       errorMessages: {
         minlengthArray: 'form.errors.tags.minOne',
       },
       layoutClass: 'col-12',
-      chipOptions,
+      chipOptions: ['Angular', 'React', 'Vue'],
       autocompleteOptions: [],
     };
+    return mergeField(defaults, { ...overrides, type: 'chips' });
   }
 
-  getAutocompleteField(
-    label = 'Country',
-    options = ['Luxembourg', 'Germany', 'France'],
-  ): FieldConfig {
-    return {
+  getAutocompleteField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const opts = overrides.autocompleteOptions ?? ['Luxembourg', 'Germany', 'France'];
+    const defaults: FieldConfig = {
       type: 'autocomplete',
       name: 'country',
-      label,
+      label: 'Country',
       placeholder: 'Start typing…',
       required: true,
       helperText: 'form.hints.country',
-      options: undefined,
-      min: undefined,
-      max: undefined,
-      step: undefined,
       minLength: 2,
       maxLength: 56,
-      pattern: undefined,
-      validators: [Validators.required, optionInListValidator(options)],
+      validators: [Validators.required, optionInListValidator(opts)],
       disabled: false,
       hidden: false,
       children: [],
@@ -355,23 +343,25 @@ export class FieldConfigService {
       },
       layoutClass: 'col-md-6',
       chipOptions: [],
-      autocompleteOptions: options,
+      autocompleteOptions: opts,
     };
+    return mergeField(defaults, { ...overrides, type: 'autocomplete' });
   }
 
-  getAllFields(): FieldConfig[] {
+  getAllFields(overrides: Partial<FieldConfig>[] = []): FieldConfig[] {
+    // Optional: pass an array of overrides aligned by index/type if you want
     return [
-      this.getTextField(),
-      this.getEmailField(),
-      this.getPasswordField(),
-      this.getPhoneField(),
-      this.getToggleField(),
-      this.getDropdownField(),
-      this.getRangeField(),
-      this.getDatepickerField(),
-      this.getChipsField(),
-      this.getAutocompleteField(),
-      this.getTextAreaField(),
+      this.getTextField(overrides[0]),
+      this.getEmailField(overrides[1]),
+      this.getPasswordField(overrides[2]),
+      this.getPhoneField(overrides[3]),
+      this.getToggleField(overrides[4]),
+      this.getDropdownField(overrides[5]),
+      this.getRangeField(overrides[6]),
+      this.getDatepickerField(overrides[7]),
+      this.getChipsField(overrides[8]),
+      this.getAutocompleteField(overrides[9]),
+      this.getTextAreaField(overrides[10]),
     ];
   }
 }

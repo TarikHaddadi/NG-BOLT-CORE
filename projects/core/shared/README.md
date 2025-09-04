@@ -22,18 +22,108 @@ export class MyFeatureComponent {
   private fields = inject(FieldConfigService);
 
   form: FormGroup = this.fb.group({});
-  fieldConfig = [
-    this.fields.getTextField('form.labels.fullname', 'form.placeholders.fullname'),
-    this.fields.getEmailField('form.labels.email', 'form.placeholders.email'),
-    this.fields.getPasswordField('form.labels.password', 'form.placeholders.password'),
-    this.fields.getPhoneField('form.labels.phone', 'form.placeholders.phone'),
-    this.fields.getToggleField('form.labels.notify'),
-    this.fields.getDropdownField('form.labels.role'),
-    this.fields.getDatepickerField('form.labels.dob'),
-    this.fields.getChipsField('form.labels.tags'),
-    this.fields.getAutocompleteField('form.labels.country'),
-    this.fields.getRangeField('form.labels.price', 0, 200, 5),
-    this.fields.getTextAreaField('form.labels.input', 'form.placeholders.input'),
+  this.fieldConfig = [
+    this.fieldsConfigService.getTextField({
+      name: 'fullName',
+      label: 'form.labels.fullname',
+      placeholder: 'form.placeholders.fullname',
+      layoutClass: 'col-12',
+      // swap/extend validation easily:
+      validators: [Validators.required, Validators.minLength(2), Validators.maxLength(80)],
+      errorMessages: { required: 'form.errors.fullname.required' },
+    }),
+
+    this.fieldsConfigService.getEmailField({
+      name: 'email',
+      label: 'form.labels.email',
+      placeholder: 'form.placeholders.email',
+      layoutClass: 'col-md-6',
+    }),
+
+    this.fieldsConfigService.getPasswordField({
+      name: 'password',
+      label: 'form.labels.password',
+      placeholder: 'form.placeholders.password',
+      layoutClass: 'col-md-6',
+      // example: enforce special char as well (SDK default allows you to replace)
+      validators: [
+        Validators.required,
+        Validators.maxLength(128),
+        passwordStrengthValidator({ minLength: 8, minUpper: 1, minDigits: 1, minSpecial: 1 }),
+      ],
+      errorMessages: { special: 'form.errors.password.special' },
+    }),
+
+    this.fieldsConfigService.getPhoneField({
+      name: 'phone',
+      label: 'form.labels.phone',
+      placeholder: '+352 12345678',
+      layoutClass: 'col-md-6',
+      defaultValue: '+352',
+    }),
+
+    this.fieldsConfigService.getToggleField({
+      name: 'notify',
+      label: 'form.labels.notify',
+      helperText: 'form.hints.notify',
+      layoutClass: 'col-md-6',
+      required: false,
+    }),
+
+    this.fieldsConfigService.getDropdownField({
+      name: 'role',
+      label: 'form.labels.role',
+      placeholder: 'form.placeholders.role',
+      options: [
+        { label: 'Admin', value: 'admin' },
+        { label: 'User', value: 'user' },
+        { label: 'Manager', value: 'manager' },
+      ],
+      multiple: false,
+      layoutClass: 'col-md-6',
+    }),
+
+    this.fieldsConfigService.getDatepickerField({
+      name: 'dob',
+      label: 'form.labels.dob',
+      placeholder: 'YYYY-MM-DD',
+      layoutClass: 'col-md-6',
+    }),
+
+    this.fieldsConfigService.getChipsField({
+      name: 'tags',
+      label: 'form.labels.tags',
+      chipOptions: ['Angular', 'React', 'Vue', 'Node.js'],
+      multiple: true,
+      layoutClass: 'col-12',
+    }),
+
+    this.fieldsConfigService.getAutocompleteField({
+      name: 'country',
+      label: 'form.labels.country',
+      autocompleteOptions: ['Luxembourg', 'Germany', 'France', 'Belgium', 'Netherlands'],
+      placeholder: 'form.placeholders.country',
+      layoutClass: 'col-md-6',
+    }),
+
+    this.fieldsConfigService.getRangeField({
+      name: 'price',
+      label: 'form.labels.price',
+      min: 0,
+      max: 200,
+      step: 5,
+      defaultValue: 20,
+      layoutClass: 'col-12',
+    }),
+
+    this.fieldsConfigService.getTextAreaField({
+      name: 'input',
+      label: 'form.labels.input',
+      placeholder: 'form.placeholders.input',
+      showCounter: true,
+      maxLength: 500,
+      layoutClass: 'col-12',
+    }),
   ];
 }
 ```
