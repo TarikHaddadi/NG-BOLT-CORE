@@ -1,5 +1,5 @@
 # 📝 Contributing Guide – `@cadai/pxs-ng-core`
->_Last updated: 2025-08-21_
+>_Last updated: 2025-09-04_
 
 Welcome! This document explains how to work with the **PXS-NG-CORE** library: setup, development, versioning, and publishing to our private Azure Artifacts feed.
 
@@ -57,6 +57,7 @@ projects/
    ├─ core/                           # Framework-agnostic building blocks
    ├─ services/                    # Config, Http, Keycloak, Layout, Theme, Toast, User, etc.
    ├─ directives/                  # Shared TS Directives
+   ├─ providers/                  # Custom providers (Such as provideCharts)
    ├─ factories/                  # Shared TS Factories
    ├─ interfaces/                  # Shared TS interfaces & models
    ├─ enums/                       # Shared enums (e.g., UserRole)

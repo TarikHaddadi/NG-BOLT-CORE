@@ -27,7 +27,7 @@ import { PXS_CHART_DEFAULTS, PXS_CHART_PLUGINS } from '@cadai/pxs-ng-core/provid
 type TimeUnit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'month';
 
 @Component({
-  selector: 'pxs-chart',
+  selector: 'app-chart',
   standalone: true,
   template: `<canvas
     #canvas
