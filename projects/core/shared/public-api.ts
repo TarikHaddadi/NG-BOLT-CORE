@@ -1,3 +1,4 @@
+export { PxsChartComponent } from './charts/chart.component';
 export { ConfirmDialogComponent } from './dialog/dialog.component';
 export { ForbiddenComponent } from './forbidden/forbidden.component';
 export { DynamicFormComponent } from './forms/dynamic-form.component';
