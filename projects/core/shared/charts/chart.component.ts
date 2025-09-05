@@ -25,18 +25,6 @@ import {
 import { PXS_CHART_DEFAULTS, PXS_CHART_PLUGINS } from '@cadai/pxs-ng-core/providers';
 
 type TimeUnit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'month';
-const DEFAULT_DISPLAY_FORMATS = {
-  millisecond: 'HH:mm:ss.SSS',
-  second: 'HH:mm:ss',
-  minute: 'HH:mm',
-  hour: 'HH:mm',
-  day: 'MMM d',
-  week: 'MMM d',
-  month: 'MMM yyyy',
-  quarter: 'qqq yyyy',
-  year: 'yyyy',
-};
-
 @Component({
   selector: 'app-chart',
   standalone: true,
@@ -187,40 +175,46 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
   private buildOptionsWithTimeDefaults(opts?: ChartOptions<TType>): ChartOptions<TType> {
     const out: any = { ...(opts ?? {}) };
 
-    // 1) Only set adapters if the global date adapter exists
+    // (A) Global adapters object must exist to avoid read of undefined
+    out.adapters = out.adapters ?? {};
+
+    // (B) Try to wire the global date adapter if available (after luxon import)
     const dateAdapter = (_adapters as any)?._date;
     if (dateAdapter && typeof dateAdapter.parse === 'function') {
-      out.adapters = out.adapters ?? {};
       out.adapters.date = out.adapters.date ?? dateAdapter;
-    } else {
-      // Don’t crash — just leave as-is. If the host forgot provideCharts(),
-      // the x scale fallback below will still try to work once they fix it.
-      // You can also console.warn here if you want:
-      // console.warn('[PxsChart] Time adapter not found. Did you call provideCharts()?');
     }
 
     if (!this.autoTime) return out as ChartOptions<TType>;
 
-    // 2) Ensure x scale exists and is 'time'
+    // (C) Ensure x scale exists and is 'time'
     out.scales = out.scales ?? {};
     const x = out.scales.x ?? {};
-
     if (!x.type) x.type = 'time';
 
-    // 3) Apply scale-level adapter if available
+    // (D) **Always** ensure scale-level adapters object exists
+    x.adapters = x.adapters ?? {};
+
+    // Only set the date adapter if we actually have one
     if (dateAdapter && typeof dateAdapter.parse === 'function') {
-      x.adapters = x.adapters ?? {};
       x.adapters.date = x.adapters.date ?? dateAdapter;
     }
 
-    // 4) Respect caller's time options but ensure displayFormats exist
+    // (E) Guarantee x.time and displayFormats exist
     x.time = x.time ?? {};
     x.time.displayFormats = {
-      ...DEFAULT_DISPLAY_FORMATS,
+      millisecond: 'HH:mm:ss.SSS',
+      second: 'HH:mm:ss',
+      minute: 'HH:mm',
+      hour: 'HH:mm',
+      day: 'MMM d',
+      week: 'MMM d',
+      month: 'MMM yyyy',
+      quarter: 'qqq yyyy',
+      year: 'yyyy',
       ...(x.time.displayFormats ?? {}),
     };
 
-    // 5) Pick unit automatically unless overridden
+    // (F) Auto-pick or respect provided unit
     if (this.timeUnit === 'auto') {
       const span = this.estimateSpanMs(this.data);
       if (span != null) x.time.unit = pickUnit(span);
