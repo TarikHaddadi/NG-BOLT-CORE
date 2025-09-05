@@ -135,49 +135,41 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
     const { hasXY, xs } = this.collectXValues(data);
     if (!hasXY || xs.length === 0) return data;
 
-    // Detect seconds vs milliseconds if numeric
-    const normalizedXs = xs.map((v) => {
-      if (typeof v === 'number') {
-        // assume seconds if 10-digit timestamp (<= 1e12 roughly)
-        return v < 1e12 ? v * 1000 : v;
-      }
-      if (typeof v === 'string') {
-        // ISO string → Date -> ms
-        const d = new Date(v);
-        return isNaN(d.getTime()) ? v : d.getTime();
-      }
-      if (v instanceof Date) {
-        return v.getTime();
-      }
-      return v as any;
+    // Detect if anything needs converting (sec->ms, ISO->ms, Date->ms)
+    const needsChange = xs.some((v) => {
+      if (typeof v === 'number') return v < 1e12; // seconds
+      if (typeof v === 'string') return !isNaN(new Date(v).getTime()); // ISO
+      if (v instanceof Date) return true;
+      return false;
     });
+    if (!needsChange) return data;
 
-    // If we converted anything, rebuild datasets with normalized x values (as ms numbers)
-    const changed = normalizedXs.some((nv, i) => nv !== xs[i]);
-    if (!changed) return data;
-
-    const toMs = (x: any): number => {
+    const toMs = (x: any): number | any => {
       if (typeof x === 'number') return x < 1e12 ? x * 1000 : x;
       if (typeof x === 'string') {
-        const d = new Date(x);
-        return isNaN(d.getTime()) ? NaN : d.getTime();
+        const t = new Date(x).getTime();
+        return isNaN(t) ? x : t;
       }
       if (x instanceof Date) return x.getTime();
-      return NaN;
+      return x; // leave unknowns as-is
     };
 
-    const cloned = structuredClone ? structuredClone(data) : JSON.parse(JSON.stringify(data));
-    (cloned.datasets as any[]).forEach((ds) => {
-      if (Array.isArray(ds.data)) {
-        ds.data = ds.data.map((pt: any) => {
+    // Shallow-copy the ChartData and only rebuild dataset.data arrays
+    const cloned: any = {
+      ...data,
+      datasets: (data.datasets as any[]).map((ds) => {
+        if (!Array.isArray(ds.data)) return ds; // leave typed arrays/numbers alone
+        const newData = ds.data.map((pt: any) => {
           if (pt && typeof pt === 'object' && 'x' in pt && 'y' in pt) {
             const ms = toMs(pt.x);
-            return isNaN(ms) ? pt : { ...pt, x: ms };
+            return typeof ms === 'number' ? { ...pt, x: ms } : pt;
           }
           return pt;
         });
-      }
-    });
+        return { ...ds, data: newData }; // keep other props (incl. functions) intact
+      }),
+    };
+
     return cloned as ChartData<TType>;
   }
 
