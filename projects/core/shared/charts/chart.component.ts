@@ -25,6 +25,17 @@ import {
 import { PXS_CHART_DEFAULTS, PXS_CHART_PLUGINS } from '@cadai/pxs-ng-core/providers';
 
 type TimeUnit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'month';
+const DEFAULT_DISPLAY_FORMATS = {
+  millisecond: 'HH:mm:ss.SSS',
+  second: 'HH:mm:ss',
+  minute: 'HH:mm',
+  hour: 'HH:mm',
+  day: 'MMM d',
+  week: 'MMM d',
+  month: 'MMM yyyy',
+  quarter: 'qqq yyyy',
+  year: 'yyyy',
+};
 
 @Component({
   selector: 'app-chart',
@@ -173,36 +184,47 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
     return cloned as ChartData<TType>;
   }
 
-  /** Ensure x scale is 'time' and pick unit automatically if not provided */
   private buildOptionsWithTimeDefaults(opts?: ChartOptions<TType>): ChartOptions<TType> {
     const out: any = { ...(opts ?? {}) };
 
-    // 1) Ensure global adapters exists
-    const dateAdapter = (_adapters as any)._date;
-    out.adapters = out.adapters ?? {};
-    out.adapters.date = out.adapters.date ?? dateAdapter;
+    // 1) Only set adapters if the global date adapter exists
+    const dateAdapter = (_adapters as any)?._date;
+    if (dateAdapter && typeof dateAdapter.parse === 'function') {
+      out.adapters = out.adapters ?? {};
+      out.adapters.date = out.adapters.date ?? dateAdapter;
+    } else {
+      // Don’t crash — just leave as-is. If the host forgot provideCharts(),
+      // the x scale fallback below will still try to work once they fix it.
+      // You can also console.warn here if you want:
+      // console.warn('[PxsChart] Time adapter not found. Did you call provideCharts()?');
+    }
 
     if (!this.autoTime) return out as ChartOptions<TType>;
 
-    // 2) Ensure x scale exists and is time
+    // 2) Ensure x scale exists and is 'time'
     out.scales = out.scales ?? {};
     const x = out.scales.x ?? {};
 
     if (!x.type) x.type = 'time';
 
-    // 3) Ensure scale-level adapters exists (this is what TimeScale reads!)
-    x.adapters = x.adapters ?? {};
-    x.adapters.date = x.adapters.date ?? dateAdapter;
+    // 3) Apply scale-level adapter if available
+    if (dateAdapter && typeof dateAdapter.parse === 'function') {
+      x.adapters = x.adapters ?? {};
+      x.adapters.date = x.adapters.date ?? dateAdapter;
+    }
 
-    // 4) Pick time unit automatically (or use provided)
+    // 4) Respect caller's time options but ensure displayFormats exist
+    x.time = x.time ?? {};
+    x.time.displayFormats = {
+      ...DEFAULT_DISPLAY_FORMATS,
+      ...(x.time.displayFormats ?? {}),
+    };
+
+    // 5) Pick unit automatically unless overridden
     if (this.timeUnit === 'auto') {
       const span = this.estimateSpanMs(this.data);
-      if (span != null) {
-        x.time = x.time ?? {};
-        x.time.unit = pickUnit(span);
-      }
+      if (span != null) x.time.unit = pickUnit(span);
     } else {
-      x.time = x.time ?? {};
       x.time.unit = this.timeUnit;
     }
 
