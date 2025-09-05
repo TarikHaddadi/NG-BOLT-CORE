@@ -48,7 +48,11 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
       />
 
       <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-      <mat-datepicker [color]="field.color || 'primary'" #picker></mat-datepicker>
+      <mat-datepicker
+        [color]="field.color || 'primary'"
+        [class]="field.layoutClass"
+        #picker
+      ></mat-datepicker>
 
       @if (field.helperText && !showError) {
         <mat-hint [id]="hintId">

@@ -27,7 +27,7 @@ export class MyFeatureComponent {
       name: 'fullName',
       label: 'form.labels.fullname',
       placeholder: 'form.placeholders.fullname',
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
       // swap/extend validation easily:
       validators: [Validators.required, Validators.minLength(2), Validators.maxLength(80)],
       errorMessages: { required: 'form.errors.fullname.required' },
@@ -37,14 +37,14 @@ export class MyFeatureComponent {
       name: 'email',
       label: 'form.labels.email',
       placeholder: 'form.placeholders.email',
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
     }),
 
     this.fieldsConfigService.getPasswordField({
       name: 'password',
       label: 'form.labels.password',
       placeholder: 'form.placeholders.password',
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
       // example: enforce special char as well (SDK default allows you to replace)
       validators: [
         Validators.required,
@@ -58,7 +58,7 @@ export class MyFeatureComponent {
       name: 'phone',
       label: 'form.labels.phone',
       placeholder: '+352 12345678',
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
       defaultValue: '+352',
     }),
 
@@ -66,7 +66,7 @@ export class MyFeatureComponent {
       name: 'notify',
       label: 'form.labels.notify',
       helperText: 'form.hints.notify',
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
       required: false,
     }),
 
@@ -80,14 +80,14 @@ export class MyFeatureComponent {
         { label: 'Manager', value: 'manager' },
       ],
       multiple: false,
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
     }),
 
     this.fieldsConfigService.getDatepickerField({
       name: 'dob',
       label: 'form.labels.dob',
       placeholder: 'YYYY-MM-DD',
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
     }),
 
     this.fieldsConfigService.getChipsField({
@@ -95,7 +95,7 @@ export class MyFeatureComponent {
       label: 'form.labels.tags',
       chipOptions: ['Angular', 'React', 'Vue', 'Node.js'],
       multiple: true,
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
     }),
 
     this.fieldsConfigService.getAutocompleteField({
@@ -103,7 +103,7 @@ export class MyFeatureComponent {
       label: 'form.labels.country',
       autocompleteOptions: ['Luxembourg', 'Germany', 'France', 'Belgium', 'Netherlands'],
       placeholder: 'form.placeholders.country',
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
     }),
 
     this.fieldsConfigService.getRangeField({
@@ -113,7 +113,7 @@ export class MyFeatureComponent {
       max: 200,
       step: 5,
       defaultValue: 20,
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
     }),
 
     this.fieldsConfigService.getTextAreaField({
@@ -122,7 +122,7 @@ export class MyFeatureComponent {
       placeholder: 'form.placeholders.input',
       showCounter: true,
       maxLength: 500,
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
     }),
   ];
 }
@@ -195,7 +195,7 @@ MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Conc
 
 - `required`, `minLength`, `maxLength`, `pattern`, `validators`
 - `errorMessages`: map of error keys → i18n keys (see example list below)
-- `layoutClass`: CSS/grid class (`'col-12'`, `'col-md-6'`, …)
+- `layoutClass`: CSS/grid class (`'primary'`, `'accent'`,`'warn'`,`'neutral'`,`'success'`, …)
 - `defaultValue`: initial value (when applicable)
 - `hidden`, `disabled`: UI/interaction flags
 - `multiple`: for `dropdown` / `chips`

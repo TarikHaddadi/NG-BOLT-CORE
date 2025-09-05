@@ -27,9 +27,9 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
   template: `
     <mat-form-field
       appearance="outline"
-      class="w-full"
       floatLabel="always"
       [color]="field.color || 'primary'"
+      [class]="field.layoutClass?.concat(' w-full') || 'w-full'"
     >
       <mat-label>{{ field.label | translate }}</mat-label>
 

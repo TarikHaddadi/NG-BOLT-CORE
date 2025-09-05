@@ -66,7 +66,7 @@ export class FieldConfigService {
         minlength: 'form.errors.textarea.minlength',
         maxlength: 'form.errors.textarea.maxlength',
       },
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
     };
     return mergeField(defaults, { ...overrides, type: 'textarea' });
   }
@@ -98,7 +98,7 @@ export class FieldConfigService {
         maxlength: 'form.errors.input.maxlength',
         invalidChars: 'form.errors.input.invalidChars',
       },
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
       chipOptions: [],
       autocompleteOptions: [],
     };
@@ -130,7 +130,7 @@ export class FieldConfigService {
       disabled: false,
       hidden: false,
       children: [],
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
       chipOptions: [],
       autocompleteOptions: [],
     };
@@ -164,7 +164,7 @@ export class FieldConfigService {
         digit: 'form.errors.password.digit',
         special: 'form.errors.password.special',
       },
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
       chipOptions: [],
       autocompleteOptions: [],
     };
@@ -186,7 +186,7 @@ export class FieldConfigService {
         pattern: 'form.errors.phone.invalid',
         phoneDigitsLen: 'form.errors.phone.invalid',
       },
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
       defaultValue: '+352',
     };
     return mergeField(defaults, { ...overrides, type: 'phone' });
@@ -207,7 +207,7 @@ export class FieldConfigService {
       errorMessages: {
         required: 'form.errors.notify.required',
       },
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
       chipOptions: [],
       autocompleteOptions: [],
     };
@@ -235,7 +235,7 @@ export class FieldConfigService {
       errorMessages: {
         required: 'form.errors.role.required',
       },
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
       chipOptions: [],
       autocompleteOptions: [],
     };
@@ -265,7 +265,7 @@ export class FieldConfigService {
         min: 'form.errors.volume.min',
         max: 'form.errors.volume.max',
       },
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
       chipOptions: [],
       autocompleteOptions: [],
       defaultValue: 20,
@@ -294,7 +294,7 @@ export class FieldConfigService {
         matDatepickerMax: 'form.errors.dob.maxDate',
         matDatepickerFilter: 'form.errors.dob.dateNotAllowed',
       },
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
     };
     return mergeField(defaults, { ...overrides, type: 'datepicker' });
   }
@@ -315,7 +315,7 @@ export class FieldConfigService {
       errorMessages: {
         minlengthArray: 'form.errors.tags.minOne',
       },
-      layoutClass: 'col-12',
+      layoutClass: 'primary',
       chipOptions: ['Angular', 'React', 'Vue'],
       autocompleteOptions: [],
     };
@@ -341,7 +341,7 @@ export class FieldConfigService {
         required: 'form.errors.country.required',
         optionNotAllowed: 'form.errors.country.notAllowed',
       },
-      layoutClass: 'col-md-6',
+      layoutClass: 'primary',
       chipOptions: [],
       autocompleteOptions: opts,
     };
