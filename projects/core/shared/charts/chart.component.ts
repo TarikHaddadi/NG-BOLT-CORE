@@ -186,12 +186,25 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
   private buildOptionsWithTimeDefaults(opts?: ChartOptions<TType>): ChartOptions<TType> {
     const out: any = { ...(opts ?? {}) };
 
+    // ✅ If autoTime is off, never touch scales
     if (!this.autoTime) return out as ChartOptions<TType>;
 
-    // Ensure x scale exists and is 'time'
+    // ✅ Only apply time logic if datasets really contain {x,y}
+    const { hasXY } = this.collectXValues(this.data);
+    if (!hasXY) {
+      // Do NOT inject an x time-scale for pie/doughnut/radar/polar/bar with labels-only
+      return out as ChartOptions<TType>;
+    }
+
+    // --- from here on, we know it's an XY/time series ---
     out.scales = out.scales ?? {};
     const x = out.scales.x ?? {};
+
+    // Ensure 'time' scale
     if (!x.type) x.type = 'time';
+
+    // Make sure the scale-level adapters object exists (prevents read of undefined inside TimeScale)
+    x.adapters = x.adapters ?? {};
 
     // Ensure time + displayFormats exist
     x.time = x.time ?? {};
@@ -208,7 +221,7 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
       ...(x.time.displayFormats ?? {}),
     };
 
-    // Decide unit (auto or explicit)
+    // Decide unit
     if (this.timeUnit === 'auto') {
       const span = this.estimateSpanMs(this.data);
       if (span != null) x.time.unit = pickUnit(span);
@@ -216,7 +229,7 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
       x.time.unit = this.timeUnit;
     }
 
-    // Final safety net: always have a valid unit (prevents "interval.steps" crash)
+    // Safety net
     if (!x.time.unit || !VALID_UNITS.has(x.time.unit)) x.time.unit = 'day';
 
     out.scales.x = x;
