@@ -1,6 +1,6 @@
 import 'chartjs-adapter-luxon';
 import { InjectionToken, Provider } from '@angular/core';
-import { _adapters, Chart, ChartOptions, Colors,Plugin, registerables } from 'chart.js';
+import { _adapters, Chart, ChartOptions, Colors, Plugin, registerables } from 'chart.js';
 
 export const PXS_CHART_DEFAULTS = new InjectionToken<ChartOptions>('PXS_CHART_DEFAULTS');
 export const PXS_CHART_PLUGINS = new InjectionToken<Plugin[]>('PXS_CHART_PLUGINS');

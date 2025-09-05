@@ -9,3 +9,12 @@ export function linearGradient(ctx: CanvasRenderingContext2D, from: string, to: 
   g.addColorStop(1, to);
   return g;
 }
+
+export const COLOR = {
+  primary: () => cssVar('--mat-primary', '#42a5f5'),
+  primaryVariant: () => cssVar('--mat-primary-variant', '#1e88e5'),
+  accent: () => cssVar('--mat-accent', '#ff4081'),
+  warn: () => cssVar('--mat-warn', '#ec9a00ff'),
+  neutral: () => cssVar('--mat-neutral', '#9e9e9e'),
+  success: () => cssVar('--mat-success', '#4caf50'),
+};
