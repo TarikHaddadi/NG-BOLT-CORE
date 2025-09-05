@@ -94,8 +94,9 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     name: 'themeSwitcher',
     label: 'form.labels.themeSwitcher',
     type: 'toggle',
-    color: 'accent',
     toggleIcons: { on: 'dark_mode', off: 'light_mode', position: 'start' },
+    color: 'primary',
+    layoutClass: 'primary',
   };
   public themeControl!: FormControl<boolean>;
 
@@ -108,6 +109,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       { label: 'English', value: 'en' },
       { label: 'Français', value: 'fr' },
     ],
+    color: 'primary',
+    layoutClass: 'primary',
   };
   public langControl!: FormControl<string>;
 
@@ -117,6 +120,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     label: 'ai.scope',
     type: 'dropdown',
     options: [],
+    color: 'primary',
+    layoutClass: 'primary',
   };
   public aiScopeControl!: FormControl<string>;
 
@@ -128,6 +133,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
       { label: 'ai.provider', value: 'ai.provider' },
       { label: 'ai.model', value: 'ai.model' },
     ],
+    color: 'primary',
+    layoutClass: 'primary',
   };
   public aiKeyControl!: FormControl<string>;
 
@@ -136,6 +143,8 @@ export class AppLayoutComponent implements OnInit, AfterViewInit {
     label: 'ai.value',
     type: 'dropdown',
     options: [],
+    color: 'primary',
+    layoutClass: 'primary',
   };
   public aiValueControl!: FormControl<string>;
 

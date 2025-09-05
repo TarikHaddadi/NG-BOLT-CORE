@@ -1,6 +1,6 @@
 <mat-sidenav-container class="app-container">
   <mat-sidenav #sidenav mode="side" [(opened)]="isOpen" class="side-nav" [fixedInViewport]="true">
-    <div class="nav-title">Navigation</div>
+    <div class="nav-title">{{ 'navigationTitle' | translate }}</div>
 
     <mat-nav-list class="menu-list">
       @for (item of menuItems; track item.route) {
@@ -13,7 +13,7 @@
           [matTooltip]="!isOpen ? item.label : ''"
           matTooltipPosition="right"
         >
-          <mat-icon>{{ item.icon }}</mat-icon>
+          <mat-icon [color]="'primary'">{{ item.icon }}</mat-icon>
           <span class="menu-label">{{ item.label | translate }}</span>
         </a>
       }
@@ -65,8 +65,9 @@
           class="user-trigger"
           [matMenuTriggerFor]="userMenu"
           [attr.aria-label]="displayName(p)"
+          [color]="'primary'"
         >
-          <mat-icon class="avatar">account_circle</mat-icon>
+          <mat-icon class="avatar" [color]="'primary'">account_circle</mat-icon>
           @if (isOpen) {
             <div class="user-meta">
               <div class="user-name">{{ displayName(p) }}</div>

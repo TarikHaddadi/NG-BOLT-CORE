@@ -41,7 +41,7 @@ export interface FieldConfig {
   children?: FieldConfig[];
   multiple?: boolean;
   errorMessages?: Record<string, string>;
-  layoutClass?: string;
+  layoutClass?: 'primary' | 'accent' | 'warn' | 'neutral' | 'success' | string;
   defaultValue?: string | number | boolean; // for text/email/phone/password, etc.
   chipOptions?: string[];
   autocompleteOptions?: string[];

@@ -54,6 +54,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
           <mat-chip-option
             [value]="chip"
             [disabled]="fc.disabled"
+            [class]="field.layoutClass"
             [color]="field.color || 'primary'"
           >
             {{ chip | translate }}

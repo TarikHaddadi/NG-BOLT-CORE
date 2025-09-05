@@ -20,6 +20,7 @@ projects/core/
   guards/          # route guards
   interceptors/    # HTTP interceptors
   interfaces/      # types, models, FieldConfig, etc.
+  providerss/      # Custom providers such as ChartsProvider.
   services/        # injectable services
   shared/          # standalone UI components (forms, layout, etc.)
   store/           # NgRx facades, actions, reducers, selectors
@@ -255,7 +256,14 @@ Add keys to your translation files (e.g., `assets/i18n/en.json`):
 ```ts
 const config: FieldConfig[] = [
   // ...
-  { name: 'custom', type: 'myCustom', label: 'form.labels.custom', required: true },
+  {
+    name: 'custom',
+    type: 'myCustom',
+    label: 'form.labels.custom',
+    required: true,
+    color: 'primary',
+    layoutClass: 'primary',
+  },
 ];
 ```
 
