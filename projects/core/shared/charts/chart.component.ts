@@ -336,7 +336,7 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
 
   private setupThemeReactivity() {
     this.store
-      .select(AppSelectors.ThemeSelectors.selectThemeMode)
+      .select(AppSelectors.ThemeSelectors.selectIsDark)
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.refreshForStyling());
   }
