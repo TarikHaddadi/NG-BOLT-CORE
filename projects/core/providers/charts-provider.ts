@@ -8,21 +8,29 @@ export const PXS_CHART_PLUGINS = new InjectionToken<Plugin[]>('PXS_CHART_PLUGINS
 const EnsureTimeAdapterPlugin: Plugin = {
   id: 'pxsEnsureTimeAdapter',
   beforeInit(chart) {
-    const date = (_adapters as any)?._date;
-    if (!date || typeof date.parse !== 'function') return; // guard
+    // Ensure options.adapters exists
     (chart.options as any).adapters = (chart.options as any).adapters ?? {};
-    (chart.options as any).adapters.date = (chart.options as any).adapters.date ?? date;
+
+    const date = (_adapters as any)?._date;
+    if (date && typeof date.parse === 'function') {
+      (chart.options as any).adapters.date = (chart.options as any).adapters.date ?? date;
+    }
   },
   beforeUpdate(chart) {
-    const date = (_adapters as any)?._date;
-    if (!date || typeof date.parse !== 'function') return; // guard
     const scales = (chart.options as any).scales;
     if (!scales) return;
+
+    // Ensure each scale has adapters = {}
     for (const key of Object.keys(scales)) {
       const s = (scales as any)[key];
-      if (s?.type === 'time') {
-        s.adapters = s.adapters ?? {};
-        s.adapters.date = s.adapters.date ?? date;
+      if (!s) continue;
+      s.adapters = s.adapters ?? {};
+
+      if (s.type === 'time') {
+        const date = (_adapters as any)?._date;
+        if (date && typeof date.parse === 'function') {
+          s.adapters.date = s.adapters.date ?? date;
+        }
       }
     }
   },
