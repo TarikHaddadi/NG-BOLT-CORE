@@ -78,6 +78,7 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@types/jasmine": "~5.1.0",
+    "@types/luxon": "^3.7.1",
     "@typescript-eslint/eslint-plugin": "^8.40.0",
     "@typescript-eslint/parser": "^8.40.0",
     "depcheck": "^1.4.7",

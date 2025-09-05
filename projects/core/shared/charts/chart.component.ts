@@ -7,10 +7,14 @@ import {
   EventEmitter,
   inject,
   Input,
+  NgZone,
   OnChanges,
   Output,
   ViewChild,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Store } from '@ngrx/store';
+import { TranslateService } from '@ngx-translate/core';
 import {
   _adapters,
   ActiveElement,
@@ -21,8 +25,11 @@ import {
   ChartType,
   Plugin,
 } from 'chart.js';
+import { Settings as LuxonSettings } from 'luxon';
+import { distinctUntilChanged } from 'rxjs';
 
 import { PXS_CHART_DEFAULTS, PXS_CHART_PLUGINS } from '@cadai/pxs-ng-core/providers';
+import { AppSelectors } from '@cadai/pxs-ng-core/store';
 
 type TimeUnit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'month';
 const VALID_UNITS = new Set([
@@ -68,7 +75,10 @@ const VALID_UNITS = new Set([
 export class PxsChartComponent<TType extends ChartType = ChartType>
   implements AfterViewInit, OnChanges
 {
+  private translate = inject(TranslateService, { optional: true });
   private destroyRef = inject(DestroyRef);
+  private zone = inject(NgZone);
+  private store = inject(Store);
   private defaults = (inject<ChartOptions>(PXS_CHART_DEFAULTS, { optional: true }) ??
     {}) as ChartOptions<TType>;
   private plugins = inject<Plugin[]>(PXS_CHART_PLUGINS, { optional: true }) ?? [];
@@ -113,6 +123,9 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
       this.ro = new ResizeObserver(() => this.chart?.resize());
       this.ro.observe(wrap);
     }
+
+    this.setupLangReactivity();
+    this.setupThemeReactivity();
 
     this.destroyRef.onDestroy(() => {
       this.ro?.disconnect();
@@ -234,7 +247,7 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
 
     if (this.timeUnit === 'auto') {
       const span = this.estimateSpanMs(this.data);
-      if (span != null) x.time.unit = pickUnit(span);
+      if (span != null) x.time.unit = this.pickUnit(span);
     } else {
       x.time.unit = this.timeUnit;
     }
@@ -286,19 +299,71 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
     const max = Math.max(...xs);
     return max - min;
   }
-}
 
-/** Pick a nice unit from span in ms */
-function pickUnit(spanMs: number): TimeUnit {
-  const s = 1000;
-  const m = 60 * s;
-  const h = 60 * m;
-  const d = 24 * h;
+  private setupLangReactivity() {
+    if (!this.translate) return;
 
-  if (spanMs <= 5 * s) return 'millisecond';
-  if (spanMs <= 3 * m) return 'second';
-  if (spanMs <= 3 * h) return 'minute';
-  if (spanMs <= 4 * d) return 'hour';
-  if (spanMs <= 60 * d) return 'day';
-  return 'month';
+    // set once on init
+    this.applyDateLocale(this.translate.getLangs()[0]);
+
+    this.translate.onLangChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(({ lang }) => {
+      this.applyDateLocale(lang);
+      this.refreshForStyling();
+    });
+
+    // Language (prefer your own NgRx selector; fallback to TranslateService)
+    const lang$ = this.store.select(AppSelectors.LangSelectors.selectLang);
+    lang$.pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe((lang) => {
+      this.applyDateLocale(lang);
+      this.refreshForStyling();
+    });
+  }
+
+  private applyDateLocale(lang: string | undefined) {
+    if (!lang) return;
+
+    // Works with date-fns adapter (has setLocale)
+    try {
+      const luxon = (Chart as any)?._adapters?._date;
+      if (luxon?.setLocale) luxon.setLocale(lang); // e.g. 'fr', 'de', 'en-GB'
+    } catch {}
+
+    // Works with luxon adapter
+    try {
+      LuxonSettings.defaultLocale = lang;
+    } catch {}
+  }
+
+  private setupThemeReactivity() {
+    this.store
+      .select(AppSelectors.ThemeSelectors.selectThemeMode)
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.refreshForStyling());
+  }
+
+  private refreshForStyling() {
+    if (!this.chart) return;
+    this.chart.options = this.mergedOptions() as any;
+
+    // Run outside Angular to avoid change detection thrash
+    this.zone.runOutsideAngular(() => {
+      // schedule next frame so computed styles are up-to-date
+      requestAnimationFrame(() => this.chart!.update());
+    });
+  }
+
+  /** Pick a nice unit from span in ms */
+  private pickUnit(spanMs: number): TimeUnit {
+    const s = 1000;
+    const m = 60 * s;
+    const h = 60 * m;
+    const d = 24 * h;
+
+    if (spanMs <= 5 * s) return 'millisecond';
+    if (spanMs <= 3 * m) return 'second';
+    if (spanMs <= 3 * h) return 'minute';
+    if (spanMs <= 4 * d) return 'hour';
+    if (spanMs <= 60 * d) return 'day';
+    return 'month';
+  }
 }
