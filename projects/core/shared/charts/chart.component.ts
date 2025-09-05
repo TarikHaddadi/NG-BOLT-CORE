@@ -25,6 +25,17 @@ import {
 import { PXS_CHART_DEFAULTS, PXS_CHART_PLUGINS } from '@cadai/pxs-ng-core/providers';
 
 type TimeUnit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'month';
+const VALID_UNITS = new Set([
+  'millisecond',
+  'second',
+  'minute',
+  'hour',
+  'day',
+  'week',
+  'month',
+  'quarter',
+  'year',
+]);
 @Component({
   selector: 'app-chart',
   standalone: true,
@@ -175,31 +186,14 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
   private buildOptionsWithTimeDefaults(opts?: ChartOptions<TType>): ChartOptions<TType> {
     const out: any = { ...(opts ?? {}) };
 
-    // (A) Global adapters object must exist to avoid read of undefined
-    out.adapters = out.adapters ?? {};
-
-    // (B) Try to wire the global date adapter if available (after luxon import)
-    const dateAdapter = (_adapters as any)?._date;
-    if (dateAdapter && typeof dateAdapter.parse === 'function') {
-      out.adapters.date = out.adapters.date ?? dateAdapter;
-    }
-
     if (!this.autoTime) return out as ChartOptions<TType>;
 
-    // (C) Ensure x scale exists and is 'time'
+    // Ensure x scale exists and is 'time'
     out.scales = out.scales ?? {};
     const x = out.scales.x ?? {};
     if (!x.type) x.type = 'time';
 
-    // (D) **Always** ensure scale-level adapters object exists
-    x.adapters = x.adapters ?? {};
-
-    // Only set the date adapter if we actually have one
-    if (dateAdapter && typeof dateAdapter.parse === 'function') {
-      x.adapters.date = x.adapters.date ?? dateAdapter;
-    }
-
-    // (E) Guarantee x.time and displayFormats exist
+    // Ensure time + displayFormats exist
     x.time = x.time ?? {};
     x.time.displayFormats = {
       millisecond: 'HH:mm:ss.SSS',
@@ -214,13 +208,16 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
       ...(x.time.displayFormats ?? {}),
     };
 
-    // (F) Auto-pick or respect provided unit
+    // Decide unit (auto or explicit)
     if (this.timeUnit === 'auto') {
       const span = this.estimateSpanMs(this.data);
       if (span != null) x.time.unit = pickUnit(span);
     } else {
       x.time.unit = this.timeUnit;
     }
+
+    // Final safety net: always have a valid unit (prevents "interval.steps" crash)
+    if (!x.time.unit || !VALID_UNITS.has(x.time.unit)) x.time.unit = 'day';
 
     out.scales.x = x;
     return out as ChartOptions<TType>;
