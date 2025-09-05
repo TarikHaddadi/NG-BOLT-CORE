@@ -36,6 +36,7 @@ const VALID_UNITS = new Set([
   'quarter',
   'year',
 ]);
+
 @Component({
   selector: 'app-chart',
   standalone: true,
@@ -188,16 +189,16 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
 
     if (!this.autoTime) return out as ChartOptions<TType>;
 
+    // ✅ Don’t touch non-XY charts (pie/doughnut/radar/polar/bar with labels[])
     const { hasXY } = this.collectXValues(this.data);
-    if (!hasXY) return out as ChartOptions<TType>; // ✅ non-time charts untouched
+    if (!hasXY) return out as ChartOptions<TType>;
 
     out.scales = out.scales ?? {};
     const x = out.scales.x ?? {};
     if (!x.type) x.type = 'time';
 
-    // Prevent read of undefined in TimeScale
+    // Guarantee scale-level shape to avoid “adapters.date” reads on undefined
     x.adapters = x.adapters ?? {};
-
     x.time = x.time ?? {};
     x.time.displayFormats = {
       millisecond: 'HH:mm:ss.SSS',
@@ -218,7 +219,6 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
     } else {
       x.time.unit = this.timeUnit;
     }
-
     if (!x.time.unit || !VALID_UNITS.has(x.time.unit)) x.time.unit = 'day';
 
     out.scales.x = x;
