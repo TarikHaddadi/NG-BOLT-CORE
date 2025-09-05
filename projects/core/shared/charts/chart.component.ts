@@ -40,13 +40,30 @@ const VALID_UNITS = new Set([
 @Component({
   selector: 'app-chart',
   standalone: true,
-  template: `<canvas
-    #canvas
-    [attr.height]="height"
-    [attr.width]="width"
-    style="display:block"
-  ></canvas>`,
+  template: `
+    <div class="pxs-chart-wrap" [style.--pxs-chart-h.px]="height ?? 300">
+      <canvas #canvas></canvas>
+    </div>
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [
+    `
+      :host {
+        display: block;
+        width: 100%;
+      }
+      .pxs-chart-wrap {
+        width: 100%;
+        height: var(--pxs-chart-h, 300px); /* default 300px */
+        overflow: hidden; /* avoid accidental overflow */
+      }
+      .pxs-chart-wrap > canvas {
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
+      }
+    `,
+  ],
 })
 export class PxsChartComponent<TType extends ChartType = ChartType>
   implements AfterViewInit, OnChanges
@@ -90,9 +107,11 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
       this.elementClick.emit({ event: e as unknown as ChartEvent, elements: pts });
     };
 
-    if (!this.width && !this.height && 'ResizeObserver' in window) {
+    if ('ResizeObserver' in window) {
+      // Observe the wrapper (better signal for width changes)
+      const wrap = this.canvas.nativeElement.parentElement!;
       this.ro = new ResizeObserver(() => this.chart?.resize());
-      this.ro.observe(this.canvas.nativeElement);
+      this.ro.observe(wrap);
     }
 
     this.destroyRef.onDestroy(() => {

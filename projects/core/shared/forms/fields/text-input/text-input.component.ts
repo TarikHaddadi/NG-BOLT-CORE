@@ -17,7 +17,12 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, TranslateModule],
   template: `
-    <mat-form-field appearance="outline" class="w-full" floatLabel="always">
+    <mat-form-field
+      appearance="outline"
+      class="w-full"
+      floatLabel="always"
+      [color]="field.color || 'primary'"
+    >
       <mat-label>{{ field.label | translate }}</mat-label>
 
       <input

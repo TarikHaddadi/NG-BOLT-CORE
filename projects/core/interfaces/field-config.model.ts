@@ -1,4 +1,5 @@
 import { ValidatorFn } from '@angular/forms';
+import { ThemePalette } from '@angular/material/core';
 
 export type FieldType =
   | 'text'
@@ -49,7 +50,7 @@ export interface FieldConfig {
     off: string;
     position?: 'start' | 'end';
   };
-  color?: 'primary' | 'accent' | 'warn';
+  color?: ThemePalette;
   rows?: number;
   maxRows?: number;
   autoResize?: boolean;
