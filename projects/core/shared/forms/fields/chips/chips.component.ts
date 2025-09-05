@@ -51,7 +51,11 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
         (blur)="markTouched()"
       >
         @for (chip of field.chipOptions ?? []; track chip) {
-          <mat-chip-option [value]="chip" [disabled]="fc.disabled">
+          <mat-chip-option
+            [value]="chip"
+            [disabled]="fc.disabled"
+            [color]="field.color || 'primary'"
+          >
             {{ chip | translate }}
           </mat-chip-option>
         }
