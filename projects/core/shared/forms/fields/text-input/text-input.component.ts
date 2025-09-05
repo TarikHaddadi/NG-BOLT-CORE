@@ -19,7 +19,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
   template: `
     <mat-form-field
       appearance="outline"
-      class="w-full"
+      [class]="field.layoutClass?.concat(' w-full') || 'w-full'"
       floatLabel="always"
       [color]="field.color || 'primary'"
     >

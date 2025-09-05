@@ -31,6 +31,7 @@ type SelCtrl = AbstractControl<SelValue | SelValue[] | null>;
       class="w-full"
       floatLabel="always"
       [color]="field.color || 'primary'"
+      [class]="field.layoutClass"
     >
       <mat-label>{{ field.label | translate }}</mat-label>
 

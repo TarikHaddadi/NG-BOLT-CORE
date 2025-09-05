@@ -27,6 +27,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 
     <mat-slider
       [id]="field.name"
+      [class]="field.layoutClass"
       [color]="field.color || 'primary'"
       [min]="field.min ?? 0"
       [max]="field.max ?? 100"
