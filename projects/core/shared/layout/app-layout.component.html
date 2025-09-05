@@ -22,7 +22,7 @@
     <div class="switchers-trigger" [class.collapsed]="!isOpen">
       <button
         mat-button
-        class="quick-settings"
+        class="quick-settings primary"
         (click)="openSwitchers()"
         matTooltip="{{ 'quick_settings' | translate }}"
         [matTooltipPosition]="isOpen ? 'above' : 'right'"
@@ -62,7 +62,7 @@
       <div class="user-panel" [class.collapsed]="!isOpen">
         <button
           mat-button
-          class="user-trigger"
+          class="user-trigger primary"
           [matMenuTriggerFor]="userMenu"
           [attr.aria-label]="displayName(p)"
           [color]="'primary'"
@@ -80,7 +80,7 @@
           @for (r of (roles$ | async) ?? []; track r) {
             <p mat-menu-item>{{ r }}</p>
           }
-          <button mat-menu-item (click)="logout()">
+          <button mat-menu-item (click)="logout()" class="primary">
             <mat-icon>logout</mat-icon>
             <span>{{ 'Logout' | translate }}</span>
           </button>

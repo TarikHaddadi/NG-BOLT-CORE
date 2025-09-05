@@ -27,10 +27,23 @@ import { ConfirmDialogData } from '@cadai/pxs-ng-core/interfaces';
         <ng-container [ngTemplateOutlet]="data.actionsTpl" [ngTemplateOutletContext]="data.context">
         </ng-container>
       } @else {
-        <button mat-button type="button" (click)="dialogRef.close(false)">
+        <button
+          mat-button
+          type="button"
+          [color]="'warn'"
+          class="warn"
+          (click)="dialogRef.close(false)"
+        >
           {{ data.cancelText || 'cancel' | translate }}
         </button>
-        <button mat-raised-button color="primary" type="button" (click)="closeWithResult()">
+        <button
+          mat-raised-button
+          color="primary"
+          [color]="'primary'"
+          class="primary"
+          type="button"
+          (click)="closeWithResult()"
+        >
           {{ data.confirmText || 'confirm' | translate }}
         </button>
       }
