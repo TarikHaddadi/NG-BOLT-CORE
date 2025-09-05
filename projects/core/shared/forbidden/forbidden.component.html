@@ -14,14 +14,14 @@
     <p>{{ 'error.403.text' | translate: { default: 'You don’t have access to this page.' } }}</p>
 
     <div class="actions">
-      <button mat-stroked-button (click)="goBack()">
+      <button mat-stroked-button color="primary" class="primary" (click)="goBack()">
         {{ 'common.back' | translate: { default: 'Back' } }}
       </button>
-      <button mat-flat-button color="primary" (click)="goHome()">
+      <button mat-flat-button color="primary" class="primary" (click)="goHome()">
         {{ 'common.home' | translate: { default: 'Home' } }}
       </button>
       @if (!isAuthenticated()) {
-        <button mat-button (click)="login()">
+        <button mat-button color="primary" class="primary" (click)="login()">
           {{ 'common.signIn' | translate: { default: 'Sign in' } }}
         </button>
       }
