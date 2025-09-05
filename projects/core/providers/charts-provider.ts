@@ -9,11 +9,13 @@ const EnsureTimeAdapterPlugin: Plugin = {
   id: 'pxsEnsureTimeAdapter',
   beforeInit(chart) {
     const date = (_adapters as any)?._date;
+    if (!date || typeof date.parse !== 'function') return; // guard
     (chart.options as any).adapters = (chart.options as any).adapters ?? {};
     (chart.options as any).adapters.date = (chart.options as any).adapters.date ?? date;
   },
   beforeUpdate(chart) {
     const date = (_adapters as any)?._date;
+    if (!date || typeof date.parse !== 'function') return; // guard
     const scales = (chart.options as any).scales;
     if (!scales) return;
     for (const key of Object.keys(scales)) {
