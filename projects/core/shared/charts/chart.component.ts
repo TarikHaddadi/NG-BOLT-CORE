@@ -1,6 +1,7 @@
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   ElementRef,
@@ -50,8 +51,8 @@ type TimeUnit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'month';
       }
       .pxs-chart-wrap {
         width: 100%;
-        height: var(--pxs-chart-h, 300px); /* default 300px */
-        overflow: hidden; /* avoid accidental overflow */
+        height: var(--pxs-chart-h, 300px);
+        overflow: hidden;
       }
       .pxs-chart-wrap > canvas {
         display: block;
@@ -64,6 +65,7 @@ type TimeUnit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'month';
 export class ChartComponent<TType extends ChartType = ChartType>
   implements AfterViewInit, OnChanges
 {
+  private cdr = inject(ChangeDetectorRef);
   private translate = inject(TranslateService, { optional: true });
   private destroyRef = inject(DestroyRef);
   private zone = inject(NgZone);
@@ -304,6 +306,7 @@ export class ChartComponent<TType extends ChartType = ChartType>
     this.translate.onLangChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(({ lang }) => {
       this.applyDateLocale(lang);
       this.refreshForStyling();
+      this.cdr.markForCheck();
     });
 
     // Language (prefer your own NgRx selector; fallback to TranslateService)
@@ -311,6 +314,7 @@ export class ChartComponent<TType extends ChartType = ChartType>
     lang$.pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe((lang) => {
       this.applyDateLocale(lang);
       this.refreshForStyling();
+      this.cdr.markForCheck();
     });
   }
 
@@ -333,7 +337,10 @@ export class ChartComponent<TType extends ChartType = ChartType>
     this.store
       .select(AppSelectors.ThemeSelectors.selectIsDark)
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.refreshForStyling());
+      .subscribe(() => {
+        this.refreshForStyling();
+        this.cdr.markForCheck();
+      });
   }
 
   private refreshForStyling() {
