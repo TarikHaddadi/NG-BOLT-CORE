@@ -4,7 +4,11 @@
     @if (enableGlobalFilter) {
       <mat-form-field appearance="outline" class="global-filter">
         <mat-icon matPrefix>search</mat-icon>
-        <input matInput [placeholder]="globalFilterPlaceholder" [formControl]="globalFilter" />
+        <input
+          matInput
+          [placeholder]="globalFilterPlaceholder | translate"
+          [formControl]="globalFilter"
+        />
         @if (globalFilter.value) {
           <button mat-icon-button matSuffix (click)="globalFilter.setValue('')">
             <mat-icon>close</mat-icon>
@@ -17,19 +21,21 @@
 
     <!-- Column toggler -->
     <button mat-button [matMenuTriggerFor]="colMenu">
-      <mat-icon>view_column</mat-icon> Columns
+      <mat-icon>view_column</mat-icon> {{ 'table.columns' | translate }}
     </button>
     <mat-menu #colMenu="matMenu">
       @for (c of menuColumns(); track trackCol($index, c)) {
         <button mat-menu-item (click)="toggleColumn(c.id)">
-          <mat-checkbox [checked]="isVisible(c.id)">{{ c.header || c.id }}</mat-checkbox>
+          <mat-checkbox [checked]="isVisible(c.id)">{{
+            c.header || c.id | translate
+          }}</mat-checkbox>
         </button>
       }
     </mat-menu>
   </div>
 
   @if (enableReorder) {
-    <div class="hint">Drag headers to reorder columns</div>
+    <div class="hint">{{ 'table.hint.reorder' | translate }}</div>
   }
 
   <div class="table-wrap" [class.sticky-header]="stickyHeader" [class.sticky-footer]="stickyFooter">
@@ -89,7 +95,7 @@
                   [attr.data-colid]="c.id"
                 >
                   <div class="header-cell">
-                    <span class="label">{{ c.header || c.id }}</span>
+                    <span class="label">{{ c.header || c.id | translate }}</span>
                     @if (isFilterable(c)) {
                       <button
                         mat-icon-button
@@ -124,7 +130,7 @@
                   [style.maxWidth]="toCss(c.maxWidth)"
                 >
                   <div class="header-cell">
-                    <span class="label">{{ c.header || c.id }}</span>
+                    <span class="label">{{ c.header || c.id | translate }}</span>
                     @if (isFilterable(c)) {
                       <button
                         mat-icon-button
@@ -178,7 +184,7 @@
                         [disabled]="b.disabledWhen?.(row)"
                         [color]="b.color"
                         (click)="action.emit({ id: b.id, row })"
-                        [matTooltip]="b.tooltip || b.label"
+                        [matTooltip]="b.tooltip || b.label | translate"
                       >
                         <mat-icon>{{ b.icon }}</mat-icon>
                       </button>
@@ -210,7 +216,7 @@
                   [attr.data-colid]="c.id"
                 >
                   <div class="header-cell">
-                    <span class="label">{{ c.header || c.id }}</span>
+                    <span class="label">{{ c.header || c.id | translate }}</span>
                     @if (isFilterable(c)) {
                       <button
                         mat-icon-button
@@ -245,7 +251,7 @@
                   [style.maxWidth]="toCss(c.maxWidth)"
                 >
                   <div class="header-cell">
-                    <span class="label">{{ c.header || c.id }}</span>
+                    <span class="label">{{ c.header || c.id | translate }}</span>
                     @if (isFilterable(c)) {
                       <button
                         mat-icon-button
@@ -299,7 +305,7 @@
                         [disabled]="b.disabledWhen?.(row)"
                         [color]="b.color"
                         (click)="action.emit({ id: b.id, row })"
-                        [matTooltip]="b.tooltip || b.label"
+                        [matTooltip]="b.tooltip || b.label | translate"
                       >
                         <mat-icon>{{ b.icon }}</mat-icon>
                       </button>
@@ -331,7 +337,7 @@
                   [attr.data-colid]="c.id"
                 >
                   <div class="header-cell">
-                    <span class="label">{{ c.header || c.id }}</span>
+                    <span class="label">{{ c.header || c.id | translate }}</span>
                     @if (isFilterable(c)) {
                       <button
                         mat-icon-button
@@ -366,7 +372,7 @@
                   [style.maxWidth]="toCss(c.maxWidth)"
                 >
                   <div class="header-cell">
-                    <span class="label">{{ c.header || c.id }}</span>
+                    <span class="label">{{ c.header || c.id | translate }}</span>
                     @if (isFilterable(c)) {
                       <button
                         mat-icon-button
@@ -420,7 +426,7 @@
                         [disabled]="b.disabledWhen?.(row)"
                         [color]="b.color"
                         (click)="action.emit({ id: b.id, row })"
-                        [matTooltip]="b.tooltip || b.label"
+                        [matTooltip]="b.tooltip || b.label | translate"
                       >
                         <mat-icon>{{ b.icon }}</mat-icon>
                       </button>
@@ -505,9 +511,9 @@
       (click)="$event.stopPropagation()"
       (mousedown)="$event.stopPropagation()"
     >
-      <div class="title">Filter: {{ activeFilterColumn() }}</div>
+      <div class="title">{{ 'table.filter' | translate }}: {{ activeFilterColumn() }}</div>
       <mat-form-field appearance="outline">
-        <mat-label>Contains</mat-label>
+        <mat-label>{{ 'table.filter.contains' | translate }}</mat-label>
         <input matInput [formControl]="columnFilterInput" />
         @if (columnFilterInput.value) {
           <button mat-icon-button matSuffix (click)="columnFilterInput.setValue('')">

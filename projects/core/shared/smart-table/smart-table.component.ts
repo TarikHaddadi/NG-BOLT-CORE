@@ -12,6 +12,7 @@ import {
   EventEmitter,
   HostBinding,
   inject,
+  Injectable,
   Input,
   NgZone,
   OnInit,
@@ -25,23 +26,56 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatRippleModule } from '@angular/material/core';
+import { DateAdapter } from '@angular/material/core';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import {
+  MatPaginator,
+  MatPaginatorIntl,
+  MatPaginatorModule,
+  PageEvent,
+} from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatTable, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTreeModule } from '@angular/material/tree';
 import { Store } from '@ngrx/store';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { catchError, debounceTime, distinctUntilChanged, map, of, tap } from 'rxjs';
 
 import { ServerPage, SmartColumn } from '@cadai/pxs-ng-core/interfaces';
 import { HttpService } from '@cadai/pxs-ng-core/services';
 import { AppSelectors } from '@cadai/pxs-ng-core/store';
+
+/* -------------------------------------------
+ * Paginator i18n that reacts to language changes
+ * ------------------------------------------*/
+@Injectable()
+export class I18nPaginatorIntl extends MatPaginatorIntl {
+  constructor(private t: TranslateService) {
+    super();
+    this._update();
+    this.t.onLangChange.subscribe(() => this._update());
+  }
+  private _update() {
+    this.itemsPerPageLabel = this.t.instant('table.paginator.itemsPerPage');
+    this.nextPageLabel = this.t.instant('table.paginator.nextPage');
+    this.previousPageLabel = this.t.instant('table.paginator.prevPage');
+    this.firstPageLabel = this.t.instant('table.paginator.firstPage');
+    this.lastPageLabel = this.t.instant('table.paginator.lastPage');
+    this.getRangeLabel = (page, pageSize, length) => {
+      if (length === 0 || pageSize === 0) return this.t.instant('table.paginator.rangeEmpty');
+      const start = page * pageSize + 1;
+      const end = Math.min((page + 1) * pageSize, length);
+      return this.t.instant('table.paginator.range', { start, end, length });
+    };
+    this.changes.next();
+  }
+}
 
 @Component({
   selector: 'app-smart-table',
@@ -67,7 +101,9 @@ import { AppSelectors } from '@cadai/pxs-ng-core/store';
     MatDividerModule,
     MatRippleModule,
     DragDropModule,
+    TranslateModule,
   ],
+  providers: [{ provide: MatPaginatorIntl, useClass: I18nPaginatorIntl }],
   templateUrl: './smart-table.component.html',
   styleUrls: ['./smart-table.component.scss'],
 })
@@ -86,7 +122,7 @@ export class SmartTableComponent implements OnInit {
   @Input() stickyFooter = false;
   @Input() rippleRows = true;
   @Input() enableGlobalFilter = true;
-  @Input() globalFilterPlaceholder = 'Search…';
+  @Input() globalFilterPlaceholder = 'table.searchPlaceholder'; // i18n key by default
   @Input() columnFilterEnabled = false; // server supports f_{col}
   @Input() enableReorder = true;
   @Input() multiSelect = true;
@@ -115,9 +151,9 @@ export class SmartTableComponent implements OnInit {
   private _allColumns = signal<SmartColumn[]>([]);
   allColumns = computed(() => this._allColumns());
 
-  // *** NEW: Persistent order and hidden set ***
-  private _masterOrder = signal<string[]>([]); // full list (no 'select'/'tree'), remembers last known order
-  private _hidden = signal<Set<string>>(new Set()); // hidden ids
+  // Persistent order and hidden set
+  private _masterOrder = signal<string[]>([]);
+  private _hidden = signal<Set<string>>(new Set());
 
   private _data = signal<any[]>([]);
   private _flatData = signal<any[]>([]);
@@ -141,18 +177,21 @@ export class SmartTableComponent implements OnInit {
   private _expanded = new Set<any>();
   private idOf = (obj: any) => this.valueAt(obj, this.idKey);
 
-  // Revision to force mat-table refresh in a safe way
+  // bump revision to prod a mat-table rerender (safe)
   private _rev = signal(0);
   rev = computed(() => this._rev());
 
   isStickyStart = (id: string) => !!this._allColumns().find((c) => c.id === id)?.sticky;
-
   isStickyEnd = (id: string) => !!this._allColumns().find((c) => c.id === id)?.stickyEnd;
 
   // Theming
   @HostBinding('class.dark-theme') isDark$ = false;
   private store = inject(Store);
   private destroyRef = inject(DestroyRef);
+
+  // i18n
+  private translate = inject(TranslateService);
+  private dateAdapter = inject(DateAdapter, { optional: true });
 
   constructor() {
     // Normalize columns + build master order, hidden stays intact
@@ -178,13 +217,12 @@ export class SmartTableComponent implements OnInit {
         .filter((c) => (c.visible ?? true) && c.id !== 'select' && c.id !== 'tree')
         .map((c) => c.id);
 
-      // Reconcile _masterOrder with allowed
+      // master order reconcile
       const current = this._masterOrder();
       let next: string[];
       if (!current.length) {
         next = [...allowed];
       } else {
-        // keep existing order, drop removed, append new
         next = [
           ...current.filter((id) => allowed.includes(id)),
           ...allowed.filter((id) => !current.includes(id)),
@@ -194,7 +232,7 @@ export class SmartTableComponent implements OnInit {
         this._masterOrder.set(next);
       }
 
-      // Auto-unhide ids that no longer exist
+      // cleanup hidden set (drop ids that no longer exist)
       const hidden = new Set(this._hidden());
       let changedHidden = false;
       Array.from(hidden).forEach((id) => {
@@ -205,7 +243,7 @@ export class SmartTableComponent implements OnInit {
       });
       if (changedHidden) this._hidden.set(hidden);
 
-      // bump rev
+      // bump rev + recompute displayed
       this._rev.update((n) => n + 1);
       this.displayedColumns = this.computeDisplayedColumns();
       this.cdr.markForCheck();
@@ -235,12 +273,41 @@ export class SmartTableComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // theme
     this.store
       .select(AppSelectors.ThemeSelectors.selectIsDark)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((data) => {
-        this.isDark$ = data;
+      .subscribe((isDark) => {
+        this.isDark$ = isDark;
         this.cdr.markForCheck();
+      });
+
+    // i18n reactivity
+    this.setupLangReactivity();
+  }
+
+  private setupLangReactivity() {
+    if (!this.translate) return;
+
+    // Update UI when ngx-translate language changes (pipes, paginator)
+    this.translate.onLangChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.dateAdapter?.setLocale?.(this.translate.currentLang);
+      this.cdr.markForCheck();
+      queueMicrotask(() => this.table?.renderRows?.());
+    });
+
+    // Store → TranslateService.use(lang) and optional data refresh
+    this.store
+      .select(AppSelectors.LangSelectors.selectLang)
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((lang) => {
+        if (lang) {
+          this.translate.use(lang);
+          this.dateAdapter?.setLocale?.(lang);
+          if (this.serverSide) this.refresh(); // fetch localized data if API supports it
+          queueMicrotask(() => this.table?.renderRows?.());
+          this.cdr.markForCheck();
+        }
       });
   }
 
@@ -456,14 +523,13 @@ export class SmartTableComponent implements OnInit {
     this.selection.toggle(row);
   }
 
-  // Toggle show/hide of columns — uses persistent order and a hidden set
+  // Show/hide columns — position preserved
   toggleColumn(id: string) {
     const hidden = new Set(this._hidden());
     if (hidden.has(id)) hidden.delete(id);
     else hidden.add(id);
     this._hidden.set(hidden);
 
-    // Recompute displayed from master (position preserved)
     this.displayedColumns = this.computeDisplayedColumns();
     this.bumpRevAndRecalcSticky();
   }
@@ -471,11 +537,11 @@ export class SmartTableComponent implements OnInit {
     return !this._hidden().has(id);
   }
 
-  // Column reorder via header drag — apply to master order (visible, but reflected to master)
+  // Reorder via header drag
   dropHeader(event: CdkDragDrop<string[]>) {
     if (!this.enableReorder) return;
 
-    const dragIds = event.container.data as string[]; // visible + draggable ids in current order
+    const dragIds = event.container.data as string[];
     const from = event.previousIndex;
     const to = event.currentIndex;
     if (from === to || from < 0 || to < 0 || from >= dragIds.length || to >= dragIds.length) {
@@ -483,12 +549,9 @@ export class SmartTableComponent implements OnInit {
       return;
     }
 
-    // reorder draggable slice
     const nextDrag = [...dragIds];
     moveItemInArray(nextDrag, from, to);
 
-    // Merge back into MASTER order:
-    // - Walk master; for ids that are in dragIds, pop next from nextDrag; else keep as-is.
     const master = [...this._masterOrder()];
     const dragSet = new Set(dragIds);
     let di = 0;
@@ -496,7 +559,6 @@ export class SmartTableComponent implements OnInit {
 
     this.zone.run(() => {
       this._masterOrder.set(nextMaster);
-      // visible -> filter by hidden
       this.displayedColumns = this.computeDisplayedColumns();
 
       this.cdr.detectChanges();
@@ -543,6 +605,7 @@ export class SmartTableComponent implements OnInit {
   toCss(w: any) {
     return typeof w === 'number' ? `${w}px` : w || null;
   }
+
   buildParams(opts: {
     pageIndex: number;
     pageSize: number;
@@ -558,6 +621,9 @@ export class SmartTableComponent implements OnInit {
         if (v) p = p.set(`f_${k}`, v);
       });
     }
+    // include current lang for server localization (optional)
+    const lang = this.translate?.currentLang || this.translate?.getDefaultLang() || 'en';
+    p = p.set('lang', lang);
     return p;
   }
 }
