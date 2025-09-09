@@ -21,7 +21,7 @@ import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
     <div class="toggle-field">
       <mat-slide-toggle
         [formControl]="fc"
-        [color]="field.color || 'accent'"
+        [color]="field.color || 'primary'"
         [class]="field.layoutClass?.concat(' w-full') || 'w-full'"
         [attr.aria-label]="field.label | translate"
         [attr.aria-checked]="fc.value"

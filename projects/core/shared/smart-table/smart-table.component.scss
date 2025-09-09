@@ -1,0 +1,206 @@
+/* ===========================
+   PXS Smart Table — SCSS Refactor
+   - Theme via CSS vars (dark overrides with :host-context(.dark-theme))
+   - De-duplicated sticky/z-index rules
+   - Clear sections + consistent naming
+   =========================== */
+
+$z-sticky-base: 10;
+$z-sticky-footer: 12;
+$z-sticky-header: 13;
+
+/* ---------- Host-scoped variables ---------- */
+:host {
+  display: block;
+
+  /* Surface + borders */
+  --pxs-outline-variant: var(--mat-sys-outline-variant, rgba(0, 0, 0, 0.12));
+  --pxs-sticky-bg: var(--mat-sys-surface, #fff);
+
+  /* Zebra rows */
+  --pxs-row-even: var(--mat-sys-surface);
+  --pxs-row-odd: var(--mat-sys-surface-container-low);
+
+  /* Indented child mask */
+  --pxs-child-mask: color-mix(in oklab, var(--mat-sys-on-surface) 8%, transparent);
+
+  /* Radii / sizing */
+  --pxs-radius: 12px;
+  --pxs-table-height: 600px;
+}
+
+/* Only override variables for dark theme; keep rules DRY */
+:host-context(.dark-theme) {
+  --pxs-sticky-bg: var(--mat-sys-surface, #575656);
+  --pxs-child-mask: color-mix(in oklab, var(--mat-sys-on-surface) 12%, transparent);
+}
+
+/* ---------- Layout wrappers ---------- */
+.pxs-smart-table {
+  position: relative;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.global-filter {
+  width: 340px;
+  max-width: 100%;
+}
+
+.hint {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin-bottom: 0.25rem;
+}
+
+.table-wrap {
+  position: relative;
+  border-radius: var(--pxs-radius);
+  overflow: auto;
+  border: 1px solid var(--pxs-outline-variant);
+  height: var(--pxs-table-height);
+  min-height: var(--pxs-table-height);
+}
+
+/* ---------- Table base ---------- */
+table {
+  min-width: 1200px;
+  width: 100%;
+  border-spacing: 0;
+}
+
+td.mat-mdc-cell,
+th.mat-mdc-header-cell {
+  white-space: nowrap;
+}
+
+/* Header base bg */
+th.mat-mdc-header-cell {
+  background: var(--mat-sys-surface-container-high, var(--mat-sys-surface));
+  z-index: $z-sticky-header;
+}
+
+/* ---------- Interactions ---------- */
+.hoverable td {
+  cursor: pointer;
+}
+
+td.mat-mdc-cell[matRipple] {
+  position: relative;
+}
+
+.sel-col {
+  width: 56px;
+  text-align: center;
+}
+
+.tree-col {
+  width: 44px;
+}
+
+.tree-indent {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-left: calc((var(--level, 0)) * 16px);
+}
+
+.col-filter {
+  padding: 0.5rem 1rem 0.75rem;
+  width: 280px;
+}
+
+.loading .table-wrap {
+  opacity: 0.85;
+}
+
+/* Hover tint */
+.hoverable td:hover {
+  background: color-mix(in oklab, var(--mat-sys-primary) 8%, transparent);
+}
+
+/* ---------- Drag & drop (header) ---------- */
+.drag-handle {
+  cursor: grab;
+}
+
+th.mat-mdc-header-cell.cdk-drag-preview {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+}
+
+th.mat-mdc-header-cell.cdk-drag-placeholder {
+  visibility: hidden;
+}
+
+.cdk-drag-preview {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  border-radius: 8px;
+}
+
+/* While dragging, let CDK position headers; cancel sticky offsets */
+tr.mat-mdc-header-row.dragging th.mat-mdc-header-cell {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+}
+
+/* ---------- Sticky handling ---------- */
+.mat-mdc-table .mat-mdc-table-sticky {
+  background: var(--pxs-sticky-bg) !important; /* avoid transparent stripes */
+  z-index: $z-sticky-base;
+}
+
+.mat-mdc-header-row .mat-mdc-header-cell.mat-mdc-table-sticky {
+  z-index: $z-sticky-header;
+}
+
+.mat-mdc-footer-row .mat-mdc-footer-cell.mat-mdc-table-sticky {
+  z-index: $z-sticky-footer;
+  border-top: 1px solid var(--pxs-outline-variant);
+}
+
+.sticky-end {
+  position: sticky;
+  right: 0;
+}
+
+/* ---------- Row backgrounds ---------- */
+/* Preferred: zebra by root parity when data-root is present */
+tr.mat-mdc-row[data-root='even'] td {
+  background-color: var(--pxs-row-even);
+}
+tr.mat-mdc-row[data-root='odd'] td {
+  background-color: var(--pxs-row-odd);
+}
+
+/* Fallback zebra if no data-root attribute is set */
+tbody tr.mat-mdc-row:not([data-root]):nth-child(even) td {
+  background-color: var(--pxs-row-even);
+}
+tbody tr.mat-mdc-row:not([data-root]):nth-child(odd) td {
+  background-color: var(--pxs-row-odd);
+}
+
+/* Child rows (level > 0) get a subtle mask overlay */
+tr.mat-mdc-row[data-level]:not([data-level='0']) td {
+  background-image: linear-gradient(var(--pxs-child-mask), var(--pxs-child-mask));
+  background-blend-mode: multiply;
+}
+
+/* ---------- Header content layout ---------- */
+.header-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}

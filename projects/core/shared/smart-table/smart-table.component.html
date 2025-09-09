@@ -1,0 +1,520 @@
+<div class="pxs-smart-table" [class.loading]="loading()">
+  <!-- Toolbar -->
+  <div class="toolbar">
+    @if (enableGlobalFilter) {
+      <mat-form-field appearance="outline" class="global-filter">
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput [placeholder]="globalFilterPlaceholder" [formControl]="globalFilter" />
+        @if (globalFilter.value) {
+          <button mat-icon-button matSuffix (click)="globalFilter.setValue('')">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+    }
+
+    <span class="spacer"></span>
+
+    <!-- Column toggler -->
+    <button mat-button [matMenuTriggerFor]="colMenu">
+      <mat-icon>view_column</mat-icon> Columns
+    </button>
+    <mat-menu #colMenu="matMenu">
+      @for (c of menuColumns(); track trackCol($index, c)) {
+        <button mat-menu-item (click)="toggleColumn(c.id)">
+          <mat-checkbox [checked]="isVisible(c.id)">{{ c.header || c.id }}</mat-checkbox>
+        </button>
+      }
+    </mat-menu>
+  </div>
+
+  @if (enableReorder) {
+    <div class="hint">Drag headers to reorder columns</div>
+  }
+
+  <div class="table-wrap" [class.sticky-header]="stickyHeader" [class.sticky-footer]="stickyFooter">
+    <table
+      mat-table
+      [dataSource]="tableData()"
+      matSort
+      (matSortChange)="onSort($event)"
+      [attr.data-rev]="rev()"
+    >
+      <!-- Selection column -->
+      @if (hasSelection) {
+        <ng-container
+          matColumnDef="select"
+          [sticky]="isStickyStart('select')"
+          [stickyEnd]="isStickyEnd('select')"
+        >
+          <th mat-header-cell *matHeaderCellDef class="sel-col" [style.width.px]="56">
+            <mat-checkbox
+              (change)="masterToggle()"
+              [checked]="isAllSelected()"
+              [indeterminate]="selection.hasValue() && !isAllSelected()"
+              aria-label="Select all rows"
+            >
+            </mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let row" class="sel-col">
+            <mat-checkbox
+              (click)="$event.stopPropagation()"
+              (change)="toggleRow(row)"
+              [checked]="selection.isSelected(row)"
+              aria-label="Select row"
+            >
+            </mat-checkbox>
+          </td>
+          <td mat-footer-cell *matFooterCellDef class="sel-col"></td>
+        </ng-container>
+      }
+
+      <!-- Dynamic data columns -->
+      @for (c of visibleColumns(); track trackCol($index, c)) {
+        @switch (stickyCase(c)) {
+          @case ('start') {
+            <ng-container [matColumnDef]="c.id" sticky>
+              @if (c.draggable !== false) {
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header
+                  [disabled]="dragging || !c.sortable"
+                  cdkDrag
+                  (cdkDragStarted)="onHeaderDragStart()"
+                  (cdkDragEnded)="onHeaderDragEnd()"
+                  cdkDragLockAxis="x"
+                  [cdkDragData]="c.id"
+                  [cdkDragDisabled]="!enableReorder || c._menuOpen"
+                  [attr.data-colid]="c.id"
+                >
+                  <div class="header-cell">
+                    <span class="label">{{ c.header || c.id }}</span>
+                    @if (isFilterable(c)) {
+                      <button
+                        mat-icon-button
+                        #filterTrig="matMenuTrigger"
+                        [matMenuTriggerFor]="colFilterMenu"
+                        [matMenuTriggerRestoreFocus]="false"
+                        (menuOpened)="c._menuOpen = true"
+                        (menuClosed)="c._menuOpen = false"
+                        (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+                        (click)="
+                          $event.stopPropagation();
+                          setActiveFilterColumn(c.id);
+                          filterTrig.openMenu()
+                        "
+                      >
+                        <mat-icon>filter_list</mat-icon>
+                      </button>
+                    }
+                    <button class="drag-handle" mat-icon-button cdkDragHandle>
+                      <mat-icon>drag_indicator</mat-icon>
+                    </button>
+                  </div>
+                </th>
+              } @else {
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header
+                  [disabled]="!c.sortable || c._menuOpen"
+                  [style.width]="toCss(c.width)"
+                  [style.minWidth]="toCss(c.minWidth)"
+                  [style.maxWidth]="toCss(c.maxWidth)"
+                >
+                  <div class="header-cell">
+                    <span class="label">{{ c.header || c.id }}</span>
+                    @if (isFilterable(c)) {
+                      <button
+                        mat-icon-button
+                        #filterTrig="matMenuTrigger"
+                        [matMenuTriggerFor]="colFilterMenu"
+                        [matMenuTriggerRestoreFocus]="false"
+                        (menuOpened)="c._menuOpen = true"
+                        (menuClosed)="c._menuOpen = false"
+                        (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+                        (click)="
+                          $event.stopPropagation();
+                          setActiveFilterColumn(c.id);
+                          filterTrig.openMenu()
+                        "
+                      >
+                        <mat-icon>filter_list</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </th>
+              }
+              <td
+                mat-cell
+                *matCellDef="let row"
+                [class]="cellClass(c, row)"
+                matRipple
+                (click)="onRowClick(row)"
+                [matRippleDisabled]="!rippleRows"
+              >
+                @switch (c.type) {
+                  @case ('text') {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                  @case ('number') {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                  @case ('date') {
+                    <span>{{ resolveValue(c, row) | date: c.format || 'mediumDate' }}</span>
+                  }
+                  @case ('chip') {
+                    <mat-chip-set>
+                      @for (v of asArray(resolveValue(c, row)); track v) {
+                        <mat-chip>{{ v }}</mat-chip>
+                      }
+                    </mat-chip-set>
+                  }
+                  @case ('actions') {
+                    @for (b of c.cellButtons || []; track b.id) {
+                      <button
+                        mat-icon-button
+                        [disabled]="b.disabledWhen?.(row)"
+                        [color]="b.color"
+                        (click)="action.emit({ id: b.id, row })"
+                        [matTooltip]="b.tooltip || b.label"
+                      >
+                        <mat-icon>{{ b.icon }}</mat-icon>
+                      </button>
+                    }
+                  }
+                  @default {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                }
+              </td>
+              <td mat-footer-cell *matFooterCellDef></td>
+            </ng-container>
+          }
+
+          @case ('end') {
+            <ng-container [matColumnDef]="c.id" stickyEnd>
+              @if (c.draggable !== false) {
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header
+                  [disabled]="dragging || !c.sortable"
+                  cdkDrag
+                  (cdkDragStarted)="onHeaderDragStart()"
+                  (cdkDragEnded)="onHeaderDragEnd()"
+                  cdkDragLockAxis="x"
+                  [cdkDragData]="c.id"
+                  [cdkDragDisabled]="!enableReorder || c._menuOpen"
+                  [attr.data-colid]="c.id"
+                >
+                  <div class="header-cell">
+                    <span class="label">{{ c.header || c.id }}</span>
+                    @if (isFilterable(c)) {
+                      <button
+                        mat-icon-button
+                        #filterTrig="matMenuTrigger"
+                        [matMenuTriggerFor]="colFilterMenu"
+                        [matMenuTriggerRestoreFocus]="false"
+                        (menuOpened)="c._menuOpen = true"
+                        (menuClosed)="c._menuOpen = false"
+                        (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+                        (click)="
+                          $event.stopPropagation();
+                          setActiveFilterColumn(c.id);
+                          filterTrig.openMenu()
+                        "
+                      >
+                        <mat-icon>filter_list</mat-icon>
+                      </button>
+                    }
+                    <button class="drag-handle" mat-icon-button cdkDragHandle>
+                      <mat-icon>drag_indicator</mat-icon>
+                    </button>
+                  </div>
+                </th>
+              } @else {
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header
+                  [disabled]="!c.sortable || c._menuOpen"
+                  [style.width]="toCss(c.width)"
+                  [style.minWidth]="toCss(c.minWidth)"
+                  [style.maxWidth]="toCss(c.maxWidth)"
+                >
+                  <div class="header-cell">
+                    <span class="label">{{ c.header || c.id }}</span>
+                    @if (isFilterable(c)) {
+                      <button
+                        mat-icon-button
+                        #filterTrig="matMenuTrigger"
+                        [matMenuTriggerFor]="colFilterMenu"
+                        [matMenuTriggerRestoreFocus]="false"
+                        (menuOpened)="c._menuOpen = true"
+                        (menuClosed)="c._menuOpen = false"
+                        (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+                        (click)="
+                          $event.stopPropagation();
+                          setActiveFilterColumn(c.id);
+                          filterTrig.openMenu()
+                        "
+                      >
+                        <mat-icon>filter_list</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </th>
+              }
+              <td
+                mat-cell
+                *matCellDef="let row"
+                [class]="cellClass(c, row)"
+                matRipple
+                (click)="onRowClick(row)"
+                [matRippleDisabled]="!rippleRows"
+              >
+                @switch (c.type) {
+                  @case ('text') {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                  @case ('number') {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                  @case ('date') {
+                    <span>{{ resolveValue(c, row) | date: c.format || 'mediumDate' }}</span>
+                  }
+                  @case ('chip') {
+                    <mat-chip-set>
+                      @for (v of asArray(resolveValue(c, row)); track v) {
+                        <mat-chip>{{ v }}</mat-chip>
+                      }
+                    </mat-chip-set>
+                  }
+                  @case ('actions') {
+                    @for (b of c.cellButtons || []; track b.id) {
+                      <button
+                        mat-icon-button
+                        [disabled]="b.disabledWhen?.(row)"
+                        [color]="b.color"
+                        (click)="action.emit({ id: b.id, row })"
+                        [matTooltip]="b.tooltip || b.label"
+                      >
+                        <mat-icon>{{ b.icon }}</mat-icon>
+                      </button>
+                    }
+                  }
+                  @default {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                }
+              </td>
+              <td mat-footer-cell *matFooterCellDef></td>
+            </ng-container>
+          }
+
+          @default {
+            <ng-container [matColumnDef]="c.id">
+              @if (c.draggable !== false) {
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header
+                  [disabled]="dragging || !c.sortable"
+                  cdkDrag
+                  (cdkDragStarted)="onHeaderDragStart()"
+                  (cdkDragEnded)="onHeaderDragEnd()"
+                  cdkDragLockAxis="x"
+                  [cdkDragData]="c.id"
+                  [cdkDragDisabled]="!enableReorder || c._menuOpen"
+                  [attr.data-colid]="c.id"
+                >
+                  <div class="header-cell">
+                    <span class="label">{{ c.header || c.id }}</span>
+                    @if (isFilterable(c)) {
+                      <button
+                        mat-icon-button
+                        #filterTrig="matMenuTrigger"
+                        [matMenuTriggerFor]="colFilterMenu"
+                        [matMenuTriggerRestoreFocus]="false"
+                        (menuOpened)="c._menuOpen = true"
+                        (menuClosed)="c._menuOpen = false"
+                        (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+                        (click)="
+                          $event.stopPropagation();
+                          setActiveFilterColumn(c.id);
+                          filterTrig.openMenu()
+                        "
+                      >
+                        <mat-icon>filter_list</mat-icon>
+                      </button>
+                    }
+                    <button class="drag-handle" mat-icon-button cdkDragHandle>
+                      <mat-icon>drag_indicator</mat-icon>
+                    </button>
+                  </div>
+                </th>
+              } @else {
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header
+                  [disabled]="!c.sortable || c._menuOpen"
+                  [style.width]="toCss(c.width)"
+                  [style.minWidth]="toCss(c.minWidth)"
+                  [style.maxWidth]="toCss(c.maxWidth)"
+                >
+                  <div class="header-cell">
+                    <span class="label">{{ c.header || c.id }}</span>
+                    @if (isFilterable(c)) {
+                      <button
+                        mat-icon-button
+                        #filterTrig="matMenuTrigger"
+                        [matMenuTriggerFor]="colFilterMenu"
+                        [matMenuTriggerRestoreFocus]="false"
+                        (menuOpened)="c._menuOpen = true"
+                        (menuClosed)="c._menuOpen = false"
+                        (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+                        (click)="
+                          $event.stopPropagation();
+                          setActiveFilterColumn(c.id);
+                          filterTrig.openMenu()
+                        "
+                      >
+                        <mat-icon>filter_list</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </th>
+              }
+              <td
+                mat-cell
+                *matCellDef="let row"
+                [class]="cellClass(c, row)"
+                matRipple
+                (click)="onRowClick(row)"
+                [matRippleDisabled]="!rippleRows"
+              >
+                @switch (c.type) {
+                  @case ('text') {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                  @case ('number') {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                  @case ('date') {
+                    <span>{{ resolveValue(c, row) | date: c.format || 'mediumDate' }}</span>
+                  }
+                  @case ('chip') {
+                    <mat-chip-set>
+                      @for (v of asArray(resolveValue(c, row)); track v) {
+                        <mat-chip>{{ v }}</mat-chip>
+                      }
+                    </mat-chip-set>
+                  }
+                  @case ('actions') {
+                    @for (b of c.cellButtons || []; track b.id) {
+                      <button
+                        mat-icon-button
+                        [disabled]="b.disabledWhen?.(row)"
+                        [color]="b.color"
+                        (click)="action.emit({ id: b.id, row })"
+                        [matTooltip]="b.tooltip || b.label"
+                      >
+                        <mat-icon>{{ b.icon }}</mat-icon>
+                      </button>
+                    }
+                  }
+                  @default {
+                    <span>{{ resolveValue(c, row) }}</span>
+                  }
+                }
+              </td>
+              <td mat-footer-cell *matFooterCellDef></td>
+            </ng-container>
+          }
+        }
+      }
+
+      <!-- Tree toggle column -->
+      @if (enableTree) {
+        <ng-container matColumnDef="tree" sticky>
+          <th mat-header-cell *matHeaderCellDef class="tree-col">
+            <mat-icon>account_tree</mat-icon>
+          </th>
+          <td mat-cell *matCellDef="let row" class="tree-col">
+            <div class="tree-indent" [style.--level]="row.level || 0">
+              @if (row.expandable) {
+                <button mat-icon-button (click)="toggleNode(row); $event.stopPropagation()">
+                  <mat-icon>{{ isExpanded(row) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+                </button>
+              }
+            </div>
+          </td>
+          <td mat-footer-cell *matFooterCellDef class="tree-col"></td>
+        </ng-container>
+      }
+
+      <!-- Header + rows -->
+      <tr
+        mat-header-row
+        *matHeaderRowDef="displayedColumns; sticky: stickyHeader"
+        cdkDropList
+        cdkDropListOrientation="horizontal"
+        cdkDropListLockAxis="x"
+        [cdkDropListData]="draggableHeaderIds()"
+        cdkDropListSortingDisabled="true"
+        (cdkDropListDropped)="dropHeader($event)"
+        [class.dragging]="dragging"
+      ></tr>
+
+      <tr
+        mat-row
+        *matRowDef="let row; columns: displayedColumns"
+        [attr.data-level]="row.level || 0"
+        [attr.data-root]="row.__rootParity || 'even'"
+        [class.hoverable]="rippleRows"
+      ></tr>
+
+      <tr mat-footer-row *matFooterRowDef="displayedColumns; sticky: stickyFooter"></tr>
+    </table>
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
+  </div>
+
+  <!-- Top paginator bar -->
+  <div class="paginator-bar paginator-top">
+    <mat-paginator
+      [length]="total()"
+      [pageSize]="pageSize"
+      [pageIndex]="pageIndex()"
+      [pageSizeOptions]="pageSizeOptions"
+      (page)="onPage($event)"
+      [showFirstLastButtons]="true"
+    >
+    </mat-paginator>
+  </div>
+
+  <!-- Column filter menu -->
+  <mat-menu #colFilterMenu="matMenu" [overlapTrigger]="false">
+    <div
+      class="col-filter"
+      (click)="$event.stopPropagation()"
+      (mousedown)="$event.stopPropagation()"
+    >
+      <div class="title">Filter: {{ activeFilterColumn() }}</div>
+      <mat-form-field appearance="outline">
+        <mat-label>Contains</mat-label>
+        <input matInput [formControl]="columnFilterInput" />
+        @if (columnFilterInput.value) {
+          <button mat-icon-button matSuffix (click)="columnFilterInput.setValue('')">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+    </div>
+  </mat-menu>
+</div>

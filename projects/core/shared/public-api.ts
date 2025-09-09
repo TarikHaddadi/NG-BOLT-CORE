@@ -1,4 +1,4 @@
-export { PxsChartComponent } from './charts/chart.component';
+export { ChartComponent } from './charts/chart.component';
 export { ConfirmDialogComponent } from './dialog/dialog.component';
 export { ForbiddenComponent } from './forbidden/forbidden.component';
 export { DynamicFormComponent } from './forms/dynamic-form.component';
@@ -14,3 +14,4 @@ export { ToggleComponent } from './forms/fields/toggle/toggle.component';
 export { AppLayoutComponent } from './layout/app-layout.component';
 export { NotFoundComponent } from './not-found/not-found.component';
 export { SeoComponent } from './seo/seo.component';
+export { SmartTableComponent } from './smart-table/smart-table.component';

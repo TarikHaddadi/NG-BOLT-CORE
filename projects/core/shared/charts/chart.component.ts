@@ -32,17 +32,6 @@ import { PXS_CHART_DEFAULTS, PXS_CHART_PLUGINS } from '@cadai/pxs-ng-core/provid
 import { AppSelectors } from '@cadai/pxs-ng-core/store';
 
 type TimeUnit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'month';
-const VALID_UNITS = new Set([
-  'millisecond',
-  'second',
-  'minute',
-  'hour',
-  'day',
-  'week',
-  'month',
-  'quarter',
-  'year',
-]);
 
 @Component({
   selector: 'app-chart',
@@ -72,7 +61,7 @@ const VALID_UNITS = new Set([
     `,
   ],
 })
-export class PxsChartComponent<TType extends ChartType = ChartType>
+export class ChartComponent<TType extends ChartType = ChartType>
   implements AfterViewInit, OnChanges
 {
   private translate = inject(TranslateService, { optional: true });
@@ -221,23 +210,26 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
 
     if (!this.autoTime) return out as ChartOptions<TType>;
 
-    // ✅ Don’t touch non-XY charts (pie/doughnut/radar/polar/bar with labels[])
     const { hasXY } = this.collectXValues(this.data);
     if (!hasXY) return out as ChartOptions<TType>;
 
     out.scales = out.scales ?? {};
-    const x = out.scales.x ?? {};
-    if (!x.type) x.type = 'time';
+    const x = { ...(out.scales.x ?? {}) };
 
-    // Guarantee scale-level shape to avoid “adapters.date” reads on undefined
+    // ✅ Keep whatever the caller set; default to 'timeseries' if missing
+    if (!x.type) x.type = 'timeseries';
+
+    // Ensure objects exist
     x.adapters = x.adapters ?? {};
-    x.time = x.time ?? {};
+    x.time = { ...(x.time ?? {}) };
+
+    // ✅ Caller formats override defaults
     x.time.displayFormats = {
       millisecond: 'HH:mm:ss.SSS',
       second: 'HH:mm:ss',
       minute: 'HH:mm',
       hour: 'HH:mm',
-      day: 'MMM d',
+      day: 'MMM d', // default (will be overridden by your 'MMMM dd')
       week: 'MMM d',
       month: 'MMM yyyy',
       quarter: 'qqq yyyy',
@@ -245,14 +237,17 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
       ...(x.time.displayFormats ?? {}),
     };
 
-    if (this.timeUnit === 'auto') {
+    // ✅ Only choose a unit if neither the options nor the input have decided
+    if (!x.time.unit) {
       const span = this.estimateSpanMs(this.data);
-      if (span != null) x.time.unit = this.pickUnit(span);
-    } else {
-      x.time.unit = this.timeUnit;
+      const fromInput = this.timeUnit !== 'auto' ? this.timeUnit : undefined;
+      x.time.unit = fromInput ?? (span != null ? this.pickUnit(span) : 'day');
     }
-    if (!x.time.unit || !VALID_UNITS.has(x.time.unit)) x.time.unit = 'day';
 
+    // Nice for day labels (optional)
+    if (x.time.unit === 'day' && !x.time.round) x.time.round = 'day';
+
+    // Keep ticks if the caller set them
     out.scales.x = x;
     return out as ChartOptions<TType>;
   }
@@ -354,16 +349,14 @@ export class PxsChartComponent<TType extends ChartType = ChartType>
 
   /** Pick a nice unit from span in ms */
   private pickUnit(spanMs: number): TimeUnit {
-    const s = 1000;
-    const m = 60 * s;
-    const h = 60 * m;
-    const d = 24 * h;
-
-    if (spanMs <= 5 * s) return 'millisecond';
-    if (spanMs <= 3 * m) return 'second';
-    if (spanMs <= 3 * h) return 'minute';
-    if (spanMs <= 4 * d) return 'hour';
-    if (spanMs <= 60 * d) return 'day';
+    const s = 1000,
+      m = 60 * s,
+      h = 60 * m,
+      d = 24 * h;
+    if (spanMs <= 30 * m) return 'second';
+    if (spanMs <= 12 * h) return 'minute';
+    if (spanMs <= 2 * d) return 'hour';
+    if (spanMs <= 120 * d) return 'day'; // up to ~4 months stay on 'day'
     return 'month';
   }
 }

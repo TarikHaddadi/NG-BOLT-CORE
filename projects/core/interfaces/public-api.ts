@@ -22,5 +22,11 @@ export { type ConfirmDialogData, type SwitchersResult } from './dialog.model';
 export { type FieldComponent, type FieldConfig, type FieldType } from './field-config.model';
 export { type AuthProfile, type AuthRuntimeConfig } from './keycloack.model';
 export { type AppEvents, type RealtimeClient, type RealtimeEventMap } from './realtime.model';
+export {
+  type ServerPage,
+  type SmartActionButton,
+  type SmartCellType,
+  type SmartColumn,
+} from './smart-table.interface';
 export { type TeamManagementState, type TeamMember } from './team-management.model';
 export { type CreateUserDto, type UpdateUserDto, type User, type UserState } from './user.model';
