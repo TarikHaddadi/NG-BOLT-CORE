@@ -12,7 +12,6 @@ import {
   EventEmitter,
   HostBinding,
   inject,
-  Injectable,
   Input,
   NgZone,
   OnInit,
@@ -51,31 +50,7 @@ import { ServerPage, SmartColumn } from '@cadai/pxs-ng-core/interfaces';
 import { HttpService } from '@cadai/pxs-ng-core/services';
 import { AppSelectors } from '@cadai/pxs-ng-core/store';
 
-/* -------------------------------------------
- * Paginator i18n that reacts to language changes
- * ------------------------------------------*/
-@Injectable()
-export class I18nPaginatorIntl extends MatPaginatorIntl {
-  constructor(private t: TranslateService) {
-    super();
-    this._update();
-    this.t.onLangChange.subscribe(() => this._update());
-  }
-  private _update() {
-    this.itemsPerPageLabel = this.t.instant('table.paginator.itemsPerPage');
-    this.nextPageLabel = this.t.instant('table.paginator.nextPage');
-    this.previousPageLabel = this.t.instant('table.paginator.prevPage');
-    this.firstPageLabel = this.t.instant('table.paginator.firstPage');
-    this.lastPageLabel = this.t.instant('table.paginator.lastPage');
-    this.getRangeLabel = (page, pageSize, length) => {
-      if (length === 0 || pageSize === 0) return this.t.instant('table.paginator.rangeEmpty');
-      const start = page * pageSize + 1;
-      const end = Math.min((page + 1) * pageSize, length);
-      return this.t.instant('table.paginator.range', { start, end, length });
-    };
-    this.changes.next();
-  }
-}
+import { I18nPaginatorIntl } from './i18n-paginator-intl';
 
 @Component({
   selector: 'app-smart-table',
