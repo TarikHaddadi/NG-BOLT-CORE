@@ -42,7 +42,10 @@
     class="table-wrap"
     [class.sticky-header]="stickyHeader"
     [class.sticky-footer]="stickyFooter"
-    [ngStyle]="{ height: height ?? 'auto', 'max-height': height ?? 'auto' }"
+    [ngStyle]="{
+      height: height ? height + ' px' : 'auto',
+      'max-height': height ? height + ' px' : 'auto',
+    }"
   >
     <table
       mat-table
