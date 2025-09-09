@@ -38,7 +38,12 @@
     <div class="hint">{{ 'table.hint.reorder' | translate }}</div>
   }
 
-  <div class="table-wrap" [class.sticky-header]="stickyHeader" [class.sticky-footer]="stickyFooter">
+  <div
+    class="table-wrap"
+    [class.sticky-header]="stickyHeader"
+    [class.sticky-footer]="stickyFooter"
+    [ngStyle]="{ height: height ?? 'auto', 'max-height': height ?? 'auto' }"
+  >
     <table
       mat-table
       [dataSource]="tableData()"

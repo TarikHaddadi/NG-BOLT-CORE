@@ -18,15 +18,14 @@ $z-sticky-header: 13;
   --pxs-sticky-bg: var(--mat-sys-surface, #fff);
 
   /* Zebra rows */
-  --pxs-row-even: var(--mat-sys-surface);
-  --pxs-row-odd: var(--mat-sys-surface-container-low);
+  --pxs-row-even: var(--mat-sys-surface, #f5f5f5);
+  --pxs-row-odd: var(--mat-sys-surface-container-low, #ffffff);
 
   /* Indented child mask */
   --pxs-child-mask: color-mix(in oklab, var(--mat-sys-on-surface) 8%, transparent);
 
   /* Radii / sizing */
   --pxs-radius: 12px;
-  --pxs-table-height: 600px;
 }
 
 /* Only override variables for dark theme; keep rules DRY */
@@ -67,8 +66,6 @@ $z-sticky-header: 13;
   border-radius: var(--pxs-radius);
   overflow: auto;
   border: 1px solid var(--pxs-outline-variant);
-  height: var(--pxs-table-height);
-  min-height: var(--pxs-table-height);
 }
 
 /* ---------- Table base ---------- */
