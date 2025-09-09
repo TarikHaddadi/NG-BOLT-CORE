@@ -101,6 +101,7 @@ export class SmartTableComponent implements OnInit {
   @Input() columnFilterEnabled = false; // server supports f_{col}
   @Input() enableReorder = true;
   @Input() multiSelect = true;
+  @Input() height?: number;
 
   // Outputs
   @Output() rowClick = new EventEmitter<any>();
@@ -266,7 +267,7 @@ export class SmartTableComponent implements OnInit {
 
     // Update UI when ngx-translate language changes (pipes, paginator)
     this.translate.onLangChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-      this.dateAdapter?.setLocale?.(this.translate.currentLang);
+      this.dateAdapter?.setLocale?.(this.translate.getLangs()[0]);
       this.cdr.markForCheck();
       queueMicrotask(() => this.table?.renderRows?.());
     });
