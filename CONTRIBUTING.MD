@@ -61,11 +61,13 @@ projects/
    ├─ factories/                  # Shared TS Factories
    ├─ interfaces/                  # Shared TS interfaces & models
    ├─ enums/                       # Shared enums (e.g., UserRole)
-   ├─ utils/                       # Pure helpers & validators
+   ├─ utils/                       # Pure helpers & validators & other helpers for custom components such as (charts, tables, etc...)
    ├─ guards/                      # Route guards (e.g., authGuard)
    ├─ interceptors/                # Http interceptors (auth, error)
    │
    ├─ shared/                         # Reusable UI + headless components
+   │  ├─ charts/                      # Reusable charts with different types.
+   │  ├─ smart-table/                 # Reusable Tables fully customizables `see relatedDocs`.
    │  ├─ dialog/                      # Confirm dialogs, etc.
    │  ├─ forms/                       # Form system & fields
    │  ├─ fields/                      # Input, select, chips, autocomplete, etc.
