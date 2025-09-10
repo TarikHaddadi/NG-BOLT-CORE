@@ -34,8 +34,8 @@ $z-sticky-header: 13;
   --pxs-child-mask: color-mix(in oklab, var(--mat-sys-on-surface) 12%, transparent);
 
   /* Zebra rows */
-  --pxs-row-even: var(--mat-sys-surface, #f5f5f5);
-  --pxs-row-odd: var(--mat-sys-surface-container-low, ##313131);
+  --pxs-row-even: var(--mat-sys-surface, #2d2d2d);
+  --pxs-row-odd: var(--mat-sys-surface-container-low, #313131);
 }
 
 /* ---------- Layout wrappers ---------- */
