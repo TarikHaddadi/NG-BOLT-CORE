@@ -29,4 +29,5 @@ export {
   type SmartColumn,
 } from './smart-table.interface';
 export { type TeamManagementState, type TeamMember } from './team-management.model';
+export { type ButtonVariant, type ToolbarAction } from './toolbar.interface';
 export { type CreateUserDto, type UpdateUserDto, type User, type UserState } from './user.model';

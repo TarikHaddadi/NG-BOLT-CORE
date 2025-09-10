@@ -7,4 +7,5 @@ export { LayoutService } from './layout.service';
 export { RealtimeService } from './realtime.service';
 export { ThemeService } from './theme.service';
 export { ToastService } from './toast.service';
+export { ToolbarActionsService } from './toolbar-actions.service';
 export { UserService } from './user.service';

@@ -99,6 +99,64 @@
         <mat-icon>menu</mat-icon>
       </button>
       <span class="title">{{ title$ | async }}</span>
+
+      <span class="spacer"></span>
+
+      @for (a of (toolbarActions$ | async) ?? []; track a.id) {
+        @if ((a.visible$ | async) ?? true) {
+          @if ((a.variant ?? 'icon') === 'icon') {
+            <button
+              mat-icon-button
+              [color]="a.color || 'primary'"
+              [matTooltip]="a.tooltip || a.label || ''"
+              [disabled]="a.disabled$ | async"
+              (click)="a.click()"
+            >
+              <mat-icon>{{ a.icon }}</mat-icon>
+            </button>
+          } @else if (a.variant === 'stroked') {
+            <button
+              mat-stroked-button
+              [color]="a.color || 'primary'"
+              [matTooltip]="a.tooltip || ''"
+              [disabled]="a.disabled$ | async"
+              (click)="a.click()"
+            >
+              @if (a.icon) {
+                <mat-icon>{{ a.icon }}</mat-icon>
+              }
+              {{ a.label }}
+            </button>
+          } @else if (a.variant === 'raised') {
+            <button
+              mat-raised-button
+              [color]="a.color || 'primary'"
+              [class]="a.class || ''"
+              [matTooltip]="a.tooltip || ''"
+              [disabled]="a.disabled$ | async"
+              (click)="a.click()"
+            >
+              @if (a.icon) {
+                <mat-icon>{{ a.icon }}</mat-icon>
+              }
+              {{ a.label }}
+            </button>
+          } @else {
+            <button
+              mat-flat-button
+              [color]="a.color || 'primary'"
+              [matTooltip]="a.tooltip || ''"
+              [disabled]="a.disabled$ | async"
+              (click)="a.click()"
+            >
+              @if (a.icon) {
+                <mat-icon>{{ a.icon }}</mat-icon>
+              }
+              {{ a.label }}
+            </button>
+          }
+        }
+      }
     </mat-toolbar>
 
     <main class="app-content">

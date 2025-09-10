@@ -42,6 +42,7 @@ import {
   KeycloakService,
   LayoutService,
   ThemeService,
+  ToolbarActionsService,
 } from '@cadai/pxs-ng-core/services';
 import { AppActions, AppSelectors } from '@cadai/pxs-ng-core/store';
 
@@ -81,6 +82,8 @@ import { ToggleComponent } from '../forms/fields/toggle/toggle.component';
 })
 export class AppLayoutComponent implements OnInit, AfterViewInit {
   constructor(@Inject(CORE_OPTIONS) private readonly coreOpts: Required<CoreOptions>) {}
+
+  public toolbarActions$ = inject(ToolbarActionsService).actions$;
 
   @ViewChild('switchersTpl', { static: true }) switchersTpl!: TemplateRef<unknown>;
   public isDark$!: Observable<boolean>;
