@@ -83,12 +83,8 @@ mat-sidenav {
     background-color 0.2s,
     color 0.2s;
 
-  .menu-label {
-    color: var(--mat-primary);
-  }
-
   &.active {
-    background-color: var(--mat-fab-small-foreground-color);
+    background-color: var(--mdc-fab-container-color);
     font-weight: 600;
   }
 
@@ -100,7 +96,7 @@ mat-sidenav {
   &:active,
   &:focus,
   &:focus-visible {
-    background-color: var(--mat-fab-small-foreground-color);
+    background-color: var(--mdc-fab-container-color);
     outline: none;
     &::before {
       display: none;
