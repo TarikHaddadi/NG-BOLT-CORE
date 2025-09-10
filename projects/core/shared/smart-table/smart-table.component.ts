@@ -541,9 +541,9 @@ export class SmartTableComponent implements OnInit {
       queueMicrotask(() => {
         try {
           this.table?.renderRows?.();
-          (this.table as any).updateStickyColumnStyles?.();
-          (this.table as any).updateStickyHeaderRowStyles?.();
-          (this.table as any).updateStickyFooterRowStyles?.();
+          this.table.updateStickyColumnStyles?.();
+          this.table.updateStickyHeaderRowStyles?.();
+          this.table.updateStickyFooterRowStyles?.();
         } catch {}
         this.dragging = false;
         this.cdr.markForCheck();
@@ -556,9 +556,9 @@ export class SmartTableComponent implements OnInit {
     queueMicrotask(() => {
       try {
         this.table?.renderRows?.();
-        (this.table as any).updateStickyColumnStyles?.();
-        (this.table as any).updateStickyHeaderRowStyles?.();
-        (this.table as any).updateStickyFooterRowStyles?.();
+        this.table.updateStickyColumnStyles?.();
+        this.table.updateStickyHeaderRowStyles?.();
+        this.table.updateStickyFooterRowStyles?.();
       } catch {}
       this.cdr.markForCheck();
     });
