@@ -262,13 +262,14 @@ Workload (est.): **S ≤1d**, **M 2–3d**, **L 4–7d**, **XL >1wk**
 Legend: **✅ Done** · **🟡 Ongoing** · **❌ To do**
 
 - [[✅] - Global Readme](./README.md)
+- [[✅] - App Layout component](./docs/README-LAYOUT.md)
 - [[✅] - Theming, Assets and translattions](./docs/README-ASSETS-TRANSLATIONS.md)
 - [[✅] - Theming colors ](./docs/README-THEMING.md)
 - [[✅] - Contribution Guide](./CONTRIBUTING.md)
 - [[✅] - Custom Form Builder and custom fields](projects/core/shared/README.md)
 - [[✅] - Contributing on Forms Core](projects/core/shared/CONTRIBUTING.md)
-- [[✅] - SmartTables](projects/core/shared/README-SmartTables.md)
-- [[✅] - Graphs and Charts](projects/core/shared/README.ChartsJs.md.md)
+- [[✅] - SmartTables](./docs/README-SmartTables.md)
+- [[✅] - Graphs and Charts](./docs/ChartsJs.md)
 - [[✅] - Authentication and NGRX state management](./projects/core/store/README.md)
 - [[✅] - Authentication Flow](./docs/README-CURRENT-AUTH.md)
 - [[✅] - Security Posture & Migration Plan – SPA](./docs/README-SECURITY.md)
