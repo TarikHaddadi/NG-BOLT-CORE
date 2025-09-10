@@ -231,7 +231,7 @@ export class ChartComponent<TType extends ChartType = ChartType>
       second: 'HH:mm:ss',
       minute: 'HH:mm',
       hour: 'HH:mm',
-      day: 'MMM d', // default (will be overridden by your 'MMMM dd')
+      day: 'MMM d',
       week: 'MMM d',
       month: 'MMM yyyy',
       quarter: 'qqq yyyy',
