@@ -83,14 +83,12 @@ mat-sidenav {
     background-color 0.2s,
     color 0.2s;
 
-  &:hover,
-  &:focus-visible {
-    background-color: rgba(0, 0, 0, 0.05);
-    outline: none;
+  .menu-label {
+    color: var(--mat-primary);
   }
 
   &.active {
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: var(--mat-fab-small-foreground-color);
     font-weight: 600;
   }
 
@@ -100,7 +98,10 @@ mat-sidenav {
 
   &:hover,
   &:active,
-  &:focus {
+  &:focus,
+  &:focus-visible {
+    background-color: var(--mat-fab-small-foreground-color);
+    outline: none;
     &::before {
       display: none;
     }
@@ -108,22 +109,6 @@ mat-sidenav {
 
   mat-icon {
     margin-right: 16px;
-  }
-
-  &.active {
-    background-color: rgba(0, 0, 0, 0.1); // Persisted effect
-    font-weight: bold;
-  }
-
-  &.isDark {
-    &:hover,
-    &:focus-visible {
-      background-color: rgba(255, 255, 255, 0.1);
-    }
-
-    &.active {
-      background-color: rgba(255, 255, 255, 0.2);
-    }
   }
 }
 
