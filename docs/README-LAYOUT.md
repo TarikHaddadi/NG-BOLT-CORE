@@ -1,6 +1,6 @@
 # Core SDK — Layout Toolbar Actions (Dynamic Per‑Page Buttons)
 
-> _Last updated: 2025‑09‑10_
+> _Last updated: 2025‑09‑11_
 
 This document explains how to add **dynamic toolbar actions** (e.g., Back, Export, Delete) to the main `AppLayoutComponent` so that **each routed page** can publish its own buttons without touching the layout code.
 
@@ -92,48 +92,60 @@ Update the toolbar template to place actions on the right:
   <span class="title">{{ title$ | async }}</span>
   <span class="spacer"></span>
 
-  @for (a of (toolbarActions$ | async) ?? []; track a.id) { @if ((a.visible$ | async) ?? true) { @if
-  ((a.variant ?? 'icon') === 'icon') {
-  <button
-    mat-icon-button
-    [color]="a.color || 'primary'"
-    [matTooltip]="a.tooltip || a.label || ''"
-    [disabled]="a.disabled$ | async"
-    (click)="a.click()"
-  >
-    <mat-icon>{{ a.icon }}</mat-icon>
-  </button>
-  } @else if (a.variant === 'stroked') {
-  <button
-    mat-stroked-button
-    [color]="a.color || 'primary'"
-    [matTooltip]="a.tooltip || ''"
-    [disabled]="a.disabled$ | async"
-    (click)="a.click()"
-  >
-    @if (a.icon) { <mat-icon>{{ a.icon }}</mat-icon> } {{ a.label }}
-  </button>
-  } @else if (a.variant === 'raised') {
-  <button
-    mat-raised-button
-    [color]="a.color || 'primary'"
-    [matTooltip]="a.tooltip || ''"
-    [disabled]="a.disabled$ | async"
-    (click)="a.click()"
-  >
-    @if (a.icon) { <mat-icon>{{ a.icon }}</mat-icon> } {{ a.label }}
-  </button>
-  } @else {
-  <button
-    mat-flat-button
-    [color]="a.color || 'primary'"
-    [matTooltip]="a.tooltip || ''"
-    [disabled]="a.disabled$ | async"
-    (click)="a.click()"
-  >
-    @if (a.icon) { <mat-icon>{{ a.icon }}</mat-icon> } {{ a.label }}
-  </button>
-  } } }
+  <div class="custom-btns">
+    @for (a of (toolbarActions$ | async) ?? []; track a.id) { @if ((a.visible$ | async) ?? true) {
+    @if ((a.variant ?? 'icon') === 'icon') {
+    <button
+      mat-icon-button
+      [color]="a.color || 'primary'"
+      [class]="a.class || ''"
+      [matTooltip]="a.tooltip || a.label || ''"
+      [disabled]="a.disabled$ | async"
+      (click)="a.click()"
+    >
+      <mat-icon [color]="a.color || 'primary'" [class]="a.class || ''">{{ a.icon }}</mat-icon>
+    </button>
+    } @else if (a.variant === 'stroked') {
+    <button
+      mat-stroked-button
+      [color]="a.color || 'primary'"
+      [class]="a.class || ''"
+      [matTooltip]="a.tooltip || ''"
+      [disabled]="a.disabled$ | async"
+      (click)="a.click()"
+    >
+      @if (a.icon) {
+      <mat-icon [color]="a.color || 'primary'" [class]="a.class || ''"> {{ a.icon }}</mat-icon>
+      } {{ a.label }}
+    </button>
+    } @else if (a.variant === 'raised') {
+    <button
+      mat-raised-button
+      [color]="a.color || 'primary'"
+      [class]="a.class || ''"
+      [matTooltip]="a.tooltip || ''"
+      [disabled]="a.disabled$ | async"
+      (click)="a.click()"
+    >
+      @if (a.icon) {
+      <mat-icon [color]="a.color || 'primary'" [class]="a.class || ''">{{ a.icon }}</mat-icon>
+      } {{ a.label }}
+    </button>
+    } @else {
+    <button
+      mat-flat-button
+      [color]="a.color || 'primary'"
+      [class]="a.class || ''"
+      [matTooltip]="a.tooltip || ''"
+      [disabled]="a.disabled$ | async"
+      (click)="a.click()"
+    >
+      @if (a.icon) {
+      <mat-icon [color]="a.color || 'primary'" [class]="a.class || ''">{{ a.icon }}</mat-icon>
+      } {{ a.label }}
+    </button>
+    } } }
+  </div>
 </mat-toolbar>
 ```
 
@@ -188,29 +200,49 @@ export class DashboardComponent implements OnInit {
     const back: ToolbarAction = {
       id: 'back',
       icon: 'arrow_back',
-      tooltip: this.i18n.instant('back'),
+      tooltip: this.translate.instant('back'),
+      class: 'primary',
       color: 'primary',
       click: () => this.location.back(),
+      variant: 'icon',
+      label: this.translate.instant('back'),
     };
 
     const exportCsv: ToolbarAction = {
       id: 'export',
       icon: 'download',
-      tooltip: this.i18n.instant('export_csv'),
+      tooltip: this.translate.instant('export'),
       color: 'primary',
-      click: () => this.exportToCsv(),
+      click: () => {},
+      variant: 'flat',
+      label: this.translate.instant('export'),
+      class: 'primary',
     };
 
     const deleteSel: ToolbarAction = {
       id: 'delete',
       icon: 'delete',
-      tooltip: this.i18n.instant('delete_selected'),
+      tooltip: this.translate.instant('delete'),
       color: 'warn',
-      disabled$: this.selectedCount$.pipe(map((c) => c === 0)),
-      click: () => this.deleteSelected(),
+      class: 'primary',
+      click: () => {},
+      variant: 'stroked',
+      label: this.translate.instant('delete'),
     };
 
-    this.toolbar.scope(this.destroyRef, [back, exportCsv, deleteSel]);
+    const refreshSel: ToolbarAction = {
+      id: 'refresh',
+      icon: 'refresh',
+      tooltip: this.translate.instant('refresh'),
+      color: 'accent',
+      class: 'accent',
+      click: () => {},
+      variant: 'raised',
+      label: this.translate.instant('refresh'),
+    };
+
+    // Publish actions for this page and auto-clear on destroy
+    this.toolbar.scope(this.destroyRef, [back, exportCsv, deleteSel, refreshSel]);
   }
 
   private exportToCsv() {
