@@ -1,6 +1,6 @@
 # PSX-NG-CORE – Angular 19 CORE (@cadai/psx-ng-core)
 
-> _Last updated: 2025-09-02_
+> _Last updated: 2025-09-11_
 
 > 🚀 Modern Angular 19 project (Proximus core Angular SDK) with runtime environment configs, standalone components, NgRx state management, dynamic forms, internationalization, and full CI/CD support.
 
