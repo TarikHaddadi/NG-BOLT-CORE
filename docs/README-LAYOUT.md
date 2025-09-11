@@ -99,7 +99,7 @@ Update the toolbar template to place actions on the right:
       mat-icon-button
       [color]="a.color || 'primary'"
       [class]="a.class || ''"
-      [matTooltip]="a.tooltip || a.label || ''"
+      [matTooltip]="a.tooltip || '' | translate"
       [disabled]="a.disabled$ | async"
       (click)="a.click()"
     >
@@ -110,39 +110,39 @@ Update the toolbar template to place actions on the right:
       mat-stroked-button
       [color]="a.color || 'primary'"
       [class]="a.class || ''"
-      [matTooltip]="a.tooltip || ''"
+      [matTooltip]="a.tooltip || '' | translate"
       [disabled]="a.disabled$ | async"
       (click)="a.click()"
     >
       @if (a.icon) {
       <mat-icon [color]="a.color || 'primary'" [class]="a.class || ''"> {{ a.icon }}</mat-icon>
-      } {{ a.label }}
+      } {{ a.label | translate }}
     </button>
     } @else if (a.variant === 'raised') {
     <button
       mat-raised-button
       [color]="a.color || 'primary'"
       [class]="a.class || ''"
-      [matTooltip]="a.tooltip || ''"
+      [matTooltip]="a.tooltip || '' | translate"
       [disabled]="a.disabled$ | async"
       (click)="a.click()"
     >
       @if (a.icon) {
       <mat-icon [color]="a.color || 'primary'" [class]="a.class || ''">{{ a.icon }}</mat-icon>
-      } {{ a.label }}
+      } {{ a.label | translate }}
     </button>
     } @else {
     <button
       mat-flat-button
       [color]="a.color || 'primary'"
       [class]="a.class || ''"
-      [matTooltip]="a.tooltip || ''"
+      [matTooltip]="a.tooltip || '' | translate"
       [disabled]="a.disabled$ | async"
       (click)="a.click()"
     >
       @if (a.icon) {
       <mat-icon [color]="a.color || 'primary'" [class]="a.class || ''">{{ a.icon }}</mat-icon>
-      } {{ a.label }}
+      } {{ a.label | translate }}
     </button>
     } } }
   </div>
@@ -200,45 +200,45 @@ export class DashboardComponent implements OnInit {
     const back: ToolbarAction = {
       id: 'back',
       icon: 'arrow_back',
-      tooltip: this.translate.instant('back'),
+      tooltip: 'back', // use keys , since the component already uses translates pipes
       class: 'primary',
       color: 'primary',
       click: () => this.location.back(),
       variant: 'icon',
-      label: this.translate.instant('back'),
+      label: 'back', // use keys , since the component already uses translates pipes
     };
 
     const exportCsv: ToolbarAction = {
       id: 'export',
       icon: 'download',
-      tooltip: this.translate.instant('export'),
+      tooltip: 'export', // use keys , since the component already uses translates pipes
       color: 'primary',
       click: () => {},
       variant: 'flat',
-      label: this.translate.instant('export'),
+      label: 'export', // use keys , since the component already uses translates pipes
       class: 'primary',
     };
 
     const deleteSel: ToolbarAction = {
       id: 'delete',
       icon: 'delete',
-      tooltip: this.translate.instant('delete'),
+      tooltip: 'delete', // use keys , since the component already uses translates pipes
       color: 'warn',
       class: 'primary',
       click: () => {},
       variant: 'stroked',
-      label: this.translate.instant('delete'),
+      label: 'delete', // use keys , since the component already uses translates pipes
     };
 
     const refreshSel: ToolbarAction = {
       id: 'refresh',
       icon: 'refresh',
-      tooltip: this.translate.instant('refresh'),
+      tooltip: 'refresh', // use keys , since the component already uses translates pipes
       color: 'accent',
       class: 'accent',
       click: () => {},
       variant: 'raised',
-      label: this.translate.instant('refresh'),
+      label: 'refresh', // use keys , since the component already uses translates pipes
     };
 
     // Publish actions for this page and auto-clear on destroy

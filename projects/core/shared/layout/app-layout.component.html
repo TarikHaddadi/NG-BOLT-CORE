@@ -110,7 +110,7 @@
                 mat-icon-button
                 [color]="a.color || 'primary'"
                 [class]="a.class || ''"
-                [matTooltip]="a.tooltip || a.label || ''"
+                [matTooltip]="a.tooltip || '' | translate"
                 [disabled]="a.disabled$ | async"
                 (click)="a.click()"
               >
@@ -123,7 +123,7 @@
                 mat-stroked-button
                 [color]="a.color || 'primary'"
                 [class]="a.class || ''"
-                [matTooltip]="a.tooltip || ''"
+                [matTooltip]="a.tooltip || '' | translate"
                 [disabled]="a.disabled$ | async"
                 (click)="a.click()"
               >
@@ -132,14 +132,14 @@
                     {{ a.icon }}</mat-icon
                   >
                 }
-                {{ a.label }}
+                {{ a.label | translate }}
               </button>
             } @else if (a.variant === 'raised') {
               <button
                 mat-raised-button
                 [color]="a.color || 'primary'"
                 [class]="a.class || ''"
-                [matTooltip]="a.tooltip || ''"
+                [matTooltip]="a.tooltip || '' | translate"
                 [disabled]="a.disabled$ | async"
                 (click)="a.click()"
               >
@@ -148,14 +148,14 @@
                     a.icon
                   }}</mat-icon>
                 }
-                {{ a.label }}
+                {{ a.label | translate }}
               </button>
             } @else {
               <button
                 mat-flat-button
                 [color]="a.color || 'primary'"
                 [class]="a.class || ''"
-                [matTooltip]="a.tooltip || ''"
+                [matTooltip]="a.tooltip || '' | translate"
                 [disabled]="a.disabled$ | async"
                 (click)="a.click()"
               >
@@ -164,7 +164,7 @@
                     a.icon
                   }}</mat-icon>
                 }
-                {{ a.label }}
+                {{ a.label | translate }}
               </button>
             }
           }
