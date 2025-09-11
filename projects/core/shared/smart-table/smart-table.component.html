@@ -189,10 +189,11 @@
                         mat-icon-button
                         [disabled]="b.disabledWhen?.(row)"
                         [color]="b.color"
+                        [class]="b.class"
                         (click)="action.emit({ id: b.id, row })"
                         [matTooltip]="b.tooltip || b.label | translate"
                       >
-                        <mat-icon>{{ b.icon }}</mat-icon>
+                        <mat-icon [color]="b.color" [class]="b.class">{{ b.icon }}</mat-icon>
                       </button>
                     }
                   }
@@ -310,10 +311,11 @@
                         mat-icon-button
                         [disabled]="b.disabledWhen?.(row)"
                         [color]="b.color"
+                        [class]="b.class"
                         (click)="action.emit({ id: b.id, row })"
                         [matTooltip]="b.tooltip || b.label | translate"
                       >
-                        <mat-icon>{{ b.icon }}</mat-icon>
+                        <mat-icon [color]="b.color" [class]="b.class">{{ b.icon }}</mat-icon>
                       </button>
                     }
                   }
@@ -431,10 +433,11 @@
                         mat-icon-button
                         [disabled]="b.disabledWhen?.(row)"
                         [color]="b.color"
+                        [class]="b.class"
                         (click)="action.emit({ id: b.id, row })"
                         [matTooltip]="b.tooltip || b.label | translate"
                       >
-                        <mat-icon>{{ b.icon }}</mat-icon>
+                        <mat-icon [color]="b.color" [class]="b.class">{{ b.icon }}</mat-icon>
                       </button>
                     }
                   }
