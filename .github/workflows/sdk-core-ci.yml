@@ -1,0 +1,168 @@
+name: SDK Bolt Core CI (Build • Lint • Publish • Tag)
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'projects/core/**'
+      - 'projects/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'projects/core/**'
+      - 'projects/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  PROJECT_DIR: 'projects/core'
+  DIST_DIR: 'dist/core'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_test:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint (CI)
+        run: npm run lint:ci
+
+      - name: Build library
+        run: npm run build:core
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pxs-ng-core
+          path: ${{ env.DIST_DIR }}/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm (main/master only)
+    needs: build_test
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: read
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pxs-ng-core
+          path: ./pxs-ng-core
+
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # This sets up npm to use the npmjs registry and read NODE_AUTH_TOKEN
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish if version not on npm
+        working-directory: ./pxs-ng-core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VER=$(node -p "require('./package.json').version")
+
+          echo "Package: $PKG_NAME"
+          echo "Version: $PKG_VER"
+
+          # Ensure scoped packages publish publicly
+          ACCESS_FLAG="--access public"
+          if [[ "$PKG_NAME" != @*/* ]]; then
+            ACCESS_FLAG=""
+          fi
+
+          # Skip if version already on npm
+          if npm view "${PKG_NAME}@${PKG_VER}" version >/dev/null 2>&1; then
+            echo "Version ${PKG_VER} already exists on npm. Skipping publish."
+            exit 0
+          fi
+
+          # Safer in CI
+          npm config set ignore-scripts true
+
+          echo "Publishing ${PKG_NAME}@${PKG_VER} to npm..."
+          npm publish --ignore-scripts ${ACCESS_FLAG}
+          echo "Publish completed."
+
+  tag_on_main:
+    name: Tag repo with v<version>
+    needs: [build_test, publish]
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (full history for tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Create & push tag from package version
+        env:
+          PKG_PATH: projects/core/package.json
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+
+          test -f "$PKG_PATH" || { echo "Cannot find $PKG_PATH"; exit 1; }
+
+          VERSION=$(node -p "require('./' + process.env.PKG_PATH).version")
+          TAG="PXS-NG-CORE@${VERSION}"
+
+          echo "Detected version: $VERSION"
+          echo "Proposed tag:    $TAG"
+
+          git fetch --tags --force
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists. Nothing to do."
+            exit 0
+          fi
+
+          git tag -a "$TAG" -m "release: $TAG"
+          git push origin "$TAG"
+          echo "Created and pushed tag $TAG"
