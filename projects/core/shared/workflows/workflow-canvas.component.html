@@ -14,6 +14,7 @@
 
   <div
     class="pxs-wf-canvas"
+    #graphHost
     cdkDropList
     (cdkDropListDropped)="onDrop($event)"
     (contextmenu)="openContextMenu($event)"
@@ -25,9 +26,9 @@
       [links]="gLinks()"
       [autoCenter]="true"
       [autoZoom]="true"
-      [update$]="update$"
       [draggingEnabled]="!disabled()"
       [zoomSpeed]="0.075"
+      [update$]="update$"
       layout="dagre"
       (nodeSelected)="onNodeSelected($event)"
       (edgeSelected)="onEdgeSelected($event)"
@@ -47,24 +48,43 @@
         </svg:marker>
       </ng-template>
 
-      <!-- node (SVG) -->
+      <!-- node (SVG) with clickable handles -->
       <ng-template #nodeTemplate let-node>
         <svg:g class="node" [ngClass]="node?.data?.type">
           <svg:rect
             rx="8"
             ry="8"
-            [attr.width]="node.dimension?.width || 160"
-            [attr.height]="node.dimension?.height || 60"
+            [attr.width]="node.dimension?.width || 200"
+            [attr.height]="node.dimension?.height || 70"
             [attr.fill]="nodeFill(node?.data?.type)"
           ></svg:rect>
 
+          <!-- label -->
           <svg:text
             alignment-baseline="central"
             [attr.x]="12"
-            [attr.y]="(node.dimension?.height || 60) / 2"
+            [attr.y]="(node.dimension?.height || 70) / 2"
           >
             {{ node.label }}
           </svg:text>
+
+          <!-- target handle (left) -->
+          <svg:circle
+            class="wf-handle target"
+            [attr.cx]="-6"
+            [attr.cy]="(node.dimension?.height || 70) / 2"
+            r="7"
+            (click)="clickHandle(node.id, 'target', $event)"
+          ></svg:circle>
+
+          <!-- source handle (right) -->
+          <svg:circle
+            class="wf-handle source"
+            [attr.cx]="(node.dimension?.width || 200) + 6"
+            [attr.cy]="(node.dimension?.height || 70) / 2"
+            r="7"
+            (click)="clickHandle(node.id, 'source', $event)"
+          ></svg:circle>
         </svg:g>
       </ng-template>
 
@@ -88,8 +108,8 @@
 
     @if (!disabled()) {
       <div class="pxs-help">
-        <span>Tip:</span> Click a node to select source, then click another to connect. Right-click
-        to delete.
+        <span>Tip:</span> Drag actions from the palette. Click a node’s right handle (source) then
+        another node’s left handle (target) to connect.
       </div>
     }
 

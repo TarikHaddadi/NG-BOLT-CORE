@@ -1,114 +1,84 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, OnInit, signal } from '@angular/core';
+import {
+  FormBuilder,
+  FormGroup,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
+import { TranslateModule } from '@ngx-translate/core';
 import { v4 as uuidv4 } from 'uuid';
 
-import { ActionDefinition, WorkflowEdge, WorkflowNode } from '@cadai/pxs-ng-core/interfaces';
+import {
+  ActionDefinition,
+  FieldConfig,
+  WorkflowEdge,
+  WorkflowNode,
+} from '@cadai/pxs-ng-core/interfaces';
+import { FieldConfigService, LayoutService } from '@cadai/pxs-ng-core/services';
 
+import { DynamicFormComponent } from '../public-api';
+import { SeoComponent } from '../seo/seo.component';
 import { WorkflowCanvasComponent } from './workflow-canvas.component';
 
 @Component({
   selector: 'app-workflow-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, WorkflowCanvasComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    WorkflowCanvasComponent,
+    SeoComponent,
+    TranslateModule,
+    DynamicFormComponent,
+    ReactiveFormsModule,
+  ],
   template: `
-    <div class="page">
-      <div class="header">
-        <h2>GenAI | {{ editingId() ? 'Edit Workflow' : 'New Workflow' }}</h2>
-        <button class="btn outline" (click)="goBack()">Back to Workflows</button>
-      </div>
+    <app-seo
+      [pageTitle]="'nav.genai-workflows' | translate"
+      [description]="'This is the workflow builder of the AI product app.'"
+      [keywords]="'workflows, workflow builder, ai'"
+      (titleChange)="onTitleChange($event)"
+    >
+    </app-seo>
 
-      <div class="card">
-        <label>Workflow Name</label>
-        <input [(ngModel)]="name" placeholder="Enter workflow name" required />
-      </div>
+    <div class="card">
+      <label>Workflow Name</label>
+      <app-dynamic-form [config]="fieldConfig" [form]="form"></app-dynamic-form>
+    </div>
 
-      <div class="card">
-        <app-workflow-canvas
-          [nodes]="nodes()"
-          [edges]="edges()"
-          [disabled]="disabled"
-          [availableActions]="availableActions"
-          (change)="onCanvasChange($event)"
-          (validityChange)="isValid.set($event)"
-        >
-        </app-workflow-canvas>
-      </div>
+    <div class="card">
+      <app-workflow-canvas
+        [nodes]="nodes()"
+        [edges]="edges()"
+        [disabled]="disabled"
+        [availableActions]="availableActions"
+        (change)="onCanvasChange($event)"
+        (validityChange)="isValid.set($event)"
+      >
+      </app-workflow-canvas>
+    </div>
 
-      <div class="footer">
-        <button
-          class="btn primary"
-          [disabled]="!name.trim() || saving() || !isValid()"
-          (click)="save()"
-        >
-          {{ saving() ? 'Saving…' : 'Save Workflow' }}
-        </button>
-      </div>
+    <div class="footer">
+      <button
+        mat-raised-button
+        [disabled]="form.invalid || saving() || !isValid()"
+        (click)="save()"
+      >
+        {{ saving() ? 'Saving…' : ('SAVE' | translate) }}
+      </button>
     </div>
   `,
-  styles: [
-    `
-      .page {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-      }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.75rem 0;
-        border-bottom: 1px solid #e0e0e0;
-      }
-      .card {
-        padding: 1rem;
-        border: 1px solid #e0e0e0;
-        border-radius: 10px;
-        background: #fff;
-      }
-      .card > label {
-        display: block;
-        margin-bottom: 0.4rem;
-        font-weight: 600;
-      }
-      .card > input {
-        width: 100%;
-        padding: 0.45rem 0.6rem;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-      }
-      .footer {
-        display: flex;
-        justify-content: flex-end;
-      }
-      .btn {
-        padding: 0.5rem 0.9rem;
-        border-radius: 8px;
-        border: 1px solid #c8c8c8;
-        background: #fff;
-        cursor: pointer;
-      }
-      .btn.primary {
-        background: #1976d2;
-        color: #fff;
-        border-color: #1976d2;
-      }
-      .btn.outline {
-        background: transparent;
-      }
-      .btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-    `,
-  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WorkflowBuilderComponent {
+export class WorkflowBuilderComponent implements OnInit {
+  public form!: FormGroup;
+  public fieldConfig: FieldConfig[] = [];
+
   // mock routing state / id
   editingId = signal<string | null>(null);
 
-  name = '';
   nodes = signal<WorkflowNode[]>([]);
   edges = signal<WorkflowEdge[]>([]);
   isValid = signal(false);
@@ -123,6 +93,30 @@ export class WorkflowBuilderComponent {
 
   disabled = signal<boolean>(false);
 
+  constructor(
+    private fb: FormBuilder,
+    private layoutService: LayoutService,
+    private fieldsConfigService: FieldConfigService,
+  ) {}
+  public onTitleChange(title: string): void {
+    this.layoutService.setTitle(title);
+  }
+
+  ngOnInit(): void {
+    this.form = this.fb.group({});
+    this.fieldConfig = [
+      this.fieldsConfigService.getTextField({
+        name: 'name',
+        label: 'form.labels.name',
+        placeholder: 'form.placeholders.name',
+        validators: [Validators.required, Validators.minLength(2), Validators.maxLength(80)],
+        errorMessages: { required: 'form.errors.name.required' },
+        color: 'primary',
+        layoutClass: 'primary',
+      }),
+    ];
+  }
+
   onCanvasChange(e: { nodes: WorkflowNode[]; edges: WorkflowEdge[] }) {
     this.nodes.set(e.nodes);
     this.edges.set(e.edges);
@@ -130,12 +124,14 @@ export class WorkflowBuilderComponent {
 
   async save() {
     try {
+      const raw = this.form.getRawValue();
+
       this.saving.set(true);
       // strip ephemeral flags if any
       const cleanedNodes = this.nodes().map((n) => ({ ...n }));
       const dto = {
         id: this.editingId() ?? uuidv4(),
-        name: this.name,
+        name: raw.name,
         nodes: cleanedNodes,
         edges: this.edges(),
       };
