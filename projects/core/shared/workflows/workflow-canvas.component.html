@@ -1,0 +1,103 @@
+<div class="pxs-wf-root">
+  @if (availableActions().length) {
+    <div class="pxs-wf-palette">
+      <div class="pxs-wf-palette-title">Actions:</div>
+      <div class="pxs-wf-palette-items">
+        @for (a of availableActions(); track a.type) {
+          <div class="pxs-wf-pill" cdkDrag [cdkDragData]="a" [class.disabled]="disabled()">
+            {{ a.type }}
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <div
+    class="pxs-wf-canvas"
+    cdkDropList
+    (cdkDropListDropped)="onDrop($event)"
+    (contextmenu)="openContextMenu($event)"
+  >
+    <ngx-graph
+      class="chart-container"
+      [view]="[canvasW(), canvasH()]"
+      [nodes]="gNodes()"
+      [links]="gLinks()"
+      [autoCenter]="true"
+      [autoZoom]="true"
+      [update]="updateSignal()"
+      [draggingEnabled]="!disabled()"
+      [zoomSpeed]="0.075"
+      layout="dagre"
+      (nodeSelected)="onNodeSelected($event)"
+      (edgeSelected)="onEdgeSelected($event)"
+    >
+      <!-- defs (arrow head) -->
+      <ng-template #defsTemplate>
+        <svg:marker
+          id="arrow"
+          viewBox="0 -5 10 10"
+          refX="8"
+          refY="0"
+          markerWidth="4"
+          markerHeight="4"
+          orient="auto"
+        >
+          <svg:path d="M0,-5L10,0L0,5" class="arrow-head"></svg:path>
+        </svg:marker>
+      </ng-template>
+
+      <!-- node (SVG) -->
+      <ng-template #nodeTemplate let-node>
+        <svg:g class="node" [ngClass]="node?.data?.type">
+          <svg:rect
+            rx="8"
+            ry="8"
+            [attr.width]="node.dimension?.width || 160"
+            [attr.height]="node.dimension?.height || 60"
+            [attr.fill]="nodeFill(node?.data?.type)"
+          ></svg:rect>
+
+          <svg:text
+            alignment-baseline="central"
+            [attr.x]="12"
+            [attr.y]="(node.dimension?.height || 60) / 2"
+          >
+            {{ node.label }}
+          </svg:text>
+        </svg:g>
+      </ng-template>
+
+      <!-- link -->
+      <ng-template #linkTemplate let-link>
+        <svg:g class="edge">
+          <svg:path class="line" stroke-width="2" marker-end="url(#arrow)"></svg:path>
+          <svg:text class="edge-label" text-anchor="middle">
+            <textPath
+              class="text-path"
+              [attr.href]="'#' + link.id"
+              [style.dominant-baseline]="link.dominantBaseline"
+              startOffset="50%"
+            >
+              {{ link.label }}
+            </textPath>
+          </svg:text>
+        </svg:g>
+      </ng-template>
+    </ngx-graph>
+
+    @if (!disabled()) {
+      <div class="pxs-help">
+        <span>Tip:</span> Click a node to select source, then click another to connect. Right-click
+        to delete.
+      </div>
+    }
+
+    @if (contextMenu(); as m) {
+      <div class="pxs-menu" [style.left.px]="m.x" [style.top.px]="m.y">
+        <button (click)="onDelete()">Delete</button>
+        <button (click)="closeContextMenu()">Close</button>
+      </div>
+    }
+  </div>
+</div>
