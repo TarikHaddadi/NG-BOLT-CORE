@@ -31,3 +31,10 @@ export {
 export { type TeamManagementState, type TeamMember } from './team-management.model';
 export { type ButtonVariant, type ToolbarAction } from './toolbar.interface';
 export { type CreateUserDto, type UpdateUserDto, type User, type UserState } from './user.model';
+export {
+  type ActionDefinition,
+  type WorkflowEdge,
+  type WorkflowNode,
+  type WorkflowNodeData,
+  type WorkflowNodeType,
+} from './workflow.model';

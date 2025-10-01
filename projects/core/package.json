@@ -1,6 +1,6 @@
 {
   "name": "@cadai/pxs-ng-core",
-  "version": "1.8.5",
+  "version": "1.9.0",
   "publishConfig": {
     "registry": "https://pkgs.dev.azure.com/cadai/Socle/_packaging/PXS-NG-CORE/npm/registry/"
   },
@@ -15,14 +15,21 @@
     "@angular/material": ">=19.0.0 <21.0.0",
     "@ngx-translate/core": "^16.0.0 || ^17.0.0",
     "@ngx-translate/http-loader": "^16.0.0 || ^17.0.0",
-    "@ngrx/store": "^18.0.0 || ^19.0.0",
-    "@ngrx/effects": "^18.0.0 || ^19.0.0",
-    "ngrx-store-localstorage": "^18.0.0 || ^19.0.0",
+    "@ngrx/store": "^18.0.0 || ^19.0.0 || ^20.0.0",
+    "@ngrx/effects": "^18.0.0 || ^19.0.0 || ^20.0.0",
+    "ngrx-store-localstorage": "^18.0.0 || ^19.0.0 || ^20.0.0",
     "keycloak-js": ">=23.0.0 <27.0.0",
     "rxjs": "~7.8.0",
     "chartjs-adapter-luxon": "^1.0.0",
     "chart.js": "^4.5.0",
-    "luxon": "^3.7.1"
+    "luxon": "^3.7.1",
+    "@swimlane/ngx-graph": "^11.0.0",
+    "uuid": "^13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@swimlane/ngx-graph": {
+      "optional": true
+    }
   },
   "dependencies": {
     "tslib": "^2.3.0"
