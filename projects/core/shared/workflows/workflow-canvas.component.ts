@@ -4,16 +4,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  CUSTOM_ELEMENTS_SCHEMA,
-  effect,
   EventEmitter,
   Input,
   Output,
   signal,
 } from '@angular/core';
-import { Edge as GEdge,NgxGraphModule, Node as GNode } from '@swimlane/ngx-graph';
+import { Edge as GEdge, NgxGraphModule, Node as GNode } from '@swimlane/ngx-graph';
+import { Subject } from 'rxjs';
 
-import { ActionDefinition,WorkflowEdge, WorkflowNode } from '@cadai/pxs-ng-core/interfaces';
+import { ActionDefinition, WorkflowEdge, WorkflowNode } from '@cadai/pxs-ng-core/interfaces';
 
 type ContextMenuTarget = { type: 'node' | 'edge'; id: string; x: number; y: number } | null;
 
@@ -21,7 +20,6 @@ type ContextMenuTarget = { type: 'node' | 'edge'; id: string; x: number; y: numb
   selector: 'app-workflow-canvas',
   standalone: true,
   imports: [CommonModule, DragDropModule, NgxGraphModule],
-  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './workflow-canvas.component.html',
   styleUrls: ['./workflow-canvas.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,7 +31,7 @@ export class WorkflowCanvasComponent {
   @Input() availableActions = signal<ActionDefinition[]>([]);
   @Output() change = new EventEmitter<{ nodes: WorkflowNode[]; edges: WorkflowEdge[] }>();
   @Output() validityChange = new EventEmitter<boolean>();
-
+  update$ = new Subject<boolean>();
   canvasW = signal(800);
   canvasH = signal(550);
 
@@ -41,30 +39,22 @@ export class WorkflowCanvasComponent {
   // store graph in two arrays to avoid shape mismatches
   private _nodes = signal<GNode[]>([]);
   private _links = signal<GEdge[]>([]);
-  private _update = signal<number>(0);
 
   contextMenu = signal<ContextMenuTarget>(null);
 
   gNodes = computed<GNode[]>(() => this._nodes());
   gLinks = computed<GEdge[]>(() => this._links());
-  updateSignal = computed(() => this._update());
 
-  constructor() {
-    effect(() => {
-      if (!this.nodes?.length) {
-        const input: WorkflowNode = { id: 'input-node', type: 'input', x: 50, y: 200, data: {} };
-        const result: WorkflowNode = {
-          id: 'result-node',
-          type: 'result',
-          x: 600,
-          y: 200,
-          data: {},
-        };
-        this.nodes = [input, result];
-        this.emitChange();
-      }
-      this.recomputeGraph();
-    });
+  constructor() {}
+
+  ngOnInit() {
+    if (!this.nodes?.length) {
+      const input: WorkflowNode = { id: 'input-node', type: 'input', x: 50, y: 200, data: {} };
+      const result: WorkflowNode = { id: 'result-node', type: 'result', x: 600, y: 200, data: {} };
+      this.nodes = [input, result];
+      this.emitChange();
+    }
+    this.recomputeGraph();
   }
 
   nodeFill(type?: string) {
@@ -88,7 +78,7 @@ export class WorkflowCanvasComponent {
     }));
     this._nodes.set(nodes);
     this._links.set(links);
-    this._update.set(this._update() + 1);
+    this.update$.next(true);
     this.emitValidity();
   }
 

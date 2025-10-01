@@ -16,3 +16,4 @@ export { NotFoundComponent } from './not-found/not-found.component';
 export { SeoComponent } from './seo/seo.component';
 export { SmartTableComponent } from './smart-table/smart-table.component';
 export { WorkflowBuilderComponent } from './workflows/workflow-builder.component';
+export { WorkflowCanvasComponent } from './workflows/workflow-canvas.component';
