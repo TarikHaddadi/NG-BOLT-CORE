@@ -15,3 +15,4 @@ export { AppLayoutComponent } from './layout/app-layout.component';
 export { NotFoundComponent } from './not-found/not-found.component';
 export { SeoComponent } from './seo/seo.component';
 export { SmartTableComponent } from './smart-table/smart-table.component';
+export { WorkflowBuilderComponent } from './workflows/workflow-builder.component';
