@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { v4 as uuidv4 } from 'uuid';
 
-import { ActionDefinition,WorkflowEdge, WorkflowNode } from '@cadai/pxs-ng-core/interfaces';
+import { ActionDefinition, WorkflowEdge, WorkflowNode } from '@cadai/pxs-ng-core/interfaces';
 
 import { WorkflowCanvasComponent } from './workflow-canvas.component';
 

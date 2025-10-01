@@ -25,7 +25,7 @@
       [links]="gLinks()"
       [autoCenter]="true"
       [autoZoom]="true"
-      [update]="updateSignal()"
+      [update$]="update$"
       [draggingEnabled]="!disabled()"
       [zoomSpeed]="0.075"
       layout="dagre"
@@ -73,14 +73,14 @@
         <svg:g class="edge">
           <svg:path class="line" stroke-width="2" marker-end="url(#arrow)"></svg:path>
           <svg:text class="edge-label" text-anchor="middle">
-            <textPath
+            <svg:textPath
               class="text-path"
               [attr.href]="'#' + link.id"
               [style.dominant-baseline]="link.dominantBaseline"
               startOffset="50%"
             >
               {{ link.label }}
-            </textPath>
+            </svg:textPath>
           </svg:text>
         </svg:g>
       </ng-template>
