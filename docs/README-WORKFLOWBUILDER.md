@@ -292,7 +292,7 @@ Apply guardrails in `applyInspector()` to enforce file counts (e.g., compare req
 
 ```ts
 export interface FieldConfig {
-  defaultValue?: unknown; // allow File | File[] | string[]
+  defaultValue?: string | number | boolean | File | File[] | string[]; // for text/email/phone/password, etc.
   accept?: string;
   maxFiles?: number;
   maxFileSize?: number; // bytes
@@ -458,3 +458,8 @@ $shadow-color: #000;
 - Fixed SCSS `$shadow-color` usage.
 - Added FR translations for file errors.
 - Simplified `ngx-graph` templates.
+
+## 🧑‍💻 Author
+
+**Angular Product Skeleton**  
+Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).
