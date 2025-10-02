@@ -77,7 +77,7 @@ type FileControlValue = File | File[] | string[] | null;
       }
     </mat-form-field>
 
-    <!-- File list + actions (outside the mat-form-field to avoid layout issues) -->
+    <!-- File list + actions -->
     @if (filesCount > 0) {
       <div class="pxs-file-list">
         <div class="pxs-file-row" *ngFor="let f of filesView; let i = index">
@@ -108,10 +108,9 @@ type FileControlValue = File | File[] | string[] | null;
 })
 export class InputFileComponent {
   @Input({ required: true }) field!: FieldConfig & {
-    // Optional extra options for file behavior
     accept?: string; // e.g. "image/*,.pdf"
     multiple?: boolean; // default false
-    maxFiles?: number; // default unlimited
+    maxFiles?: number; // count
     maxTotalSize?: number; // bytes
     maxFileSize?: number; // bytes
   };
@@ -121,6 +120,7 @@ export class InputFileComponent {
   @ViewChild('fileInput') private fileInputRef!: ElementRef<HTMLInputElement>;
 
   emptyParams: Record<string, never> = {};
+  private lastRejectedByAccept = 0; // track how many were dropped by accept
 
   constructor(private t: TranslateService) {}
 
@@ -138,7 +138,7 @@ export class InputFileComponent {
   }
 
   get showError(): boolean {
-    return !!(this.fc?.touched && this.fc?.invalid);
+    return !!((this.fc?.touched || this.fc?.dirty) && this.fc?.invalid);
   }
 
   get hintId() {
@@ -154,31 +154,46 @@ export class InputFileComponent {
     return null;
   }
 
-  // ---------- UI state ----------
+  // ---------- UI actions ----------
   openPicker() {
+    this.fc.markAsTouched();
+    // We don't want to blow away programmatic errors here.
+    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
     this.fileInputRef?.nativeElement?.click();
   }
 
   onFilesSelected(ev: Event) {
     const input = ev.target as HTMLInputElement;
     const list = input.files;
-    if (!list) return;
+    if (!list) {
+      // dialog canceled
+      this.fc.markAsTouched();
+      this.fc.updateValueAndValidity({ onlySelf: true });
+      return;
+    }
 
-    const newFiles = Array.from(list);
+    const selected = Array.from(list);
     const cur = this.currentFiles();
+    const merged = this.multiple ? [...cur, ...selected] : selected.slice(0, 1);
 
-    const merged = this.multiple ? [...cur, ...newFiles] : newFiles.slice(0, 1);
+    const { accepted, rejectedCount } = this.filterByAccept(merged);
+    this.lastRejectedByAccept = rejectedCount;
 
-    const filtered = this.filterByAccept(merged);
-    const limited = this.enforceCounts(filtered);
-    const final = this.enforceSizes(limited);
+    const limited = this.enforceCounts(accepted);
+    const final = limited; // sizes & other errors handled in applyFileErrors
 
-    // write value
+    // 1) set the value
     this.fc.setValue(this.multiple ? final : (final[0] ?? null));
+    this.fc.markAsTouched();
     this.fc.markAsDirty();
-    this.fc.updateValueAndValidity();
 
-    // reset native input so same file can be picked again
+    // 2) run built-ins (required, etc.) first
+    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+
+    // 3) now apply custom file errors (this will STICK)
+    this.applyFileErrors(final);
+
+    // reset native input value so same file can be re-picked
     input.value = '';
   }
 
@@ -186,27 +201,30 @@ export class InputFileComponent {
     const cur = this.currentFiles();
     cur.splice(i, 1);
     const next = this.multiple ? cur : (cur[0] ?? null);
+
     this.fc.setValue(next);
+    this.fc.markAsTouched();
     this.fc.markAsDirty();
-    this.fc.updateValueAndValidity();
+    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+
+    this.applyFileErrors(this.multiple ? (next as File[]) : next ? [next as File] : []);
   }
 
   clear() {
     this.fc.setValue(this.multiple ? [] : null);
+    this.fc.markAsTouched();
     this.fc.markAsDirty();
-    this.fc.updateValueAndValidity();
+    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+    this.applyFileErrors([]);
     if (this.fileInputRef?.nativeElement) this.fileInputRef.nativeElement.value = '';
   }
 
   // ---------- View / display ----------
-
-  // Replace your filesView getter with this:
   get filesView(): Array<{ name: string; size?: number }> {
     const v = this.fc.value as File | string | Array<File | string> | null;
     if (!v) return [];
 
     if (Array.isArray(v)) {
-      // v: (File | string)[]
       return v.map((x) => {
         if (isString(x)) return { name: x };
         if (isFile(x)) return { name: x.name, size: x.size };
@@ -214,7 +232,6 @@ export class InputFileComponent {
       });
     }
 
-    // single value: File | string
     if (isString(v)) return [{ name: v }];
     if (isFile(v)) return [{ name: v.name, size: v.size }];
 
@@ -228,7 +245,7 @@ export class InputFileComponent {
   get displayValue(): string {
     if (!this.filesCount) return '';
     if (this.filesCount === 1) return this.filesView[0].name;
-    return this.t.instant('form.files.count', { count: this.filesCount }); // e.g., "3 files"
+    return this.t.instant('form.files.count', { count: this.filesCount });
   }
 
   humanSize(bytes?: number): string {
@@ -247,11 +264,11 @@ export class InputFileComponent {
     return v instanceof File ? [v] : [];
   }
 
-  private filterByAccept(files: File[]): File[] {
+  /** returns accepted files and how many got rejected by accept rules */
+  private filterByAccept(files: File[]): { accepted: File[]; rejectedCount: number } {
     const accept = this.field?.accept as string | undefined;
-    if (!accept) return files;
+    if (!accept) return { accepted: files, rejectedCount: 0 };
 
-    // accept tokens are comma-separated: ".pdf,image/*"
     const tokens = accept
       .split(',')
       .map((s) => s.trim().toLowerCase())
@@ -272,7 +289,8 @@ export class InputFileComponent {
       });
     };
 
-    return files.filter(ok);
+    const accepted = files.filter(ok);
+    return { accepted, rejectedCount: files.length - accepted.length };
   }
 
   private enforceCounts(files: File[]): File[] {
@@ -282,46 +300,56 @@ export class InputFileComponent {
     return files.slice(0, maxFiles);
   }
 
-  private enforceSizes(files: File[]): File[] {
+  /** Compute and APPLY custom errors AFTER setValue()/updateValueAndValidity(). */
+  private applyFileErrors(files: File[]): void {
     const maxTotal = this.field?.maxTotalSize as number | undefined;
     const maxOne = this.field?.maxFileSize as number | undefined;
+    const maxFiles = this.field?.maxFiles as number | undefined;
 
-    // carry forward any existing errors
+    // Start with validator-produced errors (if any) to avoid nuking them.
     const errs: ValidationErrors = { ...(this.fc.errors ?? {}) };
 
-    // per-file size check
+    // accept: if any were rejected, show error
+    if (this.lastRejectedByAccept > 0) {
+      errs['accept'] = true;
+    } else {
+      delete errs['accept'];
+    }
+
+    // max single file size
     if (maxOne && files.some((f) => f.size > maxOne)) {
       errs['maxFileSize'] = { max: maxOne };
-    } else if (errs['maxFileSize']) {
+    } else {
       delete errs['maxFileSize'];
     }
 
-    // total size check
+    // max total size
     if (maxTotal) {
       const total = files.reduce((s, f) => s + f.size, 0);
       if (total > maxTotal) {
         errs['maxTotalSize'] = { max: maxTotal, total };
-      } else if (errs['maxTotalSize']) {
+      } else {
         delete errs['maxTotalSize'];
       }
+    } else {
+      delete errs['maxTotalSize'];
     }
 
-    // enforce max files (defensive; slice already limited earlier)
-    const maxFiles = this.field?.maxFiles as number | undefined;
+    // max files count
     if (maxFiles && files.length > maxFiles) {
       errs['maxFiles'] = { max: maxFiles };
-    } else if (errs['maxFiles']) {
+    } else {
       delete errs['maxFiles'];
     }
 
-    // preserve 'required' if it was set elsewhere
-    const required = !!this.fc.errors?.['required'];
-    const finalErrs = { ...(required ? { required: true } : {}), ...errs };
+    // ensure required shows when empty if field.required = true
+    const isEmpty = files.length === 0;
+    if (this.field?.required) {
+      if (isEmpty) errs['required'] = true;
+      else delete errs['required'];
+    }
 
-    // write back: use null to clear errors fully
-    this.fc.setErrors(Object.keys(finalErrs).length ? finalErrs : null);
-
-    return files;
+    this.fc.setErrors(Object.keys(errs).length ? errs : null);
   }
 
   // ---------- Error/i18n ----------
@@ -329,23 +357,20 @@ export class InputFileComponent {
     const errs = this.fc.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
 
-    // Show in this order
     const order = ['required', 'maxFiles', 'maxFileSize', 'maxTotalSize', 'accept'];
     const key = order.find((k) => k in errs) || Object.keys(errs)[0];
 
-    // Prefer per-field overrides, else generic "form.errors.file.*"
     const overrideKey = this.field.errorMessages?.[key];
     const fallbackKey = `form.errors.file.${key}`;
     const i18nKey = overrideKey ?? fallbackKey;
 
-    const params = this.paramsFor(key, errs[key]);
+    const params = this.paramsFor(key, (errs as any)[key]);
     return this.t.instant(i18nKey, params);
   }
 
   private paramsFor(key: string, val: any): Record<string, any> {
     switch (key) {
       case 'accept': {
-        // e.g. ".pdf,image/*" ➜ pretty list for message
         const raw = (this.field?.accept ?? '').trim();
         const tokens = raw
           ? raw
@@ -358,24 +383,18 @@ export class InputFileComponent {
       }
 
       case 'maxFiles': {
-        // expects: requiredLength, actualLength
         const requiredLength = val?.max ?? this.field?.maxFiles ?? 0;
         const actualLength = this.filesCount;
         return { requiredLength, actualLength };
       }
 
       case 'maxFileSize': {
-        // expects: requiredLength
         const requiredLength = this.humanSize(val?.max ?? this.field?.maxFileSize);
         return { requiredLength };
       }
 
       case 'maxTotalSize': {
-        // expects: requiredLength (optionally actualLength if you add it to the message)
         const requiredLength = this.humanSize(val?.max ?? this.field?.maxTotalSize);
-        // If you later update the translation to include actualLength, you can add:
-        // const actualLength = this.humanSize(val?.total);
-        // return { requiredLength, actualLength };
         return { requiredLength };
       }
 

@@ -1,303 +1,115 @@
-// ===============================================
-// Workflow Canvas — SCSS (Sass) stylesheet
-// -----------------------------------------------
-// - Uses CSS custom properties with sane fallbacks
-// - BEM-ish blocks with nested elements/modifiers
-// - Reusable mixins for size, elevation, and flex
-// ===============================================
-
-// ---------- Tokens (CSS var fallbacks) ----------
-$bg-surface: var(--pxs-surface, #ffffff);
-$bg-muted: var(--pxs-surface-muted, #fafafa);
-$border-color: var(--pxs-border, #e0e0e0);
-$text-muted: var(--pxs-text-muted, #666);
-$primary: var(--pxs-primary, #1976d2);
-$primary-600: var(--pxs-primary-600, #1565c0);
-$success: var(--pxs-success, #388e3c);
-$shadow-color: #000; // solid black
-
-// ---------- Mixins ----------
-@mixin size($w, $h) {
-  width: $w;
-  height: $h;
-}
-
-@mixin elevation($z: 8, $alpha: 0.08) {
-  box-shadow: 0 #{$z}px #{($z * 3)}px rgba($shadow-color, $alpha);
-}
-
-@mixin flex-row($gap: 0.5rem, $wrap: wrap, $align: center) {
-  display: flex;
-  align-items: $align;
-  gap: $gap;
-  flex-wrap: $wrap;
-}
-
-@mixin absolute($t: auto, $r: auto, $b: auto, $l: auto) {
-  position: absolute;
-  top: $t;
-  right: $r;
-  bottom: $b;
-  left: $l;
-}
-
-// ---------- Root layout ----------
 .pxs-wf-root {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 12px;
+  align-items: start;
 }
 
-// ---------- Palette ----------
 .pxs-wf-palette {
-  @include flex-row(1rem);
-  flex-wrap: wrap;
-
-  &-title {
-    font-weight: 600;
-  }
-
-  &-items {
-    @include flex-row(0.5rem);
-    margin: 15px 0;
-
-    .pxs-wf-pill {
-      text-transform: none;
-      justify-content: flex-start;
-      border-radius: 999px;
-      padding: 0.4rem 0.75rem;
-      line-height: 1.2;
-      border: 1px solid $border-color;
-      background: $bg-surface;
-      cursor: grab;
-
-      &:hover {
-        border-color: $primary;
-      }
-      &:active {
-        cursor: grabbing;
-      }
-      &:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-    }
-  }
-}
-
-// ---------- Canvas ----------
-.pxs-wf-canvas {
-  position: relative;
-  min-height: 640px;
-  border: 1px solid $border-color;
-  border-radius: 8px;
-  overflow: hidden;
-  display: block;
-  background: $bg-muted;
-
-  .chart-container {
-    @include size(100%, 100%);
-    display: block;
-
-    svg {
-      @include size(100%, 100%);
-      display: block;
-    }
-  }
-}
-
-// ---------- Node look ----------
-.node {
-  &.input rect {
-    fill: #e3f2fd;
-  }
-  &.result rect {
-    fill: #e8f5e9;
-  }
-  &.action rect {
-    fill: $bg-surface;
-  }
-}
-
-// ---------- Edges ----------
-.edge {
-  .line {
-    stroke: $primary;
-    fill: none;
-    transition:
-      stroke 0.15s ease,
-      stroke-width 0.15s ease;
-  }
-
-  &:hover .line {
-    stroke: $primary-600;
-    stroke-width: 2.5;
-  }
-
-  .edge-label {
-    font-size: 12px;
-    paint-order: stroke;
-    stroke: #fff;
-    stroke-width: 3px;
-    stroke-linejoin: round;
-  }
-}
-
-// ---------- Handles (ports) ----------
-.wf-handle {
-  fill: #fff;
-  stroke: $primary;
-  stroke-width: 3px;
-  cursor: pointer;
-  filter: drop-shadow(0 0 2px rgba($shadow-color, 0.3));
-
-  &.source {
-    stroke: $success;
-  }
-  &.target {
-    stroke: $primary;
-  }
-
-  &:hover {
-    opacity: 0.9;
-  }
-}
-
-// ---------- Inspector ----------
-.pxs-wf-inspector {
-  @include absolute(16px, 16px, auto, auto);
-  width: 360px;
-  max-height: calc(100% - 32px);
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
   overflow: auto;
-  background: $bg-surface;
-  border: 1px solid $border-color;
-  border-radius: 12px;
-  padding: 12px;
-  @include elevation(8, 0.08);
-  z-index: 10;
+  padding: 8px;
+  border: 1px solid var(--mat-divider-color, #e0e0e0);
+  border-radius: 8px;
+  background: #fafafa;
+
+  .pxs-wf-palette-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .pxs-wf-palette-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pxs-wf-pill {
+    cursor: grab;
+    user-select: none;
+    touch-action: none; /* avoid scroll-blocking path on touch */
+  }
+}
+
+.pxs-wf-canvas {
+  height: 640px; /* clamp to avoid infinite growth */
+  min-height: 640px;
+  max-height: 640px;
+  overflow: hidden;
+  position: relative;
+  border: 1px dashed #cfd8dc;
+  border-radius: 8px;
+  background: #fff;
+  touch-action: none; /* improves responsiveness for drag/zoom */
+}
+
+.chart-container {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.node .wf-handle {
+  fill: #90a4ae;
+  cursor: pointer;
+}
+
+.node.input .wf-handle,
+.node.result .wf-handle {
+  fill: #607d8b;
+}
+
+.edge .line {
+  fill: none;
+}
+
+.pxs-wf-inspector {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 320px;
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 
   .header {
-    @include flex-row(0.5rem, nowrap, center);
-    justify-content: space-between;
-    margin-bottom: 8px;
-
-    .title {
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    button {
-      border: 0;
-      background: transparent;
-      cursor: pointer;
-      line-height: 1;
-      padding: 0.25rem 0.5rem;
-      border-radius: 6px;
-
-      &:hover {
-        background: #f5f5f5;
-      }
-    }
-  }
-
-  .actions {
-    margin-top: 0.5rem;
     display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 8px;
   }
-}
-
-// ---------- Help hint ----------
-.pxs-help {
-  @include absolute(auto, 8px, 8px, auto);
-  background: rgba($shadow-color, 0.05);
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  color: $text-muted;
-
-  // if used below the grid
-  &.as-row {
-    position: static;
-    grid-column: 1 / -1;
+  .actions {
     margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
   }
 }
 
-// ---------- Context menu ----------
+.pxs-help {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #666;
+}
+
 .pxs-menu {
-  @include absolute(auto, auto, auto, auto);
-  background: $bg-surface;
-  border: 1px solid $border-color;
+  position: fixed;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid #ddd;
   border-radius: 8px;
   padding: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
   display: flex;
-  gap: 6px;
-  z-index: 20;
-  @include elevation(6, 0.06);
+  flex-direction: column;
+  gap: 4px;
 
   button {
-    padding: 0.4rem 0.7rem;
     text-align: left;
-    background: transparent;
-    border: 0;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-
-    &:hover {
-      background: #f5f5f5;
-    }
-  }
-}
-
-// ---------- Responsive tweaks ----------
-@media (max-width: 1200px) {
-  .pxs-wf-inspector {
-    width: 320px;
-  }
-}
-
-@media (max-width: 992px) {
-  .pxs-wf-inspector {
-    width: min(92vw, 360px);
-    right: 8px;
-    top: 8px;
-    border-radius: 10px;
-  }
-}
-
-@media (max-width: 680px) {
-  .pxs-wf-root {
-    gap: 0.5rem;
-  }
-
-  .pxs-wf-palette-items .pxs-wf-pill {
-    padding: 0.35rem 0.6rem;
-    font-size: 0.9rem;
-  }
-
-  .pxs-wf-canvas {
-    min-height: 520px;
-  }
-}
-
-// ---------- Optional dark-scheme polish ----------
-@media (prefers-color-scheme: dark) {
-  .pxs-wf-canvas {
-    background: var(--pxs-surface-muted-dark, #121212);
-  }
-  .pxs-wf-inspector {
-    background: var(--pxs-surface-dark, #1e1e1e);
-    border-color: color-mix(in oklab, $border-color 50%, black);
-  }
-  .pxs-menu {
-    background: var(--pxs-surface-dark, #1e1e1e);
-    border-color: color-mix(in oklab, $border-color 50%, black);
-  }
-  .pxs-help {
-    background: rgba(255, 255, 255, 0.06);
-    color: #aaa;
   }
 }
