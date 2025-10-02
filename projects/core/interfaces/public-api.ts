@@ -33,6 +33,12 @@ export { type ButtonVariant, type ToolbarAction } from './toolbar.interface';
 export { type CreateUserDto, type UpdateUserDto, type User, type UserState } from './user.model';
 export {
   type ActionDefinition,
+  type ContextMenuTarget,
+  type EdgeStyle,
+  type EdgeWithPorts,
+  type ExtendedWorkflowEdge,
+  type NodeWithPorts,
+  type Port,
   type WorkflowEdge,
   type WorkflowNode,
   type WorkflowNodeData,
