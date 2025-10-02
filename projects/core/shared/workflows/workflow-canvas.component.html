@@ -1,7 +1,14 @@
 <div class="pxs-wf-root">
   @if (availableActions().length) {
-    <div class="pxs-wf-palette">
+    <div
+      class="pxs-wf-palette"
+      cdkDropList
+      [cdkDropListSortingDisabled]="true"
+      [cdkDropListConnectedTo]="[canvasList]"
+      [cdkDropListData]="availableActions()"
+    >
       <div class="pxs-wf-palette-title">Actions:</div>
+
       <div class="pxs-wf-palette-items" #paletteHost>
         @for (a of availableActions(); track a.type) {
           <button
@@ -13,6 +20,15 @@
             cdkDragRootElement=".pxs-wf-pill"
           >
             {{ a.type }}
+
+            <!-- nice floating preview -->
+            <ng-template cdkDragPreview>
+              <div class="pxs-wf-pill preview">{{ a.type }}</div>
+            </ng-template>
+            <!-- keep layout stable -->
+            <ng-template cdkDragPlaceholder>
+              <div class="pxs-wf-pill placeholder"></div>
+            </ng-template>
           </button>
         }
       </div>
@@ -23,8 +39,10 @@
     class="pxs-wf-canvas"
     #graphHost
     cdkDropList
+    #canvasList="cdkDropList"
     [cdkDropListData]="{}"
     [cdkDropListEnterPredicate]="allowPaletteDrop"
+    [cdkDropListConnectedTo]="[]"
     (cdkDropListDropped)="onDrop($event)"
     (contextmenu)="openCanvasContextMenu($event)"
   >
@@ -147,7 +165,11 @@
             <!-- OUTPUT PORTS (right) -->
             @if (node?.data?.ports?.outputs?.length) {
               @for (p of node.data.ports.outputs; track p.id; let i = $index) {
-                <svg:g class="port port-out" (click)="clickPort(node.id, 'source', p.id, $event)">
+                <svg:g
+                  class="port port-out"
+                  [class.pending]="isPending(node.id, p.id, 'source')"
+                  (click)="clickPort(node.id, 'source', p.id, $event)"
+                >
                   <svg:circle
                     class="wf-handle source"
                     [attr.cx]="(node.dimension?.width || 220) + 8"
