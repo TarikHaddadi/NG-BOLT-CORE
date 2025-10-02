@@ -1,0 +1,54 @@
+:host {
+  display: block;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.pxs-file-list {
+  margin-top: 0.25rem;
+  border: 1px dashed var(--pxs-border, #e0e0e0);
+  border-radius: 8px;
+  background: var(--pxs-surface, #fff);
+  padding: 0.25rem;
+
+  .pxs-file-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+
+    &:hover {
+      background: #fafafa;
+    }
+
+    .pxs-file-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.95rem;
+    }
+    .pxs-file-meta {
+      color: #666;
+      font-size: 0.8rem;
+    }
+  }
+
+  .pxs-file-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+  }
+}

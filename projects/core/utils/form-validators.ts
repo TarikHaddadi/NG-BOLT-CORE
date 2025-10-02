@@ -119,3 +119,63 @@ export function datePatternFromPlaceholder(ph: string): string {
     '$'
   );
 }
+
+type FileVal = File | File[] | string[] | null;
+const asFiles = (v: FileVal): File[] =>
+  !v
+    ? []
+    : Array.isArray(v)
+      ? v.filter((x): x is File => x instanceof File)
+      : v instanceof File
+        ? [v]
+        : [];
+
+export const fileAcceptValidator = (accept?: string): ValidatorFn => {
+  if (!accept) return () => null;
+  const tokens = accept
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return (c: AbstractControl): ValidationErrors | null => {
+    const files = asFiles(c.value);
+    if (!files.length) return null;
+    const ok = (f: File) => {
+      const t = (f.type || '').toLowerCase();
+      const n = (f.name || '').toLowerCase();
+      return tokens.some(
+        (tok) =>
+          tok === '*' ||
+          (tok.endsWith('/*') && t.startsWith(tok.slice(0, -1))) ||
+          (tok.startsWith('.') && n.endsWith(tok)) ||
+          t === tok,
+      );
+    };
+    return files.every(ok) ? null : { accept: { accept } };
+  };
+};
+
+export const maxFilesValidator = (max?: number): ValidatorFn =>
+  !max || max <= 0
+    ? () => null
+    : (c) => (asFiles(c.value).length <= max ? null : { maxFiles: { max } });
+
+export const maxFileSizeValidator = (max?: number): ValidatorFn =>
+  !max || max <= 0
+    ? () => null
+    : (c) => (asFiles(c.value).every((f) => f.size <= max) ? null : { maxFileSize: { max } });
+
+export const maxTotalSizeValidator = (max?: number): ValidatorFn =>
+  !max || max <= 0
+    ? () => null
+    : (c) => {
+        const files = asFiles(c.value);
+        const total = files.reduce((s, f) => s + f.size, 0);
+        return total <= max ? null : { maxTotalSize: { max, total } };
+      };
+
+export function isFile(val: unknown): val is File {
+  return typeof File !== 'undefined' && val instanceof File;
+}
+export function isString(val: unknown): val is string {
+  return typeof val === 'string';
+}

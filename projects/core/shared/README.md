@@ -1,6 +1,6 @@
 # Dynamic Forms & Field Components Guide
 
-_Last updated: 2025-08-13_
+_Last updated: 2025-10-02_
 
 This document explains how to **instantiate forms** and **reuse custom field components** under `shared/forms/fields`. It covers the `DynamicFormComponent`, the `FieldHostComponent`, and the `FieldConfigService` helpers your teammates will use every day.
 
@@ -124,6 +124,17 @@ export class MyFeatureComponent {
       maxLength: 500,
       layoutClass: 'primary',
     }),
+
+    this.fields.getFileField({
+        name: 'files',
+        label: 'form.labels.files',
+        multiple: true,
+        accept: '.pdf,.docx,image/*',
+        maxFiles: 10,
+        maxTotalSize: 50 * 1024 * 1024,  // 50 MB total
+        required: true,
+        validators: [Validators.required],
+      });
   ];
 }
 ```
@@ -186,6 +197,7 @@ MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Conc
   - `toggle`
   - `dropdown`
   - `range`
+  - `file`
   - `group` (nested) / `array` (list)
 - `name`: unique control key in the parent form
 - `label`: i18n key or plain label
@@ -211,6 +223,7 @@ MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Conc
 - `toggle` → `ToggleComponent`
 - `dropdown` → `SelectComponent`
 - `range` → `RangeComponent`
+- `file` → `InputFileComponent`
 
 ## Validators & Error Keys (conventions)
 
@@ -224,6 +237,11 @@ Built‑in and custom validators used in `FieldConfigService`:
 - `optionInListValidator(options)` → sets `optionNotAllowed`
 - `minArrayLength(n)` → sets `minlengthArray`
 - `datePatternFromPlaceholder('YYYY-MM-DD')` → input mask for parsing in `DatepickerComponent` (do **not** use `Validators.pattern` for datepicker; the control value is `Date | null`).
+- `fileAcceptValidator`
+- `maxFilesValidator`
+- `maxFileSizeValidator`
+- `maxTotalSizeValidator`
+- `isFile`
 
 **Common error message keys (add to i18n):**
 
@@ -266,6 +284,13 @@ form.errors.tags.minOne
 
 form.errors.country.required
 form.errors.country.notAllowed
+
+
+form.errors.file.accept
+form.errors.file.multiple
+form.errors.file.maxFiles
+form.errors.file.maxTotalSize
+form.errors.file.maxFileSize
 ```
 
 ## Patterns & Examples

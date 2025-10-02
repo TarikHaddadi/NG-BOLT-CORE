@@ -6,6 +6,10 @@ import {
   allowedCharsValidator,
   datePatternFromPlaceholder,
   emailTldValidator,
+  fileAcceptValidator,
+  maxFileSizeValidator,
+  maxFilesValidator,
+  maxTotalSizeValidator,
   minArrayLength,
   optionInListValidator,
   passwordStrengthValidator,
@@ -69,6 +73,66 @@ export class FieldConfigService {
       layoutClass: 'primary',
     };
     return mergeField(defaults, { ...overrides, type: 'textarea' });
+  }
+
+  /**
+   * File picker field
+   * Supported extras on FieldConfig (kept as plain props for your renderer):
+   * - accept?: string            (".pdf,image/*")
+   * - multiple?: boolean         (default false)
+   * - maxFiles?: number
+   * - maxFileSize?: number       (bytes)
+   * - maxTotalSize?: number      (bytes)
+   */
+  getFileField(overrides: Partial<FieldConfig> = {}): FieldConfig {
+    const accept = overrides.accept;
+    const multiple = !!overrides.multiple;
+    const maxFiles = overrides.maxFiles;
+    const maxFileSize = overrides.maxFileSize; // bytes
+    const maxTotalSize = overrides.maxTotalSize; // bytes
+    const required = overrides.required ?? true;
+
+    const defaults: FieldConfig = {
+      type: 'file',
+      name: 'file',
+      label: 'form.labels.file',
+      placeholder: 'form.placeholders.file', // used by the read-only text input
+      required,
+      helperText: 'form.hints.file',
+      // UI hints used by your renderer component (app-input-file)
+      accept,
+      multiple,
+      maxFiles,
+      maxFileSize,
+      maxTotalSize,
+
+      // Validators: compose requirements based on provided constraints
+      validators: [
+        ...(required ? [Validators.required] : []),
+        fileAcceptValidator(accept),
+        maxFilesValidator(multiple ? maxFiles : 1), // single mode => max 1
+        maxFileSizeValidator(maxFileSize),
+        maxTotalSizeValidator(maxTotalSize),
+      ],
+
+      disabled: false,
+      hidden: false,
+
+      children: [],
+      errorMessages: {
+        required: 'form.errors.file.required',
+        accept: 'form.errors.file.accept',
+        maxFiles: 'form.errors.file.maxFiles',
+        maxFileSize: 'form.errors.file.maxFileSize',
+        maxTotalSize: 'form.errors.file.maxTotalSize',
+      },
+      layoutClass: 'primary',
+      chipOptions: [],
+      autocompleteOptions: [],
+    };
+
+    // Force type to 'file', let overrides customize the rest
+    return mergeField(defaults, { ...overrides, type: 'file' });
   }
 
   getTextField(overrides: Partial<FieldConfig> = {}): FieldConfig {
