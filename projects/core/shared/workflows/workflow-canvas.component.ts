@@ -7,6 +7,7 @@ import {
   computed,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnDestroy,
   OnInit,
@@ -60,6 +61,9 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
   @ViewChild('graphHost', { static: true }) graphHost!: ElementRef<HTMLElement>;
   @ViewChild('paletteHost', { static: true }) paletteHost!: ElementRef<HTMLElement>;
+  @HostListener('document:keydown.escape') onEsc() {
+    this.pending.set(null);
+  }
 
   // Canvas viewport
   canvasW = signal(900);
@@ -93,6 +97,25 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     private fb: FormBuilder,
     private fields: FieldConfigService,
   ) {}
+
+  private toSafeId(s: string): string {
+    // keep letters, numbers, underscore, dash; replace everything else with '-'
+    return String(s).replace(/[^A-Za-z0-9_-]/g, '-');
+  }
+  private makeEdgeId(
+    srcNodeId: string,
+    srcPortId: string,
+    tgtNodeId: string,
+    tgtPortId: string,
+  ): string {
+    // canonical and CSS-safe (no spaces/colons/arrows)
+    return `e-${this.toSafeId(srcNodeId)}__${this.toSafeId(srcPortId)}--${this.toSafeId(tgtNodeId)}__${this.toSafeId(tgtPortId)}`;
+  }
+
+  isPending(nodeId: string, portId: string, kind: 'source' | 'target'): boolean {
+    const p = this.pending();
+    return !!p && kind === 'source' && p.nodeId === nodeId && p.portId === portId;
+  }
 
   // ---------- Lifecycle ----------
 
@@ -221,8 +244,17 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
         this.pending.set(null);
         return;
       }
-      const id = `${from.nodeId}:${from.portId} -> ${nodeId}:${portId}`;
-      if (!this.edges.some((e) => e.id === id)) {
+      const id = this.makeEdgeId(from.nodeId, from.portId, nodeId, portId);
+
+      // prevent duplicates irrespective of id formatting
+      const exists = this.edges.some(
+        (e) =>
+          e.source === from.nodeId &&
+          e.target === nodeId &&
+          (e as any).sourcePort === from.portId &&
+          (e as any).targetPort === portId,
+      );
+      if (!exists) {
         this.edges = [
           ...this.edges,
           {
