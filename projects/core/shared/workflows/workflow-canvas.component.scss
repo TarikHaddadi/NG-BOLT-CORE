@@ -19,20 +19,38 @@
     font-weight: 600;
     margin-bottom: 8px;
   }
+
   .pxs-wf-palette-items {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
+
   .pxs-wf-pill {
     cursor: grab;
     user-select: none;
-    touch-action: none; /* avoid scroll-blocking path on touch */
+    touch-action: none;
+    /* avoid scroll-blocking path on touch */
+
+    &.preview {
+      opacity: 0.9;
+      transform: scale(1.02);
+    }
+
+    &.placeholder {
+      visibility: hidden;
+    }
   }
 }
 
+.port-out.pending .wf-handle {
+  stroke: #1976d2;
+  stroke-width: 2;
+}
+
 .pxs-wf-canvas {
-  height: 640px; /* clamp to avoid infinite growth */
+  height: 640px;
+  /* clamp to avoid infinite growth */
   min-height: 640px;
   max-height: 640px;
   overflow: hidden;
@@ -40,7 +58,8 @@
   border: 1px dashed #cfd8dc;
   border-radius: 8px;
   background: #fff;
-  touch-action: none; /* improves responsiveness for drag/zoom */
+  touch-action: none;
+  /* improves responsiveness for drag/zoom */
 }
 
 .chart-container {
@@ -83,6 +102,7 @@
     font-weight: 600;
     margin-bottom: 8px;
   }
+
   .actions {
     margin-top: 8px;
     display: flex;
