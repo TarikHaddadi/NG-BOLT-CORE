@@ -1,12 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, signal } from '@angular/core';
-import {
-  FormBuilder,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { TranslateModule } from '@ngx-translate/core';
 import { v4 as uuidv4 } from 'uuid';
@@ -71,6 +65,13 @@ import { WorkflowCanvasComponent } from './workflow-canvas.component';
       </button>
     </div>
   `,
+  styles: [
+    `
+      .footer {
+        margin-top: 15px;
+      }
+    `,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkflowBuilderComponent implements OnInit {
@@ -87,9 +88,11 @@ export class WorkflowBuilderComponent implements OnInit {
 
   // inject from API service in Host; here we expose signals for Core demo
   availableActions = signal<ActionDefinition[]>([
-    { type: 'fetch', params: { url: '', method: 'GET' } },
-    { type: 'transform', params: { script: '' } },
-    { type: 'store', params: { collection: '' } },
+    { type: 'chat-basic', params: { prompt: '' } as any },
+    { type: 'chat-on-file', params: { prompt: '', files: [] } as any },
+    { type: 'compare', params: { leftFile: null, rightFile: null } as any },
+    { type: 'summarize', params: { file: null } as any },
+    { type: 'extract', params: { text: '', entities: '' } as any },
   ]);
 
   disabled = signal<boolean>(false);
@@ -99,6 +102,7 @@ export class WorkflowBuilderComponent implements OnInit {
     private layoutService: LayoutService,
     private fieldsConfigService: FieldConfigService,
   ) {}
+
   public onTitleChange(title: string): void {
     this.layoutService.setTitle(title);
   }
@@ -110,8 +114,6 @@ export class WorkflowBuilderComponent implements OnInit {
         name: 'name',
         label: 'form.labels.name',
         placeholder: 'form.placeholders.name',
-        validators: [Validators.required, Validators.minLength(2), Validators.maxLength(80)],
-        errorMessages: { required: 'form.errors.name.required' },
         color: 'primary',
         layoutClass: 'primary',
       }),

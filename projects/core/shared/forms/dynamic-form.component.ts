@@ -115,6 +115,32 @@ export class DynamicFormComponent implements OnInit, OnChanges {
         );
       }
 
+      case 'file': {
+        const multiple = field.multiple === true;
+        if (multiple) {
+          // Multiple: File[] (for new uploads) or string[] (persisted refs)
+          return new FormControl<File[] | string[]>(
+            {
+              value: Array.isArray(field.defaultValue) ? field.defaultValue : [],
+              disabled: !!field.disabled,
+            },
+            { validators },
+          );
+        } else {
+          // Single: File | string | null
+          const initial =
+            typeof field.defaultValue === 'string'
+              ? field.defaultValue
+              : field.defaultValue instanceof File
+                ? field.defaultValue
+                : null;
+          return new FormControl<File | string | null>(
+            { value: initial, disabled: !!field.disabled },
+            { validators },
+          );
+        }
+      }
+
       // text / email / phone / password / autocomplete / textarea / etc.
       default:
         return new FormControl<string>(

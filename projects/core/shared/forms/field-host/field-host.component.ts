@@ -8,6 +8,7 @@ import { FieldComponent, FieldConfig, FieldType } from '@cadai/pxs-ng-core/inter
 import { AutocompleteComponent } from '../fields/autocomplete/autocomplete.component';
 import { ChipsComponent } from '../fields/chips/chips.component';
 import { DatepickerComponent } from '../fields/date-picker/datepicker.component';
+import { InputFileComponent } from '../fields/file/file.component';
 import { RangeComponent } from '../fields/range/range.component';
 import { SelectComponent } from '../fields/select/select.component';
 import { TextFieldComponent } from '../fields/text-field/text-field.component';
@@ -29,6 +30,7 @@ const FIELD_MAP: Partial<Record<FieldType | string, Type<FieldComponent>>> = {
   chips: ChipsComponent,
   toggle: ToggleComponent,
   range: RangeComponent,
+  file: InputFileComponent,
 
   // date
   datepicker: DatepickerComponent,

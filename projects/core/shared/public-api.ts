@@ -6,6 +6,7 @@ export { FieldHostComponent } from './forms/field-host/field-host.component';
 export { AutocompleteComponent } from './forms/fields/autocomplete/autocomplete.component';
 export { ChipsComponent } from './forms/fields/chips/chips.component';
 export { DatepickerComponent } from './forms/fields/date-picker/datepicker.component';
+export { InputFileComponent } from './forms/fields/file/file.component';
 export { RangeComponent } from './forms/fields/range/range.component';
 export { SelectComponent } from './forms/fields/select/select.component';
 export { TextFieldComponent } from './forms/fields/text-field/text-field.component';

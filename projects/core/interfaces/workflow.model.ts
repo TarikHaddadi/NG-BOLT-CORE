@@ -1,14 +1,31 @@
 export type WorkflowNodeType = 'input' | 'action' | 'result';
 
-export interface WorkflowNodeData {
-  label?: string;
-  params?: Record<string, any> | null;
+export type WorkflowNodeData = InputNodeData | ResultNodeData | ActionNodeData;
+
+/** Simple “special” nodes */
+export interface InputNodeData {
+  label: string; // display label
+  kind?: 'input'; // optional; node.type already carries 'input'
 }
+export interface ResultNodeData {
+  label: string;
+  kind?: 'result';
+}
+
+/** All “action” nodes are discriminated by aiType */
+export type ActionNodeData =
+  | ChatBasicNodeData
+  | ChatOnFileNodeData
+  | CompareNodeData
+  | SummarizeNodeData
+  | ExtractNodeData;
 
 export interface WorkflowEdge {
   id: string;
   source: string;
-  label: string;
+  label?: string;
+  sourcePort?: string;
+  targetPort?: string;
   target: string;
   style: Record<string, string | undefined | null>;
 }
@@ -37,16 +54,86 @@ export type WorkflowNode = {
   x?: number; // px (optional, for manual layouts)
   y?: number;
   data: WorkflowNodeData;
+  ports?: Ports;
 };
 
-export type NodeWithPorts = WorkflowNode & {
-  ports?: {
-    inputs?: Port[];
-    outputs?: Port[];
-  };
-};
+export interface Ports {
+  inputs?: Port[];
+  outputs?: Port[];
+}
 
 export type EdgeWithPorts = WorkflowEdge & {
   sourcePort?: string;
   targetPort?: string;
+};
+
+export type AiActionType = 'chat-basic' | 'chat-on-file' | 'compare' | 'summarize' | 'extract';
+
+export type FileRef = string; // e.g. blob URL, storage key, API id
+export type RuntimeFile = File | Blob;
+export type PersistableFile = FileRef | RuntimeFile;
+
+export type AiActionParams =
+  | { type: 'chat-basic'; prompt: string }
+  | { type: 'chat-on-file'; prompt: string; files: File[] | string[] }
+  | { type: 'compare'; leftFile: File | string; rightFile: File | string }
+  | { type: 'summarize'; file: File | string }
+  | { type: 'extract'; text?: string; entities: string }; // entities = "person,location,..."
+
+// ---- Action-specific node data + params ----
+export interface ChatBasicNodeData {
+  label: string; // e.g., "Chat (basic)"
+  aiType: 'chat-basic';
+  params: {
+    prompt: string;
+  };
+}
+
+export interface ChatOnFileNodeData {
+  label: string; // e.g., "Chat on file(s)"
+  aiType: 'chat-on-file';
+  params: {
+    prompt: string;
+    /** allow one or many; when saving to backend, convert RuntimeFile -> FileRef[] */
+    files: PersistableFile[];
+  };
+}
+
+export interface CompareNodeData {
+  label: string; // "Compare two files"
+  aiType: 'compare';
+  params: {
+    leftFile: PersistableFile | null;
+    rightFile: PersistableFile | null;
+  };
+}
+
+export interface SummarizeNodeData {
+  label: string; // "Summarize file"
+  aiType: 'summarize';
+  params: {
+    file: PersistableFile | null;
+  };
+}
+
+export interface ExtractNodeData {
+  label: string; // "Extract entities"
+  aiType: 'extract';
+  params: {
+    /** optional free text to analyze (can also come from upstream node via ports) */
+    text?: string;
+    /** comma-separated list of entities: "person, location, organization" */
+    entities: string;
+  };
+}
+
+// -------------------------------
+// Helpful label map (UI sugar)
+// -------------------------------
+export const ACTION_LABEL: Record<AiActionType, string> = {
+  'chat-basic': 'Chat (basic)',
+  'chat-on-file': 'Chat on file(s)',
+  compare: 'Compare two files',
+  summarize: 'Summarize file',
+  extract: 'Extract entities',
 };
