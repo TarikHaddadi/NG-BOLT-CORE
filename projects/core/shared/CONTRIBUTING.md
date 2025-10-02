@@ -115,6 +115,7 @@ export type FieldType =
   | 'dropdown'
   | 'select'
   | 'toggle'
+  | 'file'
   | 'range'
   | 'datepicker'
   | 'myCustom'; // <-- add your new type

@@ -1,48 +1,46 @@
 .pxs-wf-root {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 12px;
+  align-items: start;
 }
 
 .pxs-wf-palette {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--mat-divider-color, #e0e0e0);
+  border-radius: 8px;
+  background: #fafafa;
 
-.pxs-wf-palette-title {
-  font-weight: 600;
-}
-
-.pxs-wf-palette-items {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.pxs-wf-pill {
-  padding: 0.4rem 0.7rem;
-  border-radius: 6px;
-  background: var(--pxs-primary, #1976d2);
-  color: #fff;
-  cursor: grab;
-  user-select: none;
-}
-
-.pxs-wf-pill.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  .pxs-wf-palette-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .pxs-wf-palette-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pxs-wf-pill {
+    cursor: grab;
+    user-select: none;
+    touch-action: none; /* avoid scroll-blocking path on touch */
+  }
 }
 
 .pxs-wf-canvas {
-  position: relative;
-  width: 100%;
-  min-height: 560px; // give it some height; or set a fixed height if you prefer
-  border: 1px solid var(--pxs-border, #e0e0e0);
-  border-radius: 8px;
+  height: 640px; /* clamp to avoid infinite growth */
+  min-height: 640px;
+  max-height: 640px;
   overflow: hidden;
-  display: block;
+  position: relative;
+  border: 1px dashed #cfd8dc;
+  border-radius: 8px;
+  background: #fff;
+  touch-action: none; /* improves responsiveness for drag/zoom */
 }
 
 .chart-container {
@@ -51,73 +49,67 @@
   display: block;
 }
 
-.chart-container svg {
-  width: 100%;
-  height: 100%;
-  display: block;
+.node .wf-handle {
+  fill: #90a4ae;
+  cursor: pointer;
 }
 
-.node.input rect {
-  fill: #e3f2fd;
-}
-
-.node.result rect {
-  fill: #e8f5e9;
+.node.input .wf-handle,
+.node.result .wf-handle {
+  fill: #607d8b;
 }
 
 .edge .line {
-  stroke: var(--pxs-primary, #1976d2);
   fill: none;
+}
+
+.pxs-wf-inspector {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 320px;
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .actions {
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
 }
 
 .pxs-help {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  background: rgba(0, 0, 0, 0.05);
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #666;
 }
 
 .pxs-menu {
-  position: absolute;
+  position: fixed;
+  z-index: 1000;
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-  padding: 0.25rem;
+  padding: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
-  z-index: 5;
-}
+  gap: 4px;
 
-.pxs-menu button {
-  padding: 0.4rem 0.7rem;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.pxs-menu button:hover {
-  background: #f5f5f5;
-}
-
-.wf-handle {
-  fill: #fff;
-  stroke: #1976d2;
-  stroke-width: 3px;
-  cursor: pointer;
-}
-.wf-handle.source {
-  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.3));
-}
-.wf-handle.target {
-  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.3));
-}
-
-.edge .line {
-  stroke: var(--pxs-primary, #1976d2);
-  fill: none;
+  button {
+    text-align: left;
+  }
 }

@@ -1,515 +1,355 @@
-# Workflow Builder & Canvas — README
+# Workflow Builder & Canvas — Usage & Integration Guide
 
-> _Last updated: 2025-10-02_
+_Last updated: 2025-10-02_
 
-> Angular 19+ • Standalone components • Signals • `@swimlane/ngx-graph` • CDK Drag&Drop • Dynamic Form (PXS‑NG‑CORE)
+Angular 19+ • Standalone components • Signals • `@swimlane/ngx-graph` • CDK Drag&Drop • Dynamic Form (PXS‑NG‑CORE)
 
-This document explains how to **use**, **extend**, and **embed** the Workflow Builder (`WorkflowBuilderComponent`) and Workflow Canvas (`WorkflowCanvasComponent`) used to design node‑based workflows with draggable **Actions**, connectable **ports**, configurable **edges** (arrows, styles), and a per‑node **Inspector** that renders **custom field configurations** via your Core SDK dynamic form.
-
----
-
-## Table of Contents
-
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Key Concepts](#key-concepts)
-- [Data Models](#data-models)
-- [Inputs / Outputs of Components](#inputs--outputs-of-components)
-- [How to Use the Builder Screen](#how-to-use-the-builder-screen)
-- [How to Use the Canvas](#how-to-use-the-canvas)
-- [Customizing Nodes (Ports, Labels, Types)](#customizing-nodes-ports-labels-types)
-- [Customizing Edges (Arrows, Style, Labels)](#customizing-edges-arrows-style-labels)
-- [Inspector & Dynamic Form Integration](#inspector--dynamic-form-integration)
-- [Validation Rules](#validation-rules)
-- [Persistence (Save / Load DTO)](#persistence-save--load-dto)
-- [Internationalization (i18n)](#internationalization-i18n)
-- [Styling & Theming](#styling--theming)
-- [Performance Tips](#performance-tips)
-- [Troubleshooting](#troubleshooting)
-- [Testing](#testing)
-- [Changelog Hints](#changelog-hints)
+This guide adds **light implementation details** on top of the “How to Use” doc—enough to integrate and extend the builder without digging into internal code.
 
 ---
 
-## Quick Start
+## 1) What’s in the box
 
-### Prerequisites
+- **Palette → Canvas**: drag any action from the palette to create a node (infinite palette; items don’t disappear).
+- **Ports & Links**: click **right port** (output) then **left port** (input) to connect.
+- **Context Menu**: right‑click node/link → `Configure | Delete | Close`.
+- **Inspector**: per‑action form (Dynamic Form) appears on select/configure.
+- **Validation**: canvas emits a boolean when the graph satisfies wiring rules.
+- **Stable sizing**: fixed canvas height (e.g., 640px) to avoid infinite layout growth.
 
-- Angular **19+** (standalone)
-- `@swimlane/ngx-graph` (Dagre layout)
-- `@angular/cdk` (Drag&Drop)
-- `@cadai/pxs-ng-core` (FieldConfigService, DynamicForm, interfaces)
-- `@ngx-translate/core` (optional, used in `WorkflowBuilderComponent` header)
-- Angular Material (optional for buttons)
+---
 
-```bash
-# install (example versions; align to your workspace)
-npm i @swimlane/ngx-graph d3 @angular/cdk
-npm i @ngx-translate/core
-# Core SDK already in your monorepo:
-# @cadai/pxs-ng-core
-```
+## 2) Quick integration (Host page)
 
-### Minimal Embed (Host App route/component)
+Minimal wrapper to host the canvas and save workflows:
 
 ```ts
 @Component({
-  selector: 'app-workflow-builder',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    ReactiveFormsModule,
-    TranslateModule,
-    MatButtonModule,
-    DynamicFormComponent,
-    WorkflowCanvasComponent,
-    SeoComponent,
-  ],
+  selector: 'app-workflow-builder',
+  imports: [CommonModule, ReactiveFormsModule, WorkflowCanvasComponent, DynamicFormComponent],
   template: `
-    <app-seo ... (titleChange)="onTitleChange($event)"></app-seo>
+    <app-dynamic-form [config]="headerConfig" [form]="headerForm"></app-dynamic-form>
 
-    <div class="card">
-      <app-dynamic-form [config]="fieldConfig" [form]="form"></app-dynamic-form>
-    </div>
+    <app-workflow-canvas
+      [nodes]="nodes"
+      [edges]="edges"
+      [disabled]="disabled"
+      [availableActions]="availableActions"
+      (change)="onCanvasChange($event)"
+      (validityChange)="graphValid = $event"
+    >
+    </app-workflow-canvas>
 
-    <div class="card">
-      <app-workflow-canvas
-        [nodes]="nodes()"
-        [edges]="edges()"
-        [disabled]="disabled"
-        [availableActions]="availableActions"
-        (change)="onCanvasChange($event)"
-        (validityChange)="isValid.set($event)"
-      >
-      </app-workflow-canvas>
-    </div>
-
-    <div class="footer">
-      <button
-        mat-raised-button
-        [disabled]="form.invalid || saving() || !isValid()"
-        (click)="save()"
-      >
-        {{ saving() ? 'Saving…' : ('SAVE' | translate) }}
-      </button>
-    </div>
+    <button
+      mat-raised-button
+      color="primary"
+      [disabled]="headerForm.invalid || !graphValid"
+      (click)="save()"
+    >
+      Save
+    </button>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkflowBuilderComponent {
-  /* see source */
+  headerForm = new FormGroup({ name: new FormControl('', { nonNullable: true }) });
+  headerConfig = [
+    this.fields.getTextField({ name: 'name', label: 'Workflow name', required: true }),
+  ];
+
+  nodes: WorkflowNode[] = []; // initial seed optional
+  edges: WorkflowEdge[] = [];
+  disabled = signal(false);
+
+  availableActions = signal<ActionDefinition[]>([
+    { type: 'chat-basic', params: { prompt: '' } },
+    { type: 'chat-on-file', params: { prompt: '', files: [] } },
+    { type: 'compare', params: { leftFile: null, rightFile: null } },
+    { type: 'summarize', params: { file: null } },
+    { type: 'extract', params: { text: '', entities: '' } },
+  ]);
+
+  onCanvasChange(e: { nodes: WorkflowNode[]; edges: WorkflowEdge[] }) {
+    this.nodes = e.nodes;
+    this.edges = e.edges;
+  }
+
+  save() {
+    const dto = { name: this.headerForm.getRawValue().name, nodes: this.nodes, edges: this.edges };
+    // TODO: send to backend
+  }
+  constructor(private fields: FieldConfigService) {}
 }
 ```
 
----
-
-## Architecture
-
-### Builder vs Canvas
-
-- **WorkflowBuilderComponent**
-  - Owns a small header form (e.g., workflow `name`).
-  - Hosts `<app-workflow-canvas>`, listens to `(change)` and `(validityChange)`.
-  - Packages a **DTO** for persistence (`id`, `name`, `nodes`, `edges`).
-
-- **WorkflowCanvasComponent**
-  - Renders a **palette** of actions (draggable pills).
-  - Renders an `ngx-graph` canvas with **nodes** and **edges**.
-  - Supports **ports** per node (multiple input/output handles).
-  - Provides a right‑click **context menu** (Delete/Configure).
-  - Provides an **Inspector** panel driven by your **Dynamic Form** fields.
-  - Emits `change` with latest `nodes/edges`, and `validityChange` (boolean).
-
-### Rendering Pipeline
-
-1. Host provides domain `nodes`/`edges` (or canvas seeds defaults).
-2. Canvas projects them into `GNode[]`/`GEdge[]` for `ngx-graph`.
-3. A gated `update$` Subject triggers layout recompute (after view is ready).
-4. ResizeObserver adapts canvas size; auto center/zoom happens only when **ready**.
+> **Routing**: lazy‑load this builder where you need it. Ensure guards/roles are handled by the host app.
 
 ---
 
-## Key Concepts
+## 3) Inputs / Outputs (Component contract)
 
-- **Action**: a draggable item from palette (e.g., `fetch`, `transform`, `store`).
-- **Node**: a vertex in the graph. Special types: `input`, `result`, and `action`.
-- **Port**: a named input/output on a node, optionally typed (`json`, `text`, etc.).
-- **Edge**: connection between two nodes; captures `sourcePort`/`targetPort`, label, and style.
-- **Inspector**: side panel for per‑node configuration via dynamic fields.
+**Inputs**
+
+- `nodes: WorkflowNode[]` — initial or loaded nodes.
+- `edges: WorkflowEdge[]` — initial or loaded edges.
+- `disabled: Signal<boolean>` — disables drag, connect, context menu.
+- `availableActions: Signal<ActionDefinition[]>` — palette source.
+
+**Outputs**
+
+- `(change): { nodes, edges }` — emitted on any structural change.
+- `(validityChange): boolean` — `true` only when graph is valid (see §7).
 
 ---
 
-## Data Models
+## 4) Data shapes (lightweight)
 
-> The interfaces below extend Core SDK interfaces **locally** with optional fields. You can keep the original Core types and add these as intersection types in your component code.
+Keep your own typings, but the canvas expects these properties:
 
 ```ts
-export type Port = { id: string; label: string; type?: string };
+type WorkflowNodeType = 'input' | 'action' | 'result';
 
-export type NodeWithPorts = WorkflowNode & {
-  ports?: {
-    inputs?: Port[];
-    outputs?: Port[];
-  };
-  // Typical node.data usage:
-  // data: { label: string; params?: any; ports?: { ... } }
-};
+interface Port {
+  id: string;
+  label: string;
+  type?: string;
+}
 
-export type EdgeStyle = {
-  stroke?: string;
-  strokeWidth?: number;
-  dasharray?: string; // e.g., '4 4'
-  marker?: 'solid' | 'hollow' | 'round' | 'warn';
-  labelColor?: string;
-};
+interface WorkflowNode {
+  id: string;
+  type: WorkflowNodeType;
+  data: { label: string; aiType?: string; params?: any };
+  ports?: { inputs?: Port[]; outputs?: Port[] };
+}
 
-export type EdgeWithPortsAndStyle = WorkflowEdge & {
+interface WorkflowEdge {
+  id: string; // recommended: "src:port -> tgt:port"
+  source: string; // node id
+  target: string; // node id
   sourcePort?: string;
   targetPort?: string;
-  style?: EdgeStyle;
-};
+  label?: string;
+  style?: Record<string, any>; // stroke, dasharray, marker, etc.
+}
+
+interface ActionDefinition {
+  type: string;
+  params?: any;
+}
 ```
 
-### Default Seed
+**Special nodes**
 
-On first load (if no nodes provided) the canvas injects:
-
-- `input-node` (type `input`), and
-- `result-node` (type `result`).
+- `input-node` is normalized to **have an output** port `{id:'out'}`.
+- `result-node` is normalized to **have an input** port `{id:'in'}`.
 
 ---
 
-## Inputs / Outputs of Components
+## 5) Actions & the Inspector (how it decides which fields to show)
 
-### `<app-workflow-canvas>` Inputs
+- The canvas looks at `node.data.aiType` (for action nodes) and builds the Inspector form from an internal **action registry** (maps action type → field list and defaults).
+- Default actions provided:
+  - `chat-basic` — textarea `prompt`; optional `temperature` select.
+  - `chat-on-file` — textarea `prompt` + **files[]** (multi).
+  - `compare` — **leftFile** + **rightFile**.
+  - `summarize` — **file** + summary `length` select.
+  - `extract` — `entities` + optional `text`.
 
-- `nodes: WorkflowNode[]` — domain nodes (can include ports via `data.ports`).
-- `edges: WorkflowEdge[]` — domain edges (can include `sourcePort/targetPort/style`).
-- `disabled: Signal<boolean>` — disables drag/connect/context menu.
-- `availableActions: Signal<ActionDefinition[]>` — palette items to drag.
+**To add a new action** (example):
 
-### Outputs
+1. Define it in your palette `availableActions` with a `type` and optional `params` defaults.
+2. Add its field list in the action registry (one place).
+3. The Inspector will render it automatically when that node is selected.
 
-- `(change): { nodes: WorkflowNode[]; edges: WorkflowEdge[] }` — any structural change.
-- `(validityChange): boolean` — validity result (see [Validation Rules](#validation-rules)).
-
----
-
-## How to Use the Builder Screen
-
-1. Fill the **Name** field in the top form.
-2. Drag **Actions** from the left palette into the canvas.
-3. Click an **output port** on a node, then an **input port** on another node to connect.
-4. Right‑click a node → **Configure** to open the Inspector; set fields and **Apply**.
-5. Press **Save** in the builder footer to persist the assembled DTO.
+> Files: upload on save, then store **file references** (IDs/URLs) inside `node.data.params` for persistence.
 
 ---
 
-## How to Use the Canvas
+## 6) Drag & Drop semantics
 
-### Adding Nodes
-
-- Drag from the **palette** (uses CDK Drag&Drop).
-- Nodes are auto‑laid out by `ngx-graph` (Dagre).
-
-### Connecting Nodes
-
-- Click an **output** port (right side) on the source node.
-- Then click an **input** port (left side) on the target node.
-- Edge will remember `sourcePort`/`targetPort` and adopt default style.
-
-### Editing / Deleting
-
-- **Context menu** (right‑click): Configure / Delete.
-- **Inspector** (Configure): opens dynamic form for node params.
+- Dragging an item from the **Palette** creates a **new** node (copy behavior).
+- The palette button remains in place (you can drag it **infinitely**).
+- If the drop is canceled/outside, the button **returns** to the palette.
+- The canvas drop is gated by `disabled()` to prevent edits when needed.
 
 ---
 
-## Customizing Nodes (Ports, Labels, Types)
+## 7) Ports, links & validity (the rules)
 
-Nodes are rendered via `nodeTemplate`. You can:
+**Connecting**
 
-- Bind **fill color** by type with `nodeFill(type)`.
-- Render **multiple ports** with labels & consistent spacing.
-- Compute node height from port count (so handles fit).
+- Click **source** node’s **right** port → click **target** node’s **left** port.
+- Edge IDs usually include port ids: `A:out -> B:in` (recommended for uniqueness).
 
-Example default ports for a dropped **action**:
+**Compatibility**
 
-```ts
-const node: NodeWithPorts = {
-  id: crypto.randomUUID(),
-  type: 'action',
-  x: 0,
-  y: 0,
-  data: {
-    label: titleize(action.type),
-    params: { ...(action.params ?? {}) },
-    ports: {
-      inputs: [{ id: 'in', label: 'in', type: 'json' }],
-      outputs: [{ id: 'out', label: 'out', type: 'json' }],
+- If both ports specify `type` (e.g., `"json"`), they must match; otherwise, connection is ignored.
+
+**Validity (emitted via `validityChange`)**
+
+- **Input** must have **≥1 outgoing** edge.
+- **Result** must have **≥1 incoming** edge.
+- Every **Action** must have **≥1 incoming** **and** **≥1 outgoing** edge.
+
+Your host page can disable the Save button until `validityChange === true`.
+
+---
+
+## 8) Sizing & layout (important for stability)
+
+- The canvas uses a fixed **height** (e.g., 640px) so the SVG **won’t grow the page**.
+- Width follows the parent container via a `ResizeObserver`.
+- Graph updates are throttled with `requestAnimationFrame` and pushed via `update$`.
+- `autoCenter` is enabled; `autoZoom` is conservative to avoid layout thrash.
+
+**Tip**: Place the canvas in a container that has a definite width and a fixed (or predictable) height.
+
+---
+
+## 9) Styling & theming
+
+- Nodes get light fills by type (Input = blue tint, Result = green tint); override in your global/theme SCSS:
+
+```scss
+.node.input rect {
+  fill: var(--pxs-node-input, #e3f2fd);
+}
+.node.result rect {
+  fill: var(--pxs-node-result, #e8f5e9);
+}
+.edge .line {
+  stroke: var(--pxs-edge, #607d8b);
+}
+.wf-handle {
+  cursor: pointer;
+}
+```
+
+- The canvas clamps height and hides overflow; adjust to fit your layout:
+
+```scss
+.pxs-wf-canvas {
+  height: 640px;
+  overflow: hidden;
+}
+```
+
+---
+
+## 10) Persistence format (recommendation)
+
+Store and reload **verbatim**:
+
+```json
+{
+  "name": "My Workflow",
+  "nodes": [
+    {
+      "id": "input-node",
+      "type": "input",
+      "data": { "label": "Input" },
+      "ports": { "outputs": [{ "id": "out", "label": "out", "type": "json" }] }
     },
-  },
-};
+    {
+      "id": "action-1",
+      "type": "action",
+      "data": { "label": "Summarize", "aiType": "summarize", "params": { "file": "file-123" } },
+      "ports": {
+        "inputs": [{ "id": "in", "label": "in", "type": "json" }],
+        "outputs": [{ "id": "out", "label": "out", "type": "json" }]
+      }
+    },
+    {
+      "id": "result-node",
+      "type": "result",
+      "data": { "label": "Result" },
+      "ports": { "inputs": [{ "id": "in", "label": "in", "type": "json" }] }
+    }
+  ],
+  "edges": [
+    {
+      "id": "input-node:out -> action-1:in",
+      "source": "input-node",
+      "target": "action-1",
+      "sourcePort": "out",
+      "targetPort": "in"
+    },
+    {
+      "id": "action-1:out -> result-node:in",
+      "source": "action-1",
+      "target": "result-node",
+      "sourcePort": "out",
+      "targetPort": "in"
+    }
+  ]
+}
 ```
 
-Port compatibility hook:
+> If files are local during editing, convert them to **references** before saving.
 
-```ts
-private arePortsCompatible(srcNodeId: string, srcPortId: string, tgtNodeId: string, tgtPortId: string): boolean {
-  const nSrc = this.nodes.find(n => n.id === srcNodeId) as NodeWithPorts | undefined;
-  const nTgt = this.nodes.find(n => n.id === tgtNodeId) as NodeWithPorts | undefined;
-  const out = nSrc?.ports?.outputs?.find(p => p.id === srcPortId);
-  const inp = nTgt?.ports?.inputs?.find(p => p.id === tgtPortId);
-  if (!out || !inp) return true;             // lenient default
-  return !out.type || !inp.type || out.type === inp.type;
+---
+
+## 11) i18n (labels & errors)
+
+- Node labels are plain strings (e.g., `"Summarize"`). You can pass translated values when creating nodes.
+- File‑field errors—recommended keys (English/French examples):
+
+```json
+"file": {
+  "accept": "Field only accepts: {{requiredTypes}}.",
+  "required": "Field is required.",
+  "maxFiles": "Max {{requiredLength}} file(s). Selected: {{actualLength}}.",
+  "maxFileSize": "Max size {{requiredLength}}.",
+  "maxTotalSize": "Max total size {{requiredLength}}."
+}
+```
+
+```json
+"file": {
+  "accept": "Types autorisés : {{requiredTypes}}.",
+  "required": "Champ obligatoire.",
+  "maxFiles": "Maximum {{requiredLength}} fichier(s). Sélectionné(s) : {{actualLength}}.",
+  "maxFileSize": "Taille maximale {{requiredLength}}.",
+  "maxTotalSize": "Taille totale maximale {{requiredLength}}."
 }
 ```
 
 ---
 
-## Customizing Edges (Arrows, Style, Labels)
+## 12) Extending the system (new actions)
 
-Define several markers in `defsTemplate`:
+To add `translate-text` as a new action:
 
-```html
-<svg:marker id="arrow-solid" ...><svg:path d="M0,-5L10,0L0,5" fill="currentColor" /></svg:marker>
-<svg:marker id="arrow-hollow" ...>
-  <svg:path d="M0,-5L10,0L0,5" fill="none" stroke="currentColor" />
-</svg:marker>
-<svg:marker id="arrow-round" ...><svg:circle r="3" fill="currentColor" /></svg:marker>
-<svg:marker id="arrow-warn" ...><svg:path d="M0,5 L10,0 L0,-5 Z" fill="currentColor" /></svg:marker>
-```
+1. **Palette**: add `{ type: 'translate-text', params: { targetLang: 'en', text: '' } }`.
+2. **Registry**: define an Inspector form (fields: `text`, `targetLang`).
+3. **Backend**: teach your executor how to run it using the saved `params`.
+4. **(Optional)**: enforce port `type` if needed (e.g., `"text"`).
 
-Bind per‑edge style in the `linkTemplate`:
-
-```html
-<svg:path
-  class="line"
-  [attr.stroke]="link?.data?.style?.stroke || '#607d8b'"
-  [attr.stroke-width]="link?.data?.style?.strokeWidth || 2"
-  [attr.stroke-dasharray]="link?.data?.style?.dasharray || null"
-  [attr.marker-end]="'url(#arrow-' + (link?.data?.style?.marker || 'solid') + ')'"
-/>
-```
-
-Carry style into `GEdge`:
-
-```ts
-const links: GEdge[] = this.edges.map((e) => ({
-  id: e.id,
-  source: e.source,
-  target: e.target,
-  label: e['label'] || '',
-  data: { style: (e as any).style },
-}));
-```
-
-Set defaults on connect:
-
-```ts
-this.edges = [
-  ...this.edges,
-  {
-    id,
-    source: from.nodeId,
-    target: nodeId,
-    sourcePort: from.portId,
-    targetPort: portId,
-    label: '',
-    style: { marker: 'solid', strokeWidth: 2, stroke: '#607d8b' },
-  } as EdgeWithPortsAndStyle,
-];
-```
+No other changes are needed in the canvas; it will render ports, allow wiring, and persist `params`.
 
 ---
 
-## Inspector & Dynamic Form Integration
+## 13) Troubleshooting quick table
 
-- Selecting a node (or **Configure** via context) opens the Inspector.
-- The Inspector hosts your **DynamicFormComponent**, driven by `FieldConfig[]` produced from `FieldConfigService` based on node type.
-
-Typical flow:
-
-```ts
-selectedNode = signal<NodeWithPorts | null>(null);
-inspectorForm!: FormGroup;
-inspectorConfig: FieldConfig[] = [];
-
-onNodeSelected(e: any) {
-  const nodeId = e?.id;
-  const n = this.nodes.find(x => x.id === nodeId) as NodeWithPorts | undefined;
-  if (!n) return;
-  selectedNode.set(n);
-
-  const type = n.type === 'action' ? (n.data as any)?.label?.toLowerCase() : n.type;
-  inspectorConfig = buildConfigFor(type, (n.data as any)?.params);
-
-  inspectorForm = fb.group({});
-  // Let DynamicForm create controls, then patch defaults
-  queueMicrotask(() => inspectorForm.patchValue((n.data as any)?.params ?? {}));
-}
-
-applyInspector() {
-  const node = selectedNode();
-  if (!node) return;
-  const idx = this.nodes.findIndex(x => x.id === node.id);
-  const params = inspectorForm.getRawValue();
-  const updated: NodeWithPorts = {
-    ...(this.nodes[idx] as any),
-    data: { ...(this.nodes[idx].data || {}), params },
-  };
-  this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
-  recomputeGraph(); emitChange(); selectedNode.set(null);
-}
-```
-
-Example field builders:
-
-```ts
-switch (type) {
-  case 'fetch':
-    return [
-      fields.getTextField({ name: 'url', label: 'URL', validators: [Validators.required] }),
-      fields.getSelectField?.({
-        name: 'method',
-        label: 'Method',
-        options: ['GET', 'POST', 'PUT', 'DELETE'].map((m) => ({ label: m, value: m })),
-      }),
-      fields.getTextareaField?.({ name: 'headers', label: 'Headers (JSON)', rows: 4 }),
-      fields.getTextareaField?.({ name: 'body', label: 'Body (JSON)', rows: 6 }),
-    ].filter(Boolean) as FieldConfig[];
-  case 'transform':
-    return [
-      fields.getTextareaField?.({
-        name: 'script',
-        label: 'Script',
-        rows: 8,
-        monospace: true,
-        validators: [Validators.required],
-      }),
-    ].filter(Boolean) as FieldConfig[];
-  case 'store':
-    return [
-      fields.getTextField({
-        name: 'collection',
-        label: 'Collection',
-        validators: [Validators.required],
-      }),
-      fields.getTextField({ name: 'key', label: 'Key expression' }),
-    ];
-  default:
-    return [fields.getTextareaField?.({ name: 'params', label: 'Params (JSON)', rows: 8 })].filter(
-      Boolean,
-    ) as FieldConfig[];
-}
-```
+| Symptom                   | Cause                              | Fix                                                       |
+| ------------------------- | ---------------------------------- | --------------------------------------------------------- |
+| Canvas keeps growing      | SVG measured itself                | Fix container height (e.g., 640px)                        |
+| Items vanish from palette | Move instead of copy               | Ensure palette drag **copies** and resets item            |
+| Can’t connect nodes       | Click order wrong or type mismatch | Click **output → input**; align port `type` values        |
+| Save disabled             | Graph invalid                      | Wire Input → … → Result; ensure every Action has in & out |
+| Touch scroll lag          | Non‑passive listeners              | Add `touch-action: none` to interactive areas             |
 
 ---
 
-## Validation Rules
+## 14) Versioning & assumptions
 
-`validityChange` emits **true** when:
-
-1. **All nodes are connected** by at least one edge (either as source or target), and
-2. There is at least one edge **from** `input-node` and at least one edge **to** `result-node`.
-
-You can extend this to require a full **path** from input → result.
+- Tested with Angular 16–19; `@swimlane/ngx-graph` Dagre layout.
+- Uses Signals and standalone components.
+- Depends on your Dynamic Form adapters (`FieldConfigService`, `DynamicFormComponent`).
 
 ---
 
-## Persistence (Save / Load DTO)
-
-### Save
-
-```ts
-const dto = {
-  id: editingId() ?? uuidv4(),
-  name: form.getRawValue().name,
-  nodes: nodes().map((n) => ({ ...n })), // strip ephemeral flags if needed
-  edges: edges(),
-};
-// Send to your Host API
-```
-
-### Load
-
-- Provide `nodes`/`edges` inputs from your backend response.
-- The canvas will project and render them; remember to call your host store/router to manage navigation & UX.
-
----
-
-## Internationalization (i18n)
-
-- The builder header uses `TranslateModule` pipes for labels: `'nav.genai-workflows' | translate` etc.
-- Node/Action labels can be translation keys; the canvas simply renders `node.label` as given.
-
----
-
-## Styling & Theming
-
-- Node colors via `nodeFill(type)`:
-  - `input` → `#e3f2fd`
-  - `result` → `#e8f5e9`
-  - `action` → `#ffffff`
-- Override with CSS/SCSS using `.node.input`, `.node.result`, `.node.action` classes.
-- Edge color/dash/arrow via `edge.style` (see [Customizing Edges](#customizing-edges-arrows-style-labels)).
-- The **palette** pills have `.pxs-wf-pill`; toggle `.disabled` when `[disabled]` signal is true.
-
----
-
-## Performance Tips
-
-- Use **signals** + `OnPush` to minimize CD. Avoid mutating arrays; create new arrays on changes.
-- Always **track** items in `@for` (e.g., `track p.id`) to prevent DOM churn.
-- Gate `update$` emissions until **after** `ngAfterViewInit` to avoid `getScreenCTM` errors and redundant layouts.
-- If rendering in a hidden tab (`display:none`), force a refresh when the tab becomes visible: `update$.next(true)`.
-
----
-
-## Troubleshooting
-
-### `Cannot read properties of null (reading 'getScreenCTM')`
-
-Cause: `autoCenter/autoZoom` fires before the SVG exists, or container width is `0`.
-
-**Fix**
-
-- Defer initial `recomputeGraph()`/`update$.next(true)` to `ngAfterViewInit`.
-- Bind `[autoCenter]="ready()"` and `[autoZoom]="ready()"`.
-- In `ResizeObserver`, guard width/height and fallback when `clientWidth` is `0`.
-
-### Edges don’t follow style changes
-
-Ensure you pass style in `GEdge.data` and trigger `update$.next(true)` after updating arrays by reference (no in‑place mutation).
-
-### Ports overlap labels
-
-Increase node height or vertical spacing (`28 + i*18`). Recompute height based on port count.
-
----
-
-## Testing
-
-- **Component tests**: Mock `availableActions`, simulate `cdkDropListDropped`, assert `(change)` emissions.
-- **Graph projection tests**: Given `nodes/edges`, expect correct `GNode/GEdge` mapping (including `data.style`).
-- **Inspector tests**: Select a node → expect `inspectorConfig` built for type and `inspectorForm` patched with params.
-- **Validation tests**: Assert `validityChange` for various graphs (disconnected, missing input/result, etc.).
-
----
-
-## Changelog Hints
-
-When you ship updates, record:
-
-- Added edge markers or styles.
-- New action types and their field configurations.
-- Validation rule changes.
-- Breaking changes in node/edge data shape.
-
----
-
-**That’s it!** You now have a robust, extensible Workflow Builder + Canvas with ports, stylable edges, and dynamic per‑node configuration wired to your Core SDK forms. Adapt the snippets to your exact service method names & theming tokens, and you’re production‑ready.
+**That’s it** — with the above you can embed the builder, configure the palette, validate graphs, and persist workflows without diving into implementation internals.
 
 ## 🧑‍💻 Author
 

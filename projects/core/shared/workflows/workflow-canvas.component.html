@@ -2,11 +2,18 @@
   @if (availableActions().length) {
     <div class="pxs-wf-palette">
       <div class="pxs-wf-palette-title">Actions:</div>
-      <div class="pxs-wf-palette-items">
+      <div class="pxs-wf-palette-items" #paletteHost>
         @for (a of availableActions(); track a.type) {
-          <div class="pxs-wf-pill" cdkDrag [cdkDragData]="a" [class.disabled]="disabled()">
+          <button
+            mat-raised-button
+            class="pxs-wf-pill"
+            cdkDrag
+            [cdkDragData]="a"
+            [disabled]="disabled()"
+            cdkDragRootElement=".pxs-wf-pill"
+          >
             {{ a.type }}
-          </div>
+          </button>
         }
       </div>
     </div>
@@ -16,196 +23,219 @@
     class="pxs-wf-canvas"
     #graphHost
     cdkDropList
+    [cdkDropListData]="{}"
+    [cdkDropListEnterPredicate]="allowPaletteDrop"
     (cdkDropListDropped)="onDrop($event)"
-    (contextmenu)="openContextMenu($event)"
+    (contextmenu)="openCanvasContextMenu($event)"
   >
-    <ngx-graph
-      class="chart-container"
-      [view]="[canvasW(), canvasH()]"
-      [nodes]="gNodes()"
-      [links]="gLinks()"
-      [autoCenter]="ready()"
-      [autoZoom]="ready()"
-      [draggingEnabled]="!disabled()"
-      [zoomSpeed]="0.075"
-      [update$]="update$"
-      layout="dagre"
-      (nodeSelected)="onNodeSelected($event)"
-      (edgeSelected)="onEdgeSelected($event)"
-    >
-      @if (selectedNode(); as sel) {
-        <div class="pxs-wf-inspector">
-          <div class="header">
-            <div class="title">{{ sel?.data?.label }}</div>
-            <button (click)="closeInspector()">×</button>
-          </div>
-
-          <app-dynamic-form [config]="inspectorConfig" [form]="inspectorForm"></app-dynamic-form>
-
-          <div class="actions">
-            <button (click)="applyInspector()" [disabled]="inspectorForm.invalid">Apply</button>
-          </div>
-        </div>
-      }
-
-      <!-- defs (arrow head) -->
-      <ng-template #defsTemplate>
-        <!-- Solid arrow -->
-        <svg:marker
-          id="arrow-solid"
-          viewBox="0 -5 10 10"
-          refX="8"
-          refY="0"
-          markerWidth="6"
-          markerHeight="6"
-          orient="auto"
-        >
-          <svg:path d="M0,-5L10,0L0,5" fill="currentColor"></svg:path>
-        </svg:marker>
-
-        <!-- Hollow arrow -->
-        <svg:marker
-          id="arrow-hollow"
-          viewBox="0 -5 10 10"
-          refX="8"
-          refY="0"
-          markerWidth="6"
-          markerHeight="6"
-          orient="auto"
-        >
-          <svg:path
-            d="M0,-5L10,0L0,5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-          ></svg:path>
-        </svg:marker>
-
-        <!-- Round dot -->
-        <svg:marker
-          id="arrow-round"
-          viewBox="-5 -5 10 10"
-          refX="0"
-          refY="0"
-          markerWidth="6"
-          markerHeight="6"
-          orient="auto"
-        >
-          <svg:circle r="3" fill="currentColor"></svg:circle>
-        </svg:marker>
-
-        <!-- Warning (triangle) -->
-        <svg:marker
-          id="arrow-warn"
-          viewBox="0 -5 10 10"
-          refX="8"
-          refY="0"
-          markerWidth="6"
-          markerHeight="6"
-          orient="auto"
-        >
-          <svg:path d="M0,5 L10,0 L0,-5 Z" fill="currentColor"></svg:path>
-        </svg:marker>
-      </ng-template>
-
-      <!-- node (SVG) with clickable handles -->
-      <ng-template #nodeTemplate let-node>
-        <svg:g class="node" [ngClass]="node?.data?.type">
-          <svg:rect
-            rx="8"
-            ry="8"
-            [attr.width]="node.dimension?.width || 220"
-            [attr.height]="
-              node.dimension?.height ||
-              60 +
-                (node?.data?.ports?.inputs?.length || 0 + node?.data?.ports?.outputs?.length || 0) *
-                  4
-            "
-            [attr.fill]="nodeFill(node?.data?.type)"
-          />
-          <!-- label -->
-          <svg:text alignment-baseline="hanging" [attr.x]="12" [attr.y]="12" font-weight="600">
-            {{ node.label }}
-          </svg:text>
-          <!-- INPUT PORTS (left) -->
-          @if (node?.data?.ports?.inputs?.length) {
-            @for (p of node.data.ports.inputs; track p.id; let i = $index) {
-              <svg:g (click)="clickPort(node.id, 'target', p.id, $event)">
-                <svg:circle class="wf-handle target" [attr.cx]="-8" [attr.cy]="28 + i * 18" r="6" />
-                <svg:text
-                  [attr.x]="4"
-                  [attr.y]="32 + i * 18"
-                  alignment-baseline="middle"
-                  font-size="11"
-                >
-                  {{ p.label }}
-                </svg:text>
-              </svg:g>
-            }
-          }
-
-          <!-- OUTPUT PORTS (right) -->
-          @if (node?.data?.ports?.outputs?.length) {
-            @for (p of node.data.ports.outputs; track p.id; let i = $index) {
-              <svg:g (click)="clickPort(node.id, 'source', p.id, $event)">
-                <svg:circle
-                  class="wf-handle source"
-                  [attr.cx]="(node.dimension?.width || 220) + 8"
-                  [attr.cy]="28 + i * 18"
-                  r="6"
-                />
-                <svg:text
-                  [attr.x]="(node.dimension?.width || 220) - 4"
-                  [attr.y]="32 + i * 18"
-                  alignment-baseline="middle"
-                  text-anchor="end"
-                  font-size="11"
-                >
-                  {{ p.label }}
-                </svg:text>
-              </svg:g>
-            }
-          }
-        </svg:g>
-      </ng-template>
-
-      <!-- link -->
-      <ng-template #linkTemplate let-link>
-        <svg:g class="edge">
-          <svg:path
-            class="line"
-            [attr.stroke]="link?.data?.style?.stroke || '#607d8b'"
-            [attr.stroke-width]="link?.data?.style?.strokeWidth || 2"
-            [attr.stroke-dasharray]="link?.data?.style?.dasharray || null"
-            [attr.marker-end]="'url(#arrow-' + (link?.data?.style?.marker || 'solid') + ')'"
-          ></svg:path>
-
-          <svg:text
-            class="edge-label"
-            text-anchor="middle"
-            [attr.fill]="link?.data?.style?.labelColor || '#333'"
+    @if (ready() && canvasW() > 0 && canvasH() > 0) {
+      <ngx-graph
+        class="chart-container"
+        [view]="[canvasW(), canvasH()]"
+        [nodes]="gNodes()"
+        [links]="gLinks()"
+        [autoCenter]="true"
+        [autoZoom]="false"
+        [draggingEnabled]="!disabled()"
+        [zoomSpeed]="0.075"
+        [update$]="update$"
+        layout="dagre"
+        (nodeSelected)="onNodeSelected($event)"
+        (edgeSelected)="onEdgeSelected($event)"
+      >
+        <!-- defs (arrow heads) -->
+        <ng-template #defsTemplate>
+          <svg:marker
+            id="arrow-solid"
+            viewBox="0 -5 10 10"
+            refX="8"
+            refY="0"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
           >
-            <svg:textPath class="text-path" [attr.href]="'#' + link.id" startOffset="50%">
-              {{ link.label }}
-            </svg:textPath>
-          </svg:text>
-        </svg:g>
-      </ng-template>
-    </ngx-graph>
+            <svg:path d="M0,-5L10,0L0,5" fill="currentColor"></svg:path>
+          </svg:marker>
+          <svg:marker
+            id="arrow-hollow"
+            viewBox="0 -5 10 10"
+            refX="8"
+            refY="0"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <svg:path
+              d="M0,-5L10,0L0,5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            ></svg:path>
+          </svg:marker>
+          <svg:marker
+            id="arrow-round"
+            viewBox="-5 -5 10 10"
+            refX="0"
+            refY="0"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <svg:circle r="3" fill="currentColor"></svg:circle>
+          </svg:marker>
+          <svg:marker
+            id="arrow-warn"
+            viewBox="0 -5 10 10"
+            refX="8"
+            refY="0"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <svg:path d="M0,5 L10,0 L0,-5 Z" fill="currentColor"></svg:path>
+          </svg:marker>
+        </ng-template>
 
-    @if (!disabled()) {
-      <div class="pxs-help">
-        <span>Tip:</span> Drag actions from the palette. Click a node’s right handle (source) then
-        another node’s left handle (target) to connect.
-      </div>
-    }
+        <!-- NODE (right-click + clickable ports) -->
+        <ng-template #nodeTemplate let-node>
+          <svg:g
+            class="node"
+            [ngClass]="node?.data?.type"
+            [attr.data-node-id]="node.id"
+            (contextmenu)="openNodeContextMenu(node.id, $event)"
+          >
+            <svg:rect
+              rx="8"
+              ry="8"
+              [attr.width]="node.dimension?.width || 220"
+              [attr.height]="
+                node.dimension?.height ||
+                60 +
+                  ((node?.data?.ports?.inputs?.length || 0) +
+                    (node?.data?.ports?.outputs?.length || 0)) *
+                    4
+              "
+              [attr.fill]="nodeFill(node?.data?.type)"
+            />
+            <!-- label -->
+            <svg:text alignment-baseline="hanging" [attr.x]="12" [attr.y]="12" font-weight="600">
+              {{ node.label }}
+            </svg:text>
 
-    @if (contextMenu(); as m) {
-      <div class="pxs-menu" [style.left.px]="m.x" [style.top.px]="m.y">
-        <button (click)="onConfigure()">Configure</button>
-        <button (click)="onDelete()">Delete</button>
-        <button (click)="closeContextMenu()">Close</button>
-      </div>
+            <!-- INPUT PORTS (left) -->
+            @if (node?.data?.ports?.inputs?.length) {
+              @for (p of node.data.ports.inputs; track p.id; let i = $index) {
+                <svg:g class="port port-in" (click)="clickPort(node.id, 'target', p.id, $event)">
+                  <svg:circle
+                    class="wf-handle target"
+                    [attr.cx]="-8"
+                    [attr.cy]="28 + i * 18"
+                    r="6"
+                  />
+                  <svg:text
+                    [attr.x]="4"
+                    [attr.y]="32 + i * 18"
+                    alignment-baseline="middle"
+                    font-size="11"
+                  >
+                    {{ p.label }}
+                  </svg:text>
+                </svg:g>
+              }
+            }
+
+            <!-- OUTPUT PORTS (right) -->
+            @if (node?.data?.ports?.outputs?.length) {
+              @for (p of node.data.ports.outputs; track p.id; let i = $index) {
+                <svg:g class="port port-out" (click)="clickPort(node.id, 'source', p.id, $event)">
+                  <svg:circle
+                    class="wf-handle source"
+                    [attr.cx]="(node.dimension?.width || 220) + 8"
+                    [attr.cy]="28 + i * 18"
+                    r="6"
+                  />
+                  <svg:text
+                    [attr.x]="(node.dimension?.width || 220) - 4"
+                    [attr.y]="32 + i * 18"
+                    alignment-baseline="middle"
+                    text-anchor="end"
+                    font-size="11"
+                  >
+                    {{ p.label }}
+                  </svg:text>
+                </svg:g>
+              }
+            }
+          </svg:g>
+        </ng-template>
+
+        <!-- LINK (right-clickable, label path fixed) -->
+        <ng-template #linkTemplate let-link>
+          <svg:g
+            class="edge"
+            [attr.data-link-id]="link.id"
+            (contextmenu)="openLinkContextMenu(link.id, $event)"
+          >
+            <svg:path
+              [attr.id]="link.id"
+              class="line"
+              [attr.stroke]="link?.data?.style?.stroke || '#607d8b'"
+              [attr.stroke-width]="link?.data?.style?.strokeWidth || 2"
+              [attr.stroke-dasharray]="link?.data?.style?.dasharray || null"
+              [attr.marker-end]="'url(#arrow-' + (link?.data?.style?.marker || 'solid') + ')'"
+            ></svg:path>
+
+            <svg:text
+              class="edge-label"
+              text-anchor="middle"
+              [attr.fill]="link?.data?.style?.labelColor || '#333'"
+            >
+              <svg:textPath class="text-path" [attr.href]="'#' + link.id" startOffset="50%">
+                {{ link.label }}
+              </svg:textPath>
+            </svg:text>
+          </svg:g>
+        </ng-template>
+      </ngx-graph>
     }
   </div>
+
+  <!-- INSPECTOR -->
+  @if (selectedNode(); as sel) {
+    <div class="pxs-wf-inspector">
+      <div class="header">
+        <div class="title">{{ sel?.data?.label }}</div>
+        <button (click)="closeInspector()">×</button>
+      </div>
+
+      <app-dynamic-form [config]="inspectorConfig" [form]="inspectorForm"></app-dynamic-form>
+
+      <div class="actions">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="applyInspector()"
+          [disabled]="inspectorForm.invalid"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (!disabled()) {
+    <div class="pxs-help">
+      <span>Tip:</span> Drag from the palette. Click a node’s right port (source) then another
+      node’s left port (target) to connect. Right-click nodes/links for options.
+    </div>
+  }
+
+  <!-- CONTEXT MENU -->
+  @if (contextMenu(); as m) {
+    <div class="pxs-menu" [style.left.px]="m.x" [style.top.px]="m.y">
+      <button (click)="onConfigure()" [disabled]="m.type !== 'node'">Configure</button>
+      <button (click)="onDelete()">Delete</button>
+      <button (click)="closeContextMenu()">Close</button>
+    </div>
+  }
 </div>

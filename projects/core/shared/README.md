@@ -1,6 +1,6 @@
 # Dynamic Forms & Field Components Guide
 
-_Last updated: 2025-08-13_
+_Last updated: 2025-10-02_
 
 This document explains how to **instantiate forms** and **reuse custom field components** under `shared/forms/fields`. It covers the `DynamicFormComponent`, the `FieldHostComponent`, and the `FieldConfigService` helpers your teammates will use every day.
 
@@ -11,7 +11,7 @@ This document explains how to **instantiate forms** and **reuse custom field com
 ```ts
 // my-feature.component.ts
 import { Component, inject } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { FieldConfigService } from '@/app/shared/shared'; // re-export path in your project
 
 @Component({
@@ -19,16 +19,15 @@ import { FieldConfigService } from '@/app/shared/shared'; // re-export path in y
 })
 export class MyFeatureComponent {
   private fb = inject(FormBuilder);
-  private fields = inject(FieldConfigService);
+  private fieldsConfigService = inject(FieldConfigService);
 
   form: FormGroup = this.fb.group({});
-  this.fieldConfig = [
+  fieldConfig = [
     this.fieldsConfigService.getTextField({
       name: 'fullName',
       label: 'form.labels.fullname',
       placeholder: 'form.placeholders.fullname',
       layoutClass: 'primary',
-      // swap/extend validation easily:
       validators: [Validators.required, Validators.minLength(2), Validators.maxLength(80)],
       errorMessages: { required: 'form.errors.fullname.required' },
     }),
@@ -45,7 +44,6 @@ export class MyFeatureComponent {
       label: 'form.labels.password',
       placeholder: 'form.placeholders.password',
       layoutClass: 'primary',
-      // example: enforce special char as well (SDK default allows you to replace)
       validators: [
         Validators.required,
         Validators.maxLength(128),
@@ -124,6 +122,26 @@ export class MyFeatureComponent {
       maxLength: 500,
       layoutClass: 'primary',
     }),
+
+    // --- File field example ---
+    this.fieldsConfigService.getFileField({
+      name: 'files',
+      label: 'form.labels.files',
+      multiple: true,
+      accept: '.pdf,.docx,image/*',
+      maxFiles: 10,
+      maxTotalSize: 50 * 1024 * 1024, // 50 MB total
+      maxFileSize: 10 * 1024 * 1024, // 10 MB per file
+      required: true,
+      validators: [Validators.required],
+      errorMessages: {
+        required: 'form.errors.file.required',
+        accept: 'form.errors.file.accept',
+        maxFiles: 'form.errors.file.maxFiles',
+        maxFileSize: 'form.errors.file.maxFileSize',
+        maxTotalSize: 'form.errors.file.maxTotalSize',
+      },
+    }),
   ];
 }
 ```
@@ -141,8 +159,8 @@ export class MyFeatureComponent {
 
 ```html
 <form [formGroup]="form" class="grid gap-2">
-  @for (field of config; track field.name) { @if (!field.hidden) { @if (controls[field.name]; as
-  ctl) {
+  @for (field of fieldConfig; track field.name) { @if (!field.hidden) { @if (form.get(field.name);
+  as ctl) {
   <app-field-host [field]="field" [control]="ctl"></app-field-host>
   } @else {
   <div style="min-height: 48px"></div>
@@ -167,9 +185,9 @@ submit() {
 
 ## Architecture Overview
 
-- **`FieldConfigService`** → factory methods that return typed `FieldConfig` objects (text, email, password, phone, toggle, dropdown, range, datepicker, chips, autocomplete, textarea).
+- **`FieldConfigService`** → factory methods that return typed `FieldConfig` objects (text, email, password, phone, toggle, dropdown, range, datepicker, chips, autocomplete, textarea, **file**).
 - **`DynamicFormComponent`** → takes `[form]` + `[config]`, creates controls, and renders each field via `FieldHostComponent`.
-- **`FieldHostComponent`** → maps each `FieldConfig.type` to a concrete field UI component (TextInput, Datepicker, Chips, etc.).
+- **`FieldHostComponent`** → maps each `FieldConfig.type` to a concrete field UI component (TextInput, Datepicker, Chips, **InputFile**, etc.).
 
 ```
 MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Concrete Field Component
@@ -186,6 +204,7 @@ MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Conc
   - `toggle`
   - `dropdown`
   - `range`
+  - `file`
   - `group` (nested) / `array` (list)
 - `name`: unique control key in the parent form
 - `label`: i18n key or plain label
@@ -211,6 +230,220 @@ MyFeature → (FormGroup + FieldConfig[]) → DynamicForm → FieldHost → Conc
 - `toggle` → `ToggleComponent`
 - `dropdown` → `SelectComponent`
 - `range` → `RangeComponent`
+- `file` → `InputFileComponent`
+
+---
+
+# 📁 File Field (`type: 'file'`) — Complete Guide
+
+The file field is rendered by `InputFileComponent`. It supports **single** and **multiple** file selection, client‑side limits, i18n, ARIA, and safe error handling.
+
+## Value shape
+
+- **Single**: `File | string | null`
+- **Multiple**: `(File | string)[]`
+  - Strings can represent previously uploaded file URLs/ids.
+  - The component UI renders both `File` and `string` entries.
+
+> Internally, helper methods like `currentFiles()` only consider `File` instances for size/count checks.
+
+## FieldConfig options (SDK)
+
+```ts
+type FileFieldConfig = FieldConfig & {
+  accept?: string; // MIME list or extensions, e.g. ".pdf,.docx,image/*"
+  multiple?: boolean; // default: false
+  maxFiles?: number; // max allowed items (only counts File objects)
+  maxFileSize?: number; // per-file bytes limit
+  maxTotalSize?: number; // total bytes limit (sum of File sizes)
+  required?: boolean; // standard required semantics
+  validators?: ValidatorFn[]; // e.g., [Validators.required]
+  errorMessages?: Partial<
+    Record<'required' | 'accept' | 'maxFiles' | 'maxFileSize' | 'maxTotalSize', string>
+  >;
+};
+```
+
+### `accept` syntax
+
+- Comma-separated tokens:
+  - Exact MIME: `application/pdf`
+  - Wildcard MIME: `image/*`
+  - Extension: `.pdf`, `.docx`
+  - `*` allows any (not recommended)
+
+The component filters **accepted** files and drops rejected ones, while setting an **`accept`** error so the user is informed.
+
+## UX behaviors (important)
+
+- **Touched/dirty**: on open/confirm/remove/clear we mark the control touched and dirty so errors are visible.
+- **Error precedence**: component selects first error by order:  
+  `required → maxFiles → maxFileSize → maxTotalSize → accept`.
+- **Where errors are applied**: **after** `setValue()` and an initial `updateValueAndValidity({ emitEvent: false })`, we call `setErrors(...)`. This prevents Angular from overwriting custom errors.
+- **Display**: error message is rendered inside `<mat-error>` with `role="alert"` and `aria-live="polite"`.
+- **Read-only input**: the visible `<input matInput>` shows a summary (`"3 files"` or a single filename). Real file picking uses a hidden `<input type="file">`.
+
+## i18n keys (add to your locale file)
+
+```jsonc
+"form": {
+  "actions": {
+    "browse": "Browse",
+    "addFiles": "Add files",
+    "replaceFile": "Replace file",
+    "remove": "Remove",
+    "clear": "Clear"
+  },
+  "files": {
+    "count": "{{count}} files"
+  },
+  "errors": {
+    "file": {
+      "accept": "Field only accepts the following types: {{requiredTypes}}.",
+      "required": "Field is required.",
+      "maxFiles": "Maximum {{requiredLength}} file(s) allowed (you selected {{actualLength}}).",
+      "maxFileSize": "Maximum file size {{requiredLength}} allowed.",
+      "maxTotalSize": "Maximum total size {{requiredLength}} allowed."
+    }
+  }
+}
+```
+
+> `requiredTypes` is formatted from `accept` (e.g., `".pdf, .docx, image/*"`).
+
+## Example factory (`FieldConfigService.getFileField`) signature
+
+```ts
+getFileField(cfg: Partial<FileFieldConfig> & { name: string; label: string }): FileFieldConfig {
+  return {
+    type: 'file',
+    placeholder: '',
+    layoutClass: 'primary',
+    multiple: false,
+    ...cfg,
+    validators: [...(cfg.validators ?? [])],
+    errorMessages: {
+      required: 'form.errors.file.required',
+      accept: 'form.errors.file.accept',
+      maxFiles: 'form.errors.file.maxFiles',
+      maxFileSize: 'form.errors.file.maxFileSize',
+      maxTotalSize: 'form.errors.file.maxTotalSize',
+      ...(cfg.errorMessages ?? {}),
+    }
+  };
+}
+```
+
+## Component integration (FieldHost)
+
+Ensure the type map includes the file field:
+
+```ts
+const MAP = {
+  text: TextInputComponent,
+  email: TextInputComponent,
+  password: TextInputComponent,
+  phone: TextInputComponent,
+  textarea: TextFieldComponent,
+  datepicker: DatepickerComponent,
+  chips: ChipsComponent,
+  autocomplete: AutocompleteComponent,
+  toggle: ToggleComponent,
+  dropdown: SelectComponent,
+  range: RangeComponent,
+  file: InputFileComponent,
+};
+```
+
+## Common scenarios (recipes)
+
+### Single image (avatar)
+
+```ts
+this.fieldsConfigService.getFileField({
+  name: 'avatar',
+  label: 'form.labels.avatar',
+  accept: 'image/*',
+  maxFiles: 1,
+  maxFileSize: 2 * 1024 * 1024,
+  required: false,
+});
+```
+
+### Multi-doc upload with strict caps
+
+```ts
+this.fieldsConfigService.getFileField({
+  name: 'attachments',
+  label: 'form.labels.attachments',
+  multiple: true,
+  accept: '.pdf,.docx',
+  maxFiles: 5,
+  maxFileSize: 5 * 1024 * 1024,
+  maxTotalSize: 12 * 1024 * 1024,
+  required: true,
+  validators: [Validators.required],
+});
+```
+
+### Pre-filled with existing URLs/ids
+
+```ts
+form.patchValue({
+  attachments: ['https://cdn.example.com/file/1234', 'contract-2025.pdf'],
+});
+```
+
+> The UI lists strings as simple names; size info is only shown for `File` objects.
+
+## Accessibility details
+
+- `aria-invalid` follows control validity.
+- `aria-describedby` points to hint or error id depending on state.
+- Error text is inside `<mat-error>` with `role="alert"` and polite live region.
+- Keyboard users can focus the browse button and remove/clear buttons.
+
+## Testing checklist (unit/integration)
+
+- Selecting files totalling **over** `maxTotalSize` shows `form.errors.file.maxTotalSize` and keeps control invalid.
+- Selecting a file **over** `maxFileSize` shows `form.errors.file.maxFileSize`.
+- Selecting **more** than `maxFiles` shows `form.errors.file.maxFiles`.
+- Picking a **disallowed** type sets `accept` error and **excludes** the rejected file from the control value.
+- `required` appears when value is empty and field is touched.
+- `removeAt(i)` + `clear()` keep touched/dirty and recompute errors.
+- Same file can be selected twice (native input value reset after change).
+
+## Pitfalls & gotchas
+
+- **Do not** call `updateValueAndValidity()` after `setErrors(...)`—Angular may rerun validators and clear custom errors.
+- `maxFiles` counts only `File` items, not `string` placeholders.
+- If your backend needs **total size** including already‑uploaded items, compute on the server; the client only sums current `File` objects.
+- Using `accept="image/*"` relies on browser MIME detection; some images may have empty MIME—extensions in `accept` can improve detection.
+
+## Async upload pattern (optional)
+
+For direct-to-storage uploads, keep the control value as strings (URLs/ids) after a successful upload. Example flow:
+
+1. User selects files → show local list + errors.
+2. Upload files (`File[]`) asynchronously.
+3. Replace `File` entries with returned URLs/ids in the control value.
+
+```ts
+const files = (form.get('attachments')!.value as (File | string)[]).filter(
+  (x) => x instanceof File,
+) as File[];
+// upload...
+form.patchValue({
+  attachments: uploaded.map((u) => u.url), // keep strings only
+});
+```
+
+## Helpers
+
+- `humanSize(bytes)` → formats `KB/MB/GB` for display.
+- `filesView` → normalizes `(File|string)` entries into `{ name, size? }` for the list.
+
+---
 
 ## Validators & Error Keys (conventions)
 
@@ -223,7 +456,8 @@ Built‑in and custom validators used in `FieldConfigService`:
 - `phoneDigitCount(min, max)` → sets `phoneDigitsLen`
 - `optionInListValidator(options)` → sets `optionNotAllowed`
 - `minArrayLength(n)` → sets `minlengthArray`
-- `datePatternFromPlaceholder('YYYY-MM-DD')` → input mask for parsing in `DatepickerComponent` (do **not** use `Validators.pattern` for datepicker; the control value is `Date | null`).
+- `datePatternFromPlaceholder('YYYY-MM-DD')` → input mask for parsing in `DatepickerComponent`
+- **File validators (component-level enforcement):** `accept`, `maxFiles`, `maxFileSize`, `maxTotalSize`, `required`
 
 **Common error message keys (add to i18n):**
 
@@ -247,7 +481,6 @@ form.errors.password.special
 
 form.errors.phone.required
 form.errors.phone.invalid
-form.errors.phone.invalid  // also for phoneDigitsLen
 
 form.errors.role.required
 
@@ -266,79 +499,12 @@ form.errors.tags.minOne
 
 form.errors.country.required
 form.errors.country.notAllowed
-```
 
-## Patterns & Examples
-
-### Login/Profile form (minimal)
-
-```ts
-form = this.fb.group({});
-fields = [
-  this.fields.getEmailField('form.labels.email', 'form.placeholders.email'),
-  this.fields.getPasswordField('form.labels.password', 'form.placeholders.password'),
-  this.fields.getToggleField('form.labels.notify'),
-];
-```
-
-### Address as a nested group
-
-```ts
-fields = [
-  {
-    type: 'group',
-    name: 'address',
-    label: 'form.labels.address',
-    children: [
-      this.fields.getTextField('form.labels.street', 'form.placeholders.street'),
-      this.fields.getTextField('form.labels.city', 'form.placeholders.city'),
-      this.fields.getTextField('form.labels.zip', 'form.placeholders.zip'),
-    ],
-  },
-];
-// Access: form.get('address.street')?.value
-```
-
-### Dropdown with custom options (single or multiple)
-
-```ts
-fields = [
-  this.fields.getDropdownField(
-    'form.labels.role',
-    [
-      { label: 'Admin', value: 'admin' },
-      { label: 'User', value: 'user' },
-      { label: 'Manager', value: 'manager' },
-    ],
-    /* multiple? */ false,
-  ),
-];
-```
-
-### Chips with predefined options
-
-```ts
-fields = [this.fields.getChipsField('form.labels.tags', ['Angular', 'React', 'Vue'], true)];
-```
-
-### Autocomplete restricted to a list
-
-```ts
-fields = [
-  this.fields.getAutocompleteField('form.labels.country', ['Luxembourg', 'Germany', 'France']),
-];
-```
-
-### Datepicker with strict placeholder pattern
-
-```ts
-fields = [this.fields.getDatepickerField('form.labels.dob')];
-```
-
-### Range slider with min/max/step + default
-
-```ts
-fields = [this.fields.getRangeField('form.labels.price', 0, 200, 5)];
+form.errors.file.accept
+form.errors.file.maxFiles
+form.errors.file.maxTotalSize
+form.errors.file.maxFileSize
+form.errors.file.required
 ```
 
 ---
@@ -349,11 +515,11 @@ fields = [this.fields.getRangeField('form.labels.price', 0, 200, 5)];
 - **Disable/Enable**: `form.get(field.name)?.disable()` or model `field.disabled = true` before build.
 - **Update options** (dropdown/autocomplete):
   ```ts
-  const f = this.fieldConfig.find(x => x.name === 'role')!;
+  const f = fieldConfig.find(x => x.name === 'role')!;
   f.options = [{ label: 'Owner', value: 'owner' }, ...];
   ```
-- **Set values**: `this.form.patchValue({ email: 'a@b.com' })`.
-- **Listen to changes**: `this.form.get('email')?.valueChanges.subscribe(...)`.
+- **Set values**: `form.patchValue({ email: 'a@b.com' })`.
+- **Listen to changes**: `form.get('email')?.valueChanges.subscribe(...)`.
 
 ## Adding a New Field Type
 
@@ -389,6 +555,7 @@ fields = [this.fields.getRangeField('form.labels.price', 0, 200, 5)];
 - **Datepicker**: do **not** add `Validators.pattern` (value is `Date | null`); use the `pattern` only for parsing raw input.
 - **Chips**: use `minArrayLength(1)` to enforce a non-empty selection.
 - **Autocomplete**: enforce with `optionInListValidator([...])` to restrict to known values.
+- **File field**: apply custom errors **after** `setValue()`; otherwise Angular may overwrite them.
 
 ## Where Things Live
 
@@ -419,4 +586,4 @@ Happy building! 🎯
 ## 🧑‍💻 Author
 
 **Angular Product Skeleton**  
-Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).
+Built by **Tarik Haddadi** using Angular 19+ and modern best practices (2025).
