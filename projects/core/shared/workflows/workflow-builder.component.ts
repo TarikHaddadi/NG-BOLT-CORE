@@ -7,6 +7,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 import { TranslateModule } from '@ngx-translate/core';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -33,6 +34,7 @@ import { WorkflowCanvasComponent } from './workflow-canvas.component';
     TranslateModule,
     DynamicFormComponent,
     ReactiveFormsModule,
+    MatButtonModule,
   ],
   template: `
     <app-seo
@@ -44,7 +46,6 @@ import { WorkflowCanvasComponent } from './workflow-canvas.component';
     </app-seo>
 
     <div class="card">
-      <label>Workflow Name</label>
       <app-dynamic-form [config]="fieldConfig" [form]="form"></app-dynamic-form>
     </div>
 
