@@ -2,6 +2,10 @@
   display: block;
 }
 
+.mat-mdc-form-field {
+  display: block;
+}
+
 .sr-only {
   position: absolute !important;
   width: 1px;
@@ -18,8 +22,8 @@
   margin-top: 0.25rem;
   border: 1px dashed var(--pxs-border, #e0e0e0);
   border-radius: 8px;
-  background: var(--pxs-surface, #fff);
   padding: 0.25rem;
+  margin-bottom: 15px;
 
   .pxs-file-row {
     display: grid;

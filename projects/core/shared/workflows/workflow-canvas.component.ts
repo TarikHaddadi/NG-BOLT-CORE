@@ -14,7 +14,7 @@ import {
   signal,
   ViewChild,
 } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { Edge as GEdge, NgxGraphModule, Node as GNode } from '@swimlane/ngx-graph';
 import { Subject } from 'rxjs';
@@ -32,6 +32,7 @@ import {
 import { FieldConfigService } from '@cadai/pxs-ng-core/services';
 
 import { DynamicFormComponent } from '../public-api';
+import { ACTION_FORMS, makeFallback } from './action-forms.component';
 
 @Component({
   selector: 'app-workflow-canvas',
@@ -58,10 +59,11 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   @Output() validityChange = new EventEmitter<boolean>();
 
   @ViewChild('graphHost', { static: true }) graphHost!: ElementRef<HTMLElement>;
+  @ViewChild('paletteHost', { static: true }) paletteHost!: ElementRef<HTMLElement>;
 
   // Canvas viewport
   canvasW = signal(900);
-  canvasH = signal(640); // fixed default to match CSS
+  canvasH = signal(640); // fixed to CSS clamp
 
   // Graph store for ngx-graph
   private _nodes = signal<GNode[]>([]);
@@ -70,14 +72,10 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   gLinks = computed(() => this._links());
   update$ = new Subject<boolean>();
 
-  // Lifecycle
   private ro?: ResizeObserver;
   ready = signal(false);
 
-  // Drag connection (simple handles)
-  private pendingSource = signal<string | null>(null);
-
-  // Port-aware connection
+  // Port-aware connection (click-to-connect)
   private pending = signal<{ nodeId: string; portId: string } | null>(null);
 
   // Context menu
@@ -99,7 +97,6 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   // ---------- Lifecycle ----------
 
   ngOnInit() {
-    // seed default graph if nothing provided
     if (!this.nodes?.length) {
       const input: WorkflowNode = {
         id: 'input-node',
@@ -107,6 +104,10 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
         x: 0,
         y: 0,
         data: { label: 'Input' },
+        ports: {
+          inputs: [],
+          outputs: [{ id: 'out', label: 'out', type: 'json' }],
+        },
       };
       const result: WorkflowNode = {
         id: 'result-node',
@@ -114,8 +115,14 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
         x: 0,
         y: 0,
         data: { label: 'Result' },
+        ports: {
+          inputs: [{ id: 'in', label: 'in', type: 'json' }],
+          outputs: [],
+        },
       };
       this.nodes = [input, result];
+    } else {
+      this.ensureIoPorts();
     }
   }
 
@@ -124,12 +131,11 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     if (el && 'ResizeObserver' in window) {
       let lastW = 0,
         lastH = 0;
+      const FIXED_H = 640;
 
       const resize = () => {
-        let w = el.clientWidth || el.parentElement?.clientWidth || 900;
-        // IMPORTANT: clamp height to CSS (prevents infinite page growth)
-        const h = el.clientHeight > 0 ? el.clientHeight : 640;
-
+        const w = el.clientWidth || el.parentElement?.clientWidth || 900;
+        const h = FIXED_H;
         if (w === lastW && h === lastH) return;
         lastW = w;
         lastH = h;
@@ -144,10 +150,9 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
       resize();
     }
 
-    // Ensure the DOM / SVG exists before first compute
     setTimeout(() => {
       this.ready.set(true);
-      this.recomputeGraph(); // compute once view is mounted
+      this.recomputeGraph();
       this.emitChange();
       this.nudgeGraph();
     });
@@ -157,38 +162,9 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     this.ro?.disconnect();
   }
 
-  // ---------- Utilities ----------
+  // ---------- DnD palette -> canvas (copy semantics) ----------
 
-  private nudgeGraph() {
-    if (!this.ready()) return;
-    if (this.rafId != null) return;
-    this.rafId = requestAnimationFrame(() => {
-      this.update$.next(true);
-      this.rafId = null;
-    });
-  }
-
-  private emitChange() {
-    this.change.emit({ nodes: this.nodes, edges: this.edges });
-    this.emitValidity();
-  }
-
-  private emitValidity() {
-    const ids = new Set(this.nodes.map((n) => n.id));
-    const connected = new Set<string>();
-    this.edges.forEach((e) => {
-      connected.add(e.source);
-      connected.add(e.target);
-    });
-
-    const allConnected = [...ids].every((id) => connected.has(id));
-    const hasIn = this.edges.some((e) => e.source === 'input-node');
-    const hasOut = this.edges.some((e) => e.target === 'result-node');
-
-    this.validityChange.emit(allConnected && hasIn && hasOut);
-  }
-
-  // ---------- Palette / Drop ----------
+  allowPaletteDrop = () => !this.disabled();
 
   onDrop(ev: any) {
     if (this.disabled()) return;
@@ -196,6 +172,9 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     if (!action) return;
 
     const type = action.type as AiActionType;
+    const spec = ACTION_FORMS[type as any];
+    const defaults = spec?.defaults ?? {};
+
     const node: WorkflowNode = {
       id: this.uid(),
       type: 'action',
@@ -203,10 +182,9 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
       y: 0,
       data: {
         label: ACTION_LABEL[type] ?? this.titleize(type),
-        params: { ...(action.params ?? {}) },
-        aiType: type, // tag it for the inspector
+        params: { ...(action.params ?? {}), ...defaults },
+        aiType: type,
       } as ActionNodeData,
-      // Keep ports consistent for all actions (easy to wire graphs)
       ports: {
         inputs: [{ id: 'in', label: 'in', type: 'json' }],
         outputs: [{ id: 'out', label: 'out', type: 'json' }],
@@ -216,41 +194,18 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     this.nodes = [...this.nodes, node];
     this.recomputeGraph();
     this.emitChange();
+
+    // put dragged pill back into palette (infinite palette)
+    const itemEl = ev.item?.element?.nativeElement as HTMLElement | undefined;
+    const paletteEl = this.paletteHost?.nativeElement as HTMLElement | undefined;
+    if (itemEl && paletteEl && !paletteEl.contains(itemEl)) {
+      paletteEl.appendChild(itemEl);
+    }
+    if (ev.item?.reset) ev.item.reset();
   }
 
   // ---------- Node/Edge handlers ----------
 
-  // Simple 1-handle per side support (kept for completeness)
-  clickHandle(nodeId: string, kind: 'source' | 'target', e: MouseEvent) {
-    e.stopPropagation();
-    if (this.disabled()) return;
-
-    if (kind === 'source') {
-      this.pendingSource.set(nodeId);
-      return;
-    }
-    const from = this.pendingSource();
-    if (from && from !== nodeId) {
-      const id = `${from}-${nodeId}`;
-      if (!this.edges.some((e) => e.id === id)) {
-        this.edges = [
-          ...this.edges,
-          {
-            id,
-            source: from,
-            target: nodeId,
-            label: '',
-            style: { stroke: '#4caf50', marker: 'round', dasharray: '4 4' },
-          } as any,
-        ];
-        this.recomputeGraph();
-        this.emitChange();
-      }
-    }
-    this.pendingSource.set(null);
-  }
-
-  // Port-aware connect
   clickPort(nodeId: string, kind: 'source' | 'target', portId: string, e: MouseEvent) {
     e.stopPropagation();
     if (this.disabled()) return;
@@ -262,13 +217,12 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
     const from = this.pending();
     if (from && (from.nodeId !== nodeId || from.portId !== portId)) {
+      if (!this.arePortsCompatible(from.nodeId, from.portId, nodeId, portId)) {
+        this.pending.set(null);
+        return;
+      }
       const id = `${from.nodeId}:${from.portId} -> ${nodeId}:${portId}`;
       if (!this.edges.some((e) => e.id === id)) {
-        if (!this.arePortsCompatible(from.nodeId, from.portId, nodeId, portId)) {
-          this.pending.set(null);
-          return;
-        }
-
         this.edges = [
           ...this.edges,
           {
@@ -294,152 +248,41 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     if (!n) return;
 
     this.selectedNode.set(n);
-    this.inspectorConfig = this.buildConfigFor(undefined);
 
+    // Build config from registry
+    const aiType = (n.data as any)?.aiType as string | undefined;
+    const spec = (aiType && ACTION_FORMS[aiType]) || null;
+    this.inspectorConfig = spec ? spec.make(this.fields) : makeFallback(this.fields);
+
+    // Init form & patch defaults + current params
     this.inspectorForm = this.fb.group({});
     setTimeout(() => {
-      const params = (n.data as any)?.params;
-      if (params) this.inspectorForm.patchValue(params);
+      const current = (n.data as any)?.params ?? {};
+      const defaults = spec?.defaults ?? {};
+      const toPatch = { ...defaults, ...current };
+      if (Object.keys(toPatch).length) {
+        this.inspectorForm.patchValue(toPatch, { emitEvent: false });
+      }
     });
-  }
-
-  private buildConfigFor(_ignored: string | undefined): FieldConfig[] {
-    const sel = this.selectedNode();
-    const aiType = (sel?.data as ActionNodeData).aiType;
-
-    switch (aiType) {
-      case 'chat-basic':
-        return [
-          this.fields.getTextAreaField({
-            name: 'prompt',
-            label: 'Prompt',
-            placeholder: 'Ask anything…',
-            rows: 6,
-            validators: [Validators.required],
-          }),
-        ];
-
-      case 'chat-on-file': {
-        const filesField = this.fields.getFileField({
-          name: 'files',
-          label: 'form.labels.files',
-          multiple: true,
-          accept: '.pdf,.docx,image/*',
-          maxFiles: 10,
-          maxTotalSize: 50 * 1024 * 1024, // 50 MB total
-          required: true,
-          validators: [Validators.required],
-        });
-
-        return [
-          this.fields.getTextAreaField({
-            name: 'prompt',
-            label: 'Prompt',
-            placeholder: 'Ask about the uploaded document(s)…',
-            rows: 5,
-            validators: [Validators.required],
-          }),
-          filesField as FieldConfig,
-        ].filter(Boolean) as FieldConfig[];
-      }
-
-      case 'compare': {
-        const left = this.fields.getFileField({
-          name: 'files',
-          label: 'form.labels.files',
-          multiple: false,
-          accept: '.pdf,.docx,image/*',
-          maxTotalSize: 50 * 1024 * 1024, // 50 MB total
-          required: true,
-          validators: [Validators.required],
-        });
-
-        const right = this.fields.getFileField({
-          name: 'files',
-          label: 'form.labels.files',
-          multiple: false,
-          accept: '.pdf,.docx,image/*',
-          maxTotalSize: 50 * 1024 * 1024, // 50 MB total
-          required: true,
-          validators: [Validators.required],
-        });
-
-        return [left, right].filter(Boolean) as FieldConfig[];
-      }
-
-      case 'summarize': {
-        const single = this.fields.getFileField({
-          name: 'files',
-          label: 'form.labels.files',
-          multiple: false,
-          accept: '.pdf,.docx,image/*',
-          maxTotalSize: 50 * 1024 * 1024, // 50 MB total
-          required: true,
-          validators: [Validators.required],
-        });
-
-        return [single].filter(Boolean) as FieldConfig[];
-      }
-
-      case 'extract':
-        return [
-          this.fields.getTextAreaField({
-            name: 'text',
-            label: 'Text (optional)',
-            placeholder: 'Paste the text to analyze…',
-            rows: 6,
-          }),
-          this.fields.getTextField({
-            name: 'entities',
-            label: 'Entities (comma separated)',
-            placeholder: 'person, location, organization',
-            validators: [Validators.required],
-          }),
-        ];
-
-      default:
-        // fallback: show params JSON for unknown action types
-        return [
-          this.fields.getTextAreaField({
-            name: 'params',
-            label: 'Params (JSON)',
-            rows: 8,
-          }),
-        ];
-    }
   }
 
   onEdgeSelected(_: any) {}
 
-  closeInspector() {
-    this.selectedNode.set(null);
-  }
+  // ---------- Inspector ----------
 
   applyInspector() {
     const node = this.selectedNode();
     if (!node) return;
 
     const params = this.inspectorForm.getRawValue();
-    const aiType = (node.data as any)?.aiType as AiActionType | undefined;
+    const aiType = (node.data as any)?.aiType as string | undefined;
 
-    // Enforce your file-count rules
-    switch (aiType) {
-      case 'chat-on-file':
-        if (!params?.files || (Array.isArray(params.files) && params.files.length < 1)) {
-          // TODO: show a toast/snackbar in your UX
-          return;
-        }
-        break;
-      case 'compare':
-        if (!params?.leftFile || !params?.rightFile) return;
-        break;
-      case 'summarize':
-        if (!params?.file) return;
-        break;
-      case 'extract':
-        if (!params?.entities) return;
-        break;
-    }
+    // Minimal guards
+    if (aiType === 'chat-basic' && !params?.prompt) return;
+    if (aiType === 'chat-on-file' && (!params?.files || !params.files.length)) return;
+    if (aiType === 'compare' && (!params?.leftFile || !params?.rightFile)) return;
+    if (aiType === 'summarize' && !params?.file) return;
+    if (aiType === 'extract' && !params?.entities) return;
 
     const idx = this.nodes.findIndex((n) => n.id === node.id);
     const updated: WorkflowNode = {
@@ -453,13 +296,27 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     this.closeInspector();
   }
 
+  closeInspector() {
+    this.selectedNode.set(null);
+  }
+
   // ---------- Context menu ----------
 
-  openContextMenu(e: MouseEvent) {
+  openCanvasContextMenu(e: MouseEvent) {
     e.preventDefault();
-    const hit = this.pickHit(e);
+    const hit = this.pickHitFromEvent(e);
     if (!hit) return this.contextMenu.set(null);
     this.contextMenu.set({ ...hit, x: e.clientX, y: e.clientY });
+  }
+
+  openNodeContextMenu(nodeId: string, e: MouseEvent) {
+    e.preventDefault();
+    this.contextMenu.set({ type: 'node', id: nodeId, x: e.clientX, y: e.clientY });
+  }
+
+  openLinkContextMenu(linkId: string, e: MouseEvent) {
+    e.preventDefault();
+    this.contextMenu.set({ type: 'edge', id: linkId, x: e.clientX, y: e.clientY });
   }
 
   closeContextMenu() {
@@ -495,19 +352,21 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     this.closeContextMenu();
   }
 
-  private pickHit(e: MouseEvent): { type: 'node' | 'edge'; id: string } | null {
-    const el = (e.target as HTMLElement)?.closest?.('[ngx-graph-node],[ngx-graph-link]');
+  private pickHitFromEvent(e: MouseEvent): { type: 'node' | 'edge'; id: string } | null {
+    const el = (e.target as HTMLElement)?.closest?.('[data-node-id],[data-link-id]');
     if (!el) return null;
-    const nodeId = el.getAttribute('ng-reflect-node-id') || el.getAttribute('node-id');
-    const linkId = el.getAttribute('ng-reflect-link-id') || el.getAttribute('link-id');
+    const nodeId = el.getAttribute('data-node-id');
+    const linkId = el.getAttribute('data-link-id');
     if (nodeId) return { type: 'node', id: nodeId };
     if (linkId) return { type: 'edge', id: linkId };
     return null;
   }
 
-  // ---------- Graph projection ----------
+  // ---------- Graph projection & validity ----------
 
   private recomputeGraph() {
+    this.ensureIoPorts();
+
     const nodes: GNode[] = this.nodes.map((n) => ({
       id: n.id,
       label: n.data?.label ?? (n.type === 'action' ? 'Action' : n.type),
@@ -529,7 +388,69 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     this.emitValidity();
   }
 
-  // ---------- Helpers ----------
+  private emitValidity() {
+    const ids = new Set(this.nodes.map((n) => n.id));
+    const bySource = new Map<string, number>();
+    const byTarget = new Map<string, number>();
+
+    this.edges.forEach((e) => {
+      bySource.set(e.source, (bySource.get(e.source) ?? 0) + 1);
+      byTarget.set(e.target, (byTarget.get(e.target) ?? 0) + 1);
+    });
+
+    const valid = [...ids].every((id) => {
+      if (id === 'input-node') return (bySource.get(id) ?? 0) >= 1;
+      if (id === 'result-node') return (byTarget.get(id) ?? 0) >= 1;
+      return (bySource.get(id) ?? 0) >= 1 && (byTarget.get(id) ?? 0) >= 1;
+    });
+
+    this.validityChange.emit(valid);
+  }
+
+  // ---------- Utilities ----------
+
+  private nudgeGraph() {
+    if (!this.ready()) return;
+    if (this.rafId != null) return;
+    this.rafId = requestAnimationFrame(() => {
+      this.update$.next(true);
+      this.rafId = null;
+    });
+  }
+
+  private emitChange() {
+    this.change.emit({ nodes: this.nodes, edges: this.edges });
+  }
+
+  private ensureIoPorts() {
+    this.nodes = this.nodes.map((n) => {
+      if (n.type === 'input') {
+        return {
+          ...n,
+          ports: {
+            inputs: [],
+            outputs: [{ id: 'out', label: 'out', type: 'json' }],
+          },
+        };
+      }
+      if (n.type === 'result') {
+        return {
+          ...n,
+          ports: {
+            inputs: [{ id: 'in', label: 'in', type: 'json' }],
+            outputs: [],
+          },
+        };
+      }
+      const hasIn = n.ports?.inputs?.length
+        ? n.ports.inputs
+        : [{ id: 'in', label: 'in', type: 'json' }];
+      const hasOut = n.ports?.outputs?.length
+        ? n.ports.outputs
+        : [{ id: 'out', label: 'out', type: 'json' }];
+      return { ...n, ports: { inputs: hasIn, outputs: hasOut } };
+    });
+  }
 
   private arePortsCompatible(
     srcNodeId: string,
@@ -537,8 +458,8 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     tgtNodeId: string,
     tgtPortId: string,
   ): boolean {
-    const nSrc = this.nodes.find((n) => n.id === srcNodeId) as WorkflowNode | undefined;
-    const nTgt = this.nodes.find((n) => n.id === tgtNodeId) as WorkflowNode | undefined;
+    const nSrc = this.nodes.find((n) => n.id === srcNodeId);
+    const nTgt = this.nodes.find((n) => n.id === tgtNodeId);
     const out = nSrc?.ports?.outputs?.find((p) => p.id === srcPortId);
     const inp = nTgt?.ports?.inputs?.find((p) => p.id === tgtPortId);
     if (!out || !inp) return true;
@@ -553,11 +474,6 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
   titleize(s: string) {
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-  }
-
-  // --- Field builders with safe fallbacks (keeps TS happy) ---
-  private F() {
-    return this.fields;
   }
 
   private uid(): string {

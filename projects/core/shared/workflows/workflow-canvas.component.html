@@ -2,7 +2,7 @@
   @if (availableActions().length) {
     <div class="pxs-wf-palette">
       <div class="pxs-wf-palette-title">Actions:</div>
-      <div class="pxs-wf-palette-items">
+      <div class="pxs-wf-palette-items" #paletteHost>
         @for (a of availableActions(); track a.type) {
           <button
             mat-raised-button
@@ -10,6 +10,7 @@
             cdkDrag
             [cdkDragData]="a"
             [disabled]="disabled()"
+            cdkDragRootElement=".pxs-wf-pill"
           >
             {{ a.type }}
           </button>
@@ -22,10 +23,11 @@
     class="pxs-wf-canvas"
     #graphHost
     cdkDropList
+    [cdkDropListData]="{}"
+    [cdkDropListEnterPredicate]="allowPaletteDrop"
     (cdkDropListDropped)="onDrop($event)"
-    (contextmenu)="openContextMenu($event)"
+    (contextmenu)="openCanvasContextMenu($event)"
   >
-    <!-- Gate rendering to avoid early getScreenCTM calls -->
     @if (ready() && canvasW() > 0 && canvasH() > 0) {
       <ngx-graph
         class="chart-container"
@@ -33,7 +35,7 @@
         [nodes]="gNodes()"
         [links]="gLinks()"
         [autoCenter]="true"
-        [autoZoom]="true"
+        [autoZoom]="false"
         [draggingEnabled]="!disabled()"
         [zoomSpeed]="0.075"
         [update$]="update$"
@@ -54,7 +56,6 @@
           >
             <svg:path d="M0,-5L10,0L0,5" fill="currentColor"></svg:path>
           </svg:marker>
-
           <svg:marker
             id="arrow-hollow"
             viewBox="0 -5 10 10"
@@ -71,7 +72,6 @@
               stroke-width="1.5"
             ></svg:path>
           </svg:marker>
-
           <svg:marker
             id="arrow-round"
             viewBox="-5 -5 10 10"
@@ -83,7 +83,6 @@
           >
             <svg:circle r="3" fill="currentColor"></svg:circle>
           </svg:marker>
-
           <svg:marker
             id="arrow-warn"
             viewBox="0 -5 10 10"
@@ -97,9 +96,14 @@
           </svg:marker>
         </ng-template>
 
-        <!-- node (SVG) with clickable ports -->
+        <!-- NODE (right-click + clickable ports) -->
         <ng-template #nodeTemplate let-node>
-          <svg:g class="node" [ngClass]="node?.data?.type">
+          <svg:g
+            class="node"
+            [ngClass]="node?.data?.type"
+            [attr.data-node-id]="node.id"
+            (contextmenu)="openNodeContextMenu(node.id, $event)"
+          >
             <svg:rect
               rx="8"
               ry="8"
@@ -113,7 +117,6 @@
               "
               [attr.fill]="nodeFill(node?.data?.type)"
             />
-
             <!-- label -->
             <svg:text alignment-baseline="hanging" [attr.x]="12" [attr.y]="12" font-weight="600">
               {{ node.label }}
@@ -122,7 +125,7 @@
             <!-- INPUT PORTS (left) -->
             @if (node?.data?.ports?.inputs?.length) {
               @for (p of node.data.ports.inputs; track p.id; let i = $index) {
-                <svg:g (click)="clickPort(node.id, 'target', p.id, $event)">
+                <svg:g class="port port-in" (click)="clickPort(node.id, 'target', p.id, $event)">
                   <svg:circle
                     class="wf-handle target"
                     [attr.cx]="-8"
@@ -144,7 +147,7 @@
             <!-- OUTPUT PORTS (right) -->
             @if (node?.data?.ports?.outputs?.length) {
               @for (p of node.data.ports.outputs; track p.id; let i = $index) {
-                <svg:g (click)="clickPort(node.id, 'source', p.id, $event)">
+                <svg:g class="port port-out" (click)="clickPort(node.id, 'source', p.id, $event)">
                   <svg:circle
                     class="wf-handle source"
                     [attr.cx]="(node.dimension?.width || 220) + 8"
@@ -166,10 +169,15 @@
           </svg:g>
         </ng-template>
 
-        <!-- link -->
+        <!-- LINK (right-clickable, label path fixed) -->
         <ng-template #linkTemplate let-link>
-          <svg:g class="edge">
+          <svg:g
+            class="edge"
+            [attr.data-link-id]="link.id"
+            (contextmenu)="openLinkContextMenu(link.id, $event)"
+          >
             <svg:path
+              [attr.id]="link.id"
               class="line"
               [attr.stroke]="link?.data?.style?.stroke || '#607d8b'"
               [attr.stroke-width]="link?.data?.style?.strokeWidth || 2"
@@ -192,7 +200,7 @@
     }
   </div>
 
-  <!-- INSPECTOR / HELP / CONTEXT-MENU OUTSIDE THE GRAPH to avoid layout thrash -->
+  <!-- INSPECTOR -->
   @if (selectedNode(); as sel) {
     <div class="pxs-wf-inspector">
       <div class="header">
@@ -217,14 +225,15 @@
 
   @if (!disabled()) {
     <div class="pxs-help">
-      <span>Tip:</span> Drag actions from the palette. Click a node’s right port (source) then
-      another node’s left port (target) to connect.
+      <span>Tip:</span> Drag from the palette. Click a node’s right port (source) then another
+      node’s left port (target) to connect. Right-click nodes/links for options.
     </div>
   }
 
+  <!-- CONTEXT MENU -->
   @if (contextMenu(); as m) {
     <div class="pxs-menu" [style.left.px]="m.x" [style.top.px]="m.y">
-      <button (click)="onConfigure()">Configure</button>
+      <button (click)="onConfigure()" [disabled]="m.type !== 'node'">Configure</button>
       <button (click)="onDelete()">Delete</button>
       <button (click)="closeContextMenu()">Close</button>
     </div>
