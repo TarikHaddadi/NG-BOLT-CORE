@@ -20,6 +20,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { Edge as GEdge, NgxGraphModule, Node as GNode } from '@swimlane/ngx-graph';
+import * as d3 from 'd3-shape';
 import { Subject } from 'rxjs';
 
 import {
@@ -44,6 +45,8 @@ import { FieldConfigService } from '@cadai/pxs-ng-core/services';
 import { ConfirmDialogComponent, DynamicFormComponent } from '../public-api';
 import { ACTION_FORMS, makeFallback } from './action-forms.component';
 import { FrozenLayout, XY } from './frozen-layout.component';
+
+type DropEv = CdkDragDrop<any, any, any>;
 
 @Component({
   selector: 'app-workflow-canvas',
@@ -116,6 +119,8 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
   // rAF coalescing
   private rafId: number | null = null;
+
+  curve = d3.curveLinear;
 
   constructor(
     private fb: FormBuilder,
@@ -199,8 +204,6 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
     const hostEl = this.graphHost.nativeElement;
     const rect = hostEl.getBoundingClientRect();
-
-    // get viewport client point, then convert to canvas-relative
     const client = this.getDropClientPoint(ev);
     const x = client.x - rect.left;
     const y = client.y - rect.top;
@@ -242,22 +245,19 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     return !!e && 'changedTouches' in (e as TouchEvent);
   }
 
-  private getDropClientPoint(ev: CdkDragDrop<{}, any, any>): { x: number; y: number } {
-    // CDK v16+ provides dropPoint (already client coords)
+  private getDropClientPoint(ev: DropEv): { x: number; y: number } {
     const anyEv = ev as unknown as { dropPoint?: { x: number; y: number }; event?: unknown };
     if (anyEv.dropPoint) return anyEv.dropPoint;
-
-    const native = anyEv.event;
-    if (this.isMouseLike(native)) {
+    const native = anyEv.event as any;
+    if (native && typeof native.clientX === 'number')
       return { x: native.clientX, y: native.clientY };
-    }
-    if (this.isTouch(native) && native.changedTouches.length) {
+    if (native?.changedTouches?.length) {
       const t = native.changedTouches[0];
       return { x: t.clientX, y: t.clientY };
     }
-    // fallback (upper-left of canvas)
     return { x: 0, y: 0 };
   }
+
   // ---------- Node/Edge handlers ----------
 
   onCanvasMouseMove(evt: MouseEvent) {
@@ -665,36 +665,62 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   /** Match template rect sizing so port Y math stays in sync */
-  private nodeRectSize(n: WorkflowNode): { w: number; h: number } {
-    const w = 220;
-    const portsCount = (n.ports?.inputs?.length ?? 0) + (n.ports?.outputs?.length ?? 0);
-    const h = 60 + portsCount * 4;
-    return { w, h };
-  }
-  private portOffset(n: WorkflowNode, portId: string, kind: 'input' | 'output'): XY {
-    const { w } = this.nodeRectSize(n);
-    const list = kind === 'input' ? (n.ports?.inputs ?? []) : (n.ports?.outputs ?? []);
+  private portCenterFromDom(
+    nodeId: string,
+    portKind: 'input' | 'output',
+    portId: string,
+  ): { x: number; y: number } | undefined {
+    // In your nodeTemplate you already set data-node-id on the <g class="node"> wrapper
+    const svg = this.graphHost.nativeElement.querySelector('svg') as SVGSVGElement | null;
+    if (!svg) return;
+
+    const nodeEl = this.graphHost.nativeElement.querySelector<SVGGElement>(
+      `[data-node-id="${nodeId}"]`,
+    );
+    if (!nodeEl) return;
+
+    // Port circles have classes .port-in .wf-handle.target and .port-out .wf-handle.source
+    const selector =
+      portKind === 'input' ? `.port-in .wf-handle.target` : `.port-out .wf-handle.source`;
+
+    // Pick the right circle by index matching the id
+    const ports = Array.from(nodeEl.querySelectorAll<SVGCircleElement>(selector));
+    // Map your id to index
+    const node = this.nodes.find((n) => n.id === nodeId);
+    const list = portKind === 'input' ? (node?.ports?.inputs ?? []) : (node?.ports?.outputs ?? []);
     const idx = Math.max(
       0,
       list.findIndex((p) => p.id === portId),
     );
-    const cy = 28 + idx * 18;
-    const cx = kind === 'input' ? -8 : w + 8;
-    return { x: cx, y: cy };
+    const circle = ports[idx] ?? ports[0];
+    if (!circle) return;
+
+    const ctm = circle.getScreenCTM();
+    if (!ctm) return;
+
+    const pt = (svg as any).createSVGPoint();
+    pt.x = circle.cx.baseVal.value;
+    pt.y = circle.cy.baseVal.value;
+    const sp = pt.matrixTransform((circle as any).getCTM()); // local → node space
+    const gp = (svg as any).createSVGPoint();
+    gp.x = sp.x;
+    gp.y = sp.y;
+    const result = gp.matrixTransform(ctm); // node → screen
+    // Convert screen → SVG space
+    const inv = (svg as any).getScreenCTM()?.inverse?.();
+    if (!inv) return;
+    const svgPt = (svg as any).createSVGPoint();
+    svgPt.x = result.x;
+    svgPt.y = result.y;
+    const local = svgPt.matrixTransform(inv);
+    return { x: local.x, y: local.y };
   }
-  private portAbs(nodeId: string, portId: string, kind: 'input' | 'output'): XY | undefined {
-    const n = this.nodes.find((nn) => nn.id === nodeId);
-    if (!n) return;
-    const pos = this.nodePos.get(nodeId);
-    if (!pos) return;
-    const off = this.portOffset(n, portId, kind);
-    return { x: pos.x + off.x, y: pos.y + off.y };
-  }
+
   private edgePointsFromPorts(edgeId?: string) {
     const e = this.edges.find((x) => x.id === edgeId);
     if (!e) return;
-    const s = this.portAbs(e.source, e.sourcePort!, 'output');
-    const t = this.portAbs(e.target, e.targetPort!, 'input');
+    const s = this.portCenterFromDom(e.source, 'output', e.sourcePort!);
+    const t = this.portCenterFromDom(e.target, 'input', e.targetPort!);
     if (!s || !t) return;
 
     const midX = (s.x + t.x) / 2;
@@ -706,11 +732,10 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     ];
   }
 
-  /** Rubber-band starting point = pending source port center (or 0,0 if none) */
-  ghostStart(): XY {
+  ghostStart(): { x: number; y: number } {
     const p = this.pending();
     if (!p) return { x: 0, y: 0 };
-    return this.portAbs(p.nodeId, p.portId, 'output') ?? { x: 0, y: 0 };
+    return this.portCenterFromDom(p.nodeId, 'output', p.portId) ?? { x: 0, y: 0 };
   }
 
   isPending(nodeId: string, portId: string, kind: 'source' | 'target'): boolean {
