@@ -17,6 +17,8 @@ import {
 } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { TranslateModule } from '@ngx-translate/core';
 import { Edge as GEdge, NgxGraphModule, Node as GNode } from '@swimlane/ngx-graph';
 import { Subject } from 'rxjs';
 
@@ -28,6 +30,7 @@ import {
   ChatBasicNodeData,
   ChatOnFileNodeData,
   CompareNodeData,
+  ConfirmDialogData,
   ContextMenuTarget,
   ExtractNodeData,
   FieldConfig,
@@ -38,8 +41,9 @@ import {
 } from '@cadai/pxs-ng-core/interfaces';
 import { FieldConfigService } from '@cadai/pxs-ng-core/services';
 
-import { DynamicFormComponent } from '../public-api';
+import { ConfirmDialogComponent, DynamicFormComponent } from '../public-api';
 import { ACTION_FORMS, makeFallback } from './action-forms.component';
+import { FrozenLayout, XY } from './frozen-layout.component';
 
 @Component({
   selector: 'app-workflow-canvas',
@@ -51,6 +55,7 @@ import { ACTION_FORMS, makeFallback } from './action-forms.component';
     DynamicFormComponent,
     ReactiveFormsModule,
     MatButtonModule,
+    TranslateModule,
   ],
   templateUrl: './workflow-canvas.component.html',
   styleUrls: ['./workflow-canvas.component.scss'],
@@ -67,10 +72,17 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
   @ViewChild('graphHost', { static: true }) graphHost!: ElementRef<HTMLElement>;
   @ViewChild('paletteHost', { static: true }) paletteHost!: ElementRef<HTMLElement>;
+  @ViewChild('inspectorTpl', { static: true }) inspectorTpl!: any;
+  @ViewChild('inspectorActionsTpl', { static: true }) inspectorActionsTpl!: any;
+
+  private inspectorDialogRef: MatDialogRef<
+    ConfirmDialogComponent<{ form: FormGroup; title: string }>,
+    Record<string, unknown> | false
+  > | null = null;
 
   // Canvas viewport
   canvasW = signal(900);
-  canvasH = signal(640); // fixed to CSS clamp
+  canvasH = signal(640);
 
   // Graph store for ngx-graph
   private _nodes = signal<GNode[]>([]);
@@ -82,8 +94,17 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   private ro?: ResizeObserver;
   ready = signal(false);
 
-  // Port-aware connection (click-to-connect)
+  // Manual positions (top-left corner of each node)
+  private nodePos = new Map<string, XY>();
+  frozenLayout = new FrozenLayout(
+    (id) => this.nodePos.get(id),
+    (_graph, edgeId) => this.edgePointsFromPorts(edgeId),
+  );
+
+  // Port-aware connection (click-to-connect + drag preview)
   pending = signal<{ nodeId: string; portId: string } | null>(null);
+  mouse = signal<{ x: number; y: number } | null>(null);
+  selectedEdgeId = signal<string | null>(null);
 
   // Context menu
   contextMenu = signal<ContextMenuTarget | null>(null);
@@ -96,18 +117,157 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   // rAF coalescing
   private rafId: number | null = null;
 
-  mouse = signal<{ x: number; y: number } | null>(null);
-  selectedEdgeId = signal<string | null>(null);
-  autoCenter = signal(true); // we'll disable after first layout
+  constructor(
+    private fb: FormBuilder,
+    private fields: FieldConfigService,
+    private dialog: MatDialog,
+  ) {}
+
+  // ---------- Lifecycle ----------
+
+  ngOnInit() {
+    if (!this.nodes?.length) {
+      const input: WorkflowNode = {
+        id: 'input-node',
+        type: 'input',
+        x: 60,
+        y: 60,
+        data: { label: 'Input' },
+        ports: { inputs: [], outputs: [{ id: 'out', label: 'out', type: 'json' }] },
+      };
+      const result: WorkflowNode = {
+        id: 'result-node',
+        type: 'result',
+        x: 360,
+        y: 60,
+        data: { label: 'Result' },
+        ports: { inputs: [{ id: 'in', label: 'in', type: 'json' }], outputs: [] },
+      };
+      this.nodes = [input, result];
+    }
+    // seed positions from model if present
+    for (const n of this.nodes) this.nodePos.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
+  }
+
+  ngAfterViewInit() {
+    const el = this.graphHost?.nativeElement;
+    if (el && 'ResizeObserver' in window) {
+      let lastW = 0,
+        lastH = 0;
+      const FIXED_H = 640;
+
+      const resize = () => {
+        const w = el.clientWidth || el.parentElement?.clientWidth || 900;
+        const h = FIXED_H;
+        if (w === lastW && h === lastH) return;
+        lastW = w;
+        lastH = h;
+        this.canvasW.set(w);
+        this.canvasH.set(h);
+        this.nudgeGraph();
+      };
+
+      this.ro = new ResizeObserver(resize);
+      this.ro.observe(el);
+      resize();
+    }
+
+    setTimeout(() => {
+      this.ready.set(true);
+      this.recomputeGraph();
+      this.emitChange();
+      this.nudgeGraph();
+    });
+  }
+
+  ngOnDestroy() {
+    this.ro?.disconnect();
+  }
+
+  // ---------- DnD (palette -> canvas, copy semantics) ----------
+
+  allowPaletteDrop = () => !this.disabled();
+
+  onDrop(ev: CdkDragDrop<{}, any, any>) {
+    if (this.disabled()) return;
+    const action = ev.item?.data as ActionDefinition | undefined;
+    if (!action) return;
+
+    const type = action.type as AiActionType;
+    const spec = ACTION_FORMS[type];
+    const defaults = spec?.defaults ?? {};
+
+    const hostEl = this.graphHost.nativeElement;
+    const rect = hostEl.getBoundingClientRect();
+
+    // get viewport client point, then convert to canvas-relative
+    const client = this.getDropClientPoint(ev);
+    const x = client.x - rect.left;
+    const y = client.y - rect.top;
+
+    const nodeId = this.uid();
+    const node: WorkflowNode = {
+      id: nodeId,
+      type: 'action',
+      x,
+      y,
+      data: {
+        label: ACTION_LABEL[type] ?? this.titleize(type),
+        params: { ...(action.params ?? {}), ...defaults },
+        aiType: type,
+      } as ActionNodeData,
+      ports: {
+        inputs: [{ id: 'in', label: 'in', type: 'json' }],
+        outputs: [{ id: 'out', label: 'out', type: 'json' }],
+      },
+    };
+
+    this.nodePos.set(nodeId, { x, y });
+    this.nodes = [...this.nodes, node];
+    this.recomputeGraph();
+    this.emitChange();
+
+    // return pill to palette
+    const itemEl = ev.item?.element?.nativeElement as HTMLElement | undefined;
+    const paletteEl = this.paletteHost?.nativeElement as HTMLElement | undefined;
+    if (itemEl && paletteEl && !paletteEl.contains(itemEl)) paletteEl.appendChild(itemEl);
+    if (ev.item?.reset) ev.item.reset();
+  }
+
+  isMouseLike(e: unknown): e is MouseEvent | PointerEvent {
+    return !!e && typeof (e as { clientX?: unknown }).clientX === 'number';
+  }
+
+  isTouch(e: unknown): e is TouchEvent {
+    return !!e && 'changedTouches' in (e as TouchEvent);
+  }
+
+  private getDropClientPoint(ev: CdkDragDrop<{}, any, any>): { x: number; y: number } {
+    // CDK v16+ provides dropPoint (already client coords)
+    const anyEv = ev as unknown as { dropPoint?: { x: number; y: number }; event?: unknown };
+    if (anyEv.dropPoint) return anyEv.dropPoint;
+
+    const native = anyEv.event;
+    if (this.isMouseLike(native)) {
+      return { x: native.clientX, y: native.clientY };
+    }
+    if (this.isTouch(native) && native.changedTouches.length) {
+      const t = native.changedTouches[0];
+      return { x: t.clientX, y: t.clientY };
+    }
+    // fallback (upper-left of canvas)
+    return { x: 0, y: 0 };
+  }
+  // ---------- Node/Edge handlers ----------
 
   onCanvasMouseMove(evt: MouseEvent) {
     const svg = (evt.currentTarget as HTMLElement).querySelector('svg');
     if (!svg) return;
-    const pt = svg.createSVGPoint?.() || { x: 0, y: 0, matrixTransform: () => ({ x: 0, y: 0 }) };
     if ('createSVGPoint' in svg) {
+      const pt = (svg as any).createSVGPoint();
       pt.x = evt.clientX;
       pt.y = evt.clientY;
-      const ctm = svg.getScreenCTM?.();
+      const ctm = (svg as any).getScreenCTM?.();
       const p = ctm ? pt.matrixTransform(ctm.inverse()) : { x: evt.offsetX, y: evt.offsetY };
       this.mouse.set({ x: p.x, y: p.y });
     } else {
@@ -121,8 +281,68 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     this.mouse.set(null);
   }
 
-  selectEdge(edgeId: string, e?: MouseEvent) {
-    e?.stopPropagation();
+  clickPort(nodeId: string, kind: 'source' | 'target', portId: string, e: MouseEvent) {
+    e.stopPropagation();
+    if (this.disabled()) return;
+
+    if (kind === 'source') {
+      this.pending.set({ nodeId, portId });
+      return;
+    }
+
+    // kind === 'target'
+    const from = this.pending();
+    if (from && (from.nodeId !== nodeId || from.portId !== portId)) {
+      if (!this.arePortsCompatible(from.nodeId, from.portId, nodeId, portId)) {
+        this.pending.set(null);
+        this.mouse.set(null);
+        return;
+      }
+      const id = this.makeEdgeId(from.nodeId, from.portId, nodeId, portId);
+      const exists = this.edges.some(
+        (ee) =>
+          ee.source === from.nodeId &&
+          ee.target === nodeId &&
+          ee.sourcePort === from.portId &&
+          ee.targetPort === portId,
+      );
+      if (!exists) {
+        this.edges = [
+          ...this.edges,
+          {
+            id,
+            source: from.nodeId,
+            target: nodeId,
+            label: '',
+            sourcePort: from.portId,
+            targetPort: portId,
+            style: { marker: 'solid' },
+          },
+        ];
+        this.recomputeGraph(); // nodes won't move; only edges refresh
+        this.emitChange();
+      }
+    }
+    this.pending.set(null);
+    this.mouse.set(null);
+  }
+
+  onNodeSelected(e: GNode) {
+    const n = this.nodes.find((nn) => nn.id === e.id);
+    if (!n) return;
+    this.selectedNode.set(n);
+    this.openInspectorDialogFor(n);
+  }
+
+  onEdgeSelected(e: GEdge) {
+    const id = e?.id;
+    if (!id) return;
+    this.selectedEdgeId.set(this.selectedEdgeId() === id ? null : id);
+    this.nudgeGraph();
+  }
+
+  selectEdge(edgeId: string, ev?: MouseEvent) {
+    ev?.stopPropagation();
     this.selectedEdgeId.set(edgeId);
   }
 
@@ -141,324 +361,109 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(ev: KeyboardEvent) {
-    if (ev.key === 'Delete' || ev.key === 'Backspace') {
-      if (this.selectedEdgeId()) {
-        ev.preventDefault();
-        this.deleteSelectedEdge();
-      }
+    if ((ev.key === 'Delete' || ev.key === 'Backspace') && this.selectedEdgeId()) {
+      ev.preventDefault();
+      this.deleteSelectedEdge();
     }
   }
 
-  constructor(
-    private fb: FormBuilder,
-    private fields: FieldConfigService,
-  ) {}
+  // ---------- Inspector (dialog-driven) ----------
 
-  private toSafeId(s: string): string {
-    // keep letters, numbers, underscore, dash; replace everything else with '-'
-    return String(s).replace(/[^A-Za-z0-9_-]/g, '-');
-  }
-  private makeEdgeId(
-    srcNodeId: string,
-    srcPortId: string,
-    tgtNodeId: string,
-    tgtPortId: string,
-  ): string {
-    // canonical and CSS-safe (no spaces/colons/arrows)
-    return `e-${this.toSafeId(srcNodeId)}__${this.toSafeId(srcPortId)}--${this.toSafeId(tgtNodeId)}__${this.toSafeId(tgtPortId)}`;
-  }
+  private openInspectorDialogFor(node: WorkflowNode) {
+    const isAction = this.isActionNode(node);
+    const aiType = isAction ? node.data.aiType : undefined;
+    const spec = isAction && aiType ? (ACTION_FORMS[aiType] ?? null) : null;
 
-  isPending(nodeId: string, portId: string, kind: 'source' | 'target'): boolean {
-    const p = this.pending();
-    return !!p && kind === 'source' && p.nodeId === nodeId && p.portId === portId;
-  }
+    this.inspectorConfig = spec ? spec.make(this.fields) : makeFallback(this.fields);
 
-  // ---------- Lifecycle ----------
-
-  ngOnInit() {
-    if (!this.nodes?.length) {
-      const input: WorkflowNode = {
-        id: 'input-node',
-        type: 'input',
-        x: 0,
-        y: 0,
-        data: { label: 'Input' },
-        ports: {
-          inputs: [],
-          outputs: [{ id: 'out', label: 'out', type: 'json' }],
-        },
-      };
-      const result: WorkflowNode = {
-        id: 'result-node',
-        type: 'result',
-        x: 0,
-        y: 0,
-        data: { label: 'Result' },
-        ports: {
-          inputs: [{ id: 'in', label: 'in', type: 'json' }],
-          outputs: [],
-        },
-      };
-      this.nodes = [input, result];
-    } else {
-      this.ensureIoPorts();
-    }
-  }
-
-  ngAfterViewInit() {
-    const el = this.graphHost?.nativeElement;
-    if (el && 'ResizeObserver' in window) {
-      let lastW = 0,
-        lastH = 0;
-      const FIXED_H = 640;
-
-      const resize = () => {
-        const w = el.clientWidth || el.parentElement?.clientWidth || 900;
-        const h = FIXED_H;
-        if (w === lastW && h === lastH) return;
-        lastW = w;
-        lastH = h;
-
-        this.canvasW.set(w);
-        this.canvasH.set(h);
-        this.nudgeGraph();
-      };
-
-      this.ro = new ResizeObserver(resize);
-      this.ro.observe(el);
-      resize();
-    }
-
+    this.inspectorForm = this.fb.group({});
     setTimeout(() => {
-      this.ready.set(true);
-      this.recomputeGraph();
-      this.emitChange();
-      this.nudgeGraph();
+      const current = isAction ? node.data.params : {};
+      const defaults = spec?.defaults ?? {};
+      const toPatch = { ...defaults, ...(current as object) };
+      if (Object.keys(toPatch).length) {
+        this.inspectorForm.patchValue(toPatch, { emitEvent: false });
+      }
+    });
 
-      // disable autoCenter after first stable frame to avoid jump on subsequent updates
-      setTimeout(() => this.autoCenter.set(false));
+    this.inspectorDialogRef = this.dialog.open<
+      ConfirmDialogComponent<{ form: FormGroup; title: string }>,
+      ConfirmDialogData<{ form: FormGroup; title: string }>,
+      Record<string, unknown> | false
+    >(ConfirmDialogComponent, {
+      width: '560px',
+      maxWidth: '95vw',
+      panelClass: 'inspector-dialog-panel',
+      backdropClass: 'app-overlay-backdrop',
+      data: {
+        title: node.data?.label ?? 'configure',
+        contentTpl: this.inspectorTpl,
+        actionsTpl: this.inspectorActionsTpl,
+        context: { form: this.inspectorForm, title: node.data?.label ?? '' },
+        getResult: () => (this.inspectorForm.valid ? this.inspectorForm.getRawValue() : false),
+      },
+    });
+
+    this.inspectorDialogRef.afterClosed().subscribe((result) => {
+      this.inspectorDialogRef = null;
+      if (!result) return; // cancelled or invalid
+      this.applyInspector(node, result as Record<string, unknown>);
     });
   }
 
-  ngOnDestroy() {
-    this.ro?.disconnect();
+  dialogCancel() {
+    this.inspectorDialogRef?.close(false);
+  }
+  dialogConfirm() {
+    this.inspectorDialogRef?.componentInstance?.closeWithResult();
   }
 
-  allowPaletteDrop = () => !this.disabled();
-
-  onDrop(ev: CdkDragDrop<{}, any, any>) {
-    if (this.disabled()) return;
-    const action = ev.item?.data as ActionDefinition | undefined;
-    if (!action) return;
-
-    const type = action.type as AiActionType;
-    const spec = ACTION_FORMS[type];
-    const defaults = spec?.defaults ?? {};
-
-    const node: WorkflowNode = {
-      id: this.uid(),
-      type: 'action',
-      x: 0,
-      y: 0,
-      data: {
-        label: ACTION_LABEL[type] ?? this.titleize(type),
-        params: { ...(action.params ?? {}), ...defaults },
-        aiType: type,
-      } as ActionNodeData,
-      ports: {
-        inputs: [{ id: 'in', label: 'in', type: 'json' }],
-        outputs: [{ id: 'out', label: 'out', type: 'json' }],
-      },
-    };
-
-    this.nodes = [...this.nodes, node];
-    this.recomputeGraph();
-    this.emitChange();
-
-    // put dragged pill back into palette (infinite palette)
-    const itemEl = ev.item?.element?.nativeElement as HTMLElement | undefined;
-    const paletteEl = this.paletteHost?.nativeElement as HTMLElement | undefined;
-    if (itemEl && paletteEl && !paletteEl.contains(itemEl)) {
-      paletteEl.appendChild(itemEl);
-    }
-    if (ev.item?.reset) ev.item.reset();
-  }
-
-  // ---------- Node/Edge handlers ----------
-
-  clickPort(nodeId: string, kind: 'source' | 'target', portId: string, e: MouseEvent) {
-    e.stopPropagation();
-    if (this.disabled()) return;
-
-    if (kind === 'source') {
-      this.pending.set({ nodeId, portId });
-      return;
-    }
-
-    const from = this.pending();
-    if (from && (from.nodeId !== nodeId || from.portId !== portId)) {
-      if (!this.arePortsCompatible(from.nodeId, from.portId, nodeId, portId)) {
-        this.pending.set(null);
-        this.mouse.set(null);
-        return;
-      }
-      const id = this.makeEdgeId(from.nodeId, from.portId, nodeId, portId);
-      const exists = this.edges.some(
-        (e) =>
-          e.source === from.nodeId &&
-          e.target === nodeId &&
-          e.sourcePort === from.portId &&
-          e.targetPort === portId,
-      );
-      if (!exists) {
-        this.edges = [
-          ...this.edges,
-          {
-            id,
-            source: from.nodeId,
-            target: nodeId,
-            label: '',
-            sourcePort: from.portId,
-            targetPort: portId,
-            style: { marker: 'solid' },
-          },
-        ];
-        this.recomputeGraph();
-        this.emitChange();
-      }
-    }
-    this.pending.set(null);
-    this.mouse.set(null);
-  }
-
-  onNodeSelected(e: any) {
-    const nodeId: string = e?.id;
-    const n = this.nodes.find((nn) => nn.id === nodeId);
-    if (!n) return;
-
-    this.selectedNode.set(n);
-
-    // If it's an action node, load the action-specific form; otherwise fallback (e.g., just label)
-    if (this.isActionNode(n)) {
-      const aiType = n.data.aiType; // strongly typed now
-      const spec = ACTION_FORMS[aiType] ?? null;
-
-      this.inspectorConfig = spec ? spec.make(this.fields) : makeFallback(this.fields);
-
-      this.inspectorForm = this.fb.group({});
-      setTimeout(() => {
-        const current = n.data.params; // typed
-        const defaults = spec?.defaults ?? {};
-        const toPatch = { ...defaults, ...current };
-        if (Object.keys(toPatch).length) {
-          this.inspectorForm.patchValue(toPatch, { emitEvent: false });
-        }
-      });
-    } else {
-      // input/result nodes: no aiType/params — provide a simple fallback config (e.g., label only)
-      this.inspectorConfig = makeFallback(this.fields);
-      this.inspectorForm = this.fb.group({});
-      setTimeout(() => {
-        // Example: patch only a label if your fallback has it; otherwise omit.
-        const label = n.data?.label ?? '';
-        if (label) this.inspectorForm.patchValue({ label }, { emitEvent: false });
-      });
-    }
-  }
-
-  onEdgeSelected(e: any) {
-    // ngx-graph sends the edge object; we only need the id
-    const id: string | undefined = e?.id;
-    if (!id) return;
-
-    // toggle selection if clicking the same edge again
-    const currentlySelected = this.selectedEdgeId?.() ?? null;
-    if (currentlySelected === id) {
-      this.selectedEdgeId.set(null);
-    } else {
-      this.selectedEdgeId.set(id);
-    }
-
-    // ask ngx-graph to redraw so the selected style applies immediately
-    this.nudgeGraph();
-  }
-
-  // ---------- Inspector ----------
-
-  applyInspector() {
-    const node = this.selectedNode();
-    if (!node) return;
-
+  applyInspector(node: WorkflowNode, rawParams: Record<string, unknown>) {
     const idx = this.nodes.findIndex((n) => n.id === node.id);
     if (idx < 0) return;
 
-    // Only action nodes have params to apply
     if (!this.isActionNode(node)) {
-      // For input/result nodes you might update only 'label' etc. If not needed, just return.
       this.closeInspector();
       return;
     }
 
-    // Narrow by aiType and cast the form value to the *correct* params shape.
-    // NOTE: getRawValue() is untyped; we narrow by switch for safety.
     switch (node.data.aiType) {
       case 'chat-basic': {
-        const params = this.inspectorForm.getRawValue() as ChatBasicNodeData['params'];
+        const params = rawParams as ChatBasicNodeData['params'];
         if (!params.prompt) return;
-        const updated: WorkflowNode = {
-          ...node,
-          data: { ...node.data, params } satisfies ChatBasicNodeData,
-        };
+        const updated: WorkflowNode = { ...node, data: { ...node.data, params } };
         this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
         break;
       }
-
       case 'chat-on-file': {
-        const params = this.inspectorForm.getRawValue() as ChatOnFileNodeData['params'];
-        if (!params.prompt || !params.files || params.files.length === 0) return;
-        const updated: WorkflowNode = {
-          ...node,
-          data: { ...node.data, params } satisfies ChatOnFileNodeData,
-        };
+        const params = rawParams as ChatOnFileNodeData['params'];
+        if (!params.prompt || !params.files?.length) return;
+        const updated: WorkflowNode = { ...node, data: { ...node.data, params } };
         this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
         break;
       }
-
       case 'compare': {
-        const params = this.inspectorForm.getRawValue() as CompareNodeData['params'];
+        const params = rawParams as CompareNodeData['params'];
         if (!params.leftFile || !params.rightFile) return;
-        const updated: WorkflowNode = {
-          ...node,
-          data: { ...node.data, params } satisfies CompareNodeData,
-        };
+        const updated: WorkflowNode = { ...node, data: { ...node.data, params } };
         this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
         break;
       }
-
       case 'summarize': {
-        const params = this.inspectorForm.getRawValue() as SummarizeNodeData['params'];
+        const params = rawParams as SummarizeNodeData['params'];
         if (!params.file) return;
-        const updated: WorkflowNode = {
-          ...node,
-          data: { ...node.data, params } satisfies SummarizeNodeData,
-        };
+        const updated: WorkflowNode = { ...node, data: { ...node.data, params } };
         this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
         break;
       }
-
       case 'extract': {
-        const params = this.inspectorForm.getRawValue() as ExtractNodeData['params'];
-        if (!params.entities || params.entities.trim().length === 0) return;
-        const updated: WorkflowNode = {
-          ...node,
-          data: { ...node.data, params } satisfies ExtractNodeData,
-        };
+        const params = rawParams as ExtractNodeData['params'];
+        if (!params.entities?.trim()) return;
+        const updated: WorkflowNode = { ...node, data: { ...node.data, params } };
         this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
         break;
       }
-
       default: {
-        // Exhaustiveness guard — if a new aiType is added and not handled here, TS will error.
         const _never: never = node.data;
         return _never;
       }
@@ -481,17 +486,14 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     if (!hit) return this.contextMenu.set(null);
     this.contextMenu.set({ ...hit, x: e.clientX, y: e.clientY });
   }
-
   openNodeContextMenu(nodeId: string, e: MouseEvent) {
     e.preventDefault();
     this.contextMenu.set({ type: 'node', id: nodeId, x: e.clientX, y: e.clientY });
   }
-
   openLinkContextMenu(linkId: string, e: MouseEvent) {
     e.preventDefault();
     this.contextMenu.set({ type: 'edge', id: linkId, x: e.clientX, y: e.clientY });
   }
-
   closeContextMenu() {
     this.contextMenu.set(null);
   }
@@ -499,16 +501,16 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   onConfigure() {
     const m = this.contextMenu();
     if (!m || m.type !== 'node') return;
-    const n = this.nodes.find((nn) => nn.id === m.id) as WorkflowNode | undefined;
+    const n = this.nodes.find((nn) => nn.id === m.id);
     if (!n) return;
-    this.onNodeSelected({ id: n.id });
+    this.selectedNode.set(n);
+    this.openInspectorDialogFor(n);
     this.closeContextMenu();
   }
 
   onDelete() {
     const m = this.contextMenu();
     if (!m) return;
-
     if (m.type === 'node') {
       if (m.id === 'input-node' || m.id === 'result-node') {
         this.closeContextMenu();
@@ -519,7 +521,6 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     } else {
       this.edges = this.edges.filter((e) => e.id !== m.id);
     }
-
     this.recomputeGraph();
     this.emitChange();
     this.closeContextMenu();
@@ -600,20 +601,11 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
       if (n.type === 'input') {
         return {
           ...n,
-          ports: {
-            inputs: [],
-            outputs: [{ id: 'out', label: 'out', type: 'json' }],
-          },
+          ports: { inputs: [], outputs: [{ id: 'out', label: 'out', type: 'json' }] },
         };
       }
       if (n.type === 'result') {
-        return {
-          ...n,
-          ports: {
-            inputs: [{ id: 'in', label: 'in', type: 'json' }],
-            outputs: [],
-          },
-        };
+        return { ...n, ports: { inputs: [{ id: 'in', label: 'in', type: 'json' }], outputs: [] } };
       }
       const hasIn = n.ports?.inputs?.length
         ? n.ports.inputs
@@ -642,7 +634,7 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   nodeFill(type?: string) {
     if (type === 'input') return '#e3f2fd';
     if (type === 'result') return '#e8f5e9';
-    return '#e7e4eb';
+    return '#e7e4eb'; // default for action/unknown
   }
 
   titleize(s: string) {
@@ -653,11 +645,76 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     return crypto?.randomUUID?.() ?? 'id-' + Math.random().toString(36).slice(2, 9);
   }
 
-  isActionNodeData(data: WorkflowNodeData): data is ActionNodeData {
-    return (data as any)?.aiType !== undefined; // discriminant present only on action nodes
+  private toSafeId(s: string): string {
+    return String(s).replace(/[^A-Za-z0-9_-]/g, '-');
+  }
+  private makeEdgeId(
+    srcNodeId: string,
+    srcPortId: string,
+    tgtNodeId: string,
+    tgtPortId: string,
+  ): string {
+    return `e-${this.toSafeId(srcNodeId)}__${this.toSafeId(srcPortId)}--${this.toSafeId(tgtNodeId)}__${this.toSafeId(tgtPortId)}`;
   }
 
+  isActionNodeData(data: WorkflowNodeData): data is ActionNodeData {
+    return !!data && typeof data === 'object' && 'aiType' in data;
+  }
   isActionNode(n: WorkflowNode): n is WorkflowNode & { data: ActionNodeData } {
     return this.isActionNodeData(n.data);
+  }
+
+  /** Match template rect sizing so port Y math stays in sync */
+  private nodeRectSize(n: WorkflowNode): { w: number; h: number } {
+    const w = 220;
+    const portsCount = (n.ports?.inputs?.length ?? 0) + (n.ports?.outputs?.length ?? 0);
+    const h = 60 + portsCount * 4;
+    return { w, h };
+  }
+  private portOffset(n: WorkflowNode, portId: string, kind: 'input' | 'output'): XY {
+    const { w } = this.nodeRectSize(n);
+    const list = kind === 'input' ? (n.ports?.inputs ?? []) : (n.ports?.outputs ?? []);
+    const idx = Math.max(
+      0,
+      list.findIndex((p) => p.id === portId),
+    );
+    const cy = 28 + idx * 18;
+    const cx = kind === 'input' ? -8 : w + 8;
+    return { x: cx, y: cy };
+  }
+  private portAbs(nodeId: string, portId: string, kind: 'input' | 'output'): XY | undefined {
+    const n = this.nodes.find((nn) => nn.id === nodeId);
+    if (!n) return;
+    const pos = this.nodePos.get(nodeId);
+    if (!pos) return;
+    const off = this.portOffset(n, portId, kind);
+    return { x: pos.x + off.x, y: pos.y + off.y };
+  }
+  private edgePointsFromPorts(edgeId?: string) {
+    const e = this.edges.find((x) => x.id === edgeId);
+    if (!e) return;
+    const s = this.portAbs(e.source, e.sourcePort!, 'output');
+    const t = this.portAbs(e.target, e.targetPort!, 'input');
+    if (!s || !t) return;
+
+    const midX = (s.x + t.x) / 2;
+    return [
+      { x: s.x, y: s.y },
+      { x: midX, y: s.y },
+      { x: midX, y: t.y },
+      { x: t.x, y: t.y },
+    ];
+  }
+
+  /** Rubber-band starting point = pending source port center (or 0,0 if none) */
+  ghostStart(): XY {
+    const p = this.pending();
+    if (!p) return { x: 0, y: 0 };
+    return this.portAbs(p.nodeId, p.portId, 'output') ?? { x: 0, y: 0 };
+  }
+
+  isPending(nodeId: string, portId: string, kind: 'source' | 'target'): boolean {
+    const p = this.pending();
+    return !!p && kind === 'source' && p.nodeId === nodeId && p.portId === portId;
   }
 }
