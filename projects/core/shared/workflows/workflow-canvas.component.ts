@@ -1,4 +1,4 @@
-import { DragDropModule } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { CommonModule } from '@angular/common';
 import {
   AfterViewInit,
@@ -25,10 +25,16 @@ import {
   ActionDefinition,
   ActionNodeData,
   AiActionType,
+  ChatBasicNodeData,
+  ChatOnFileNodeData,
+  CompareNodeData,
   ContextMenuTarget,
+  ExtractNodeData,
   FieldConfig,
+  SummarizeNodeData,
   WorkflowEdge,
   WorkflowNode,
+  WorkflowNodeData,
 } from '@cadai/pxs-ng-core/interfaces';
 import { FieldConfigService } from '@cadai/pxs-ng-core/services';
 
@@ -61,9 +67,6 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
   @ViewChild('graphHost', { static: true }) graphHost!: ElementRef<HTMLElement>;
   @ViewChild('paletteHost', { static: true }) paletteHost!: ElementRef<HTMLElement>;
-  @HostListener('document:keydown.escape') onEsc() {
-    this.pending.set(null);
-  }
 
   // Canvas viewport
   canvasW = signal(900);
@@ -80,7 +83,7 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   ready = signal(false);
 
   // Port-aware connection (click-to-connect)
-  private pending = signal<{ nodeId: string; portId: string } | null>(null);
+  pending = signal<{ nodeId: string; portId: string } | null>(null);
 
   // Context menu
   contextMenu = signal<ContextMenuTarget | null>(null);
@@ -92,6 +95,59 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
   // rAF coalescing
   private rafId: number | null = null;
+
+  mouse = signal<{ x: number; y: number } | null>(null);
+  selectedEdgeId = signal<string | null>(null);
+  autoCenter = signal(true); // we'll disable after first layout
+
+  onCanvasMouseMove(evt: MouseEvent) {
+    const svg = (evt.currentTarget as HTMLElement).querySelector('svg');
+    if (!svg) return;
+    const pt = svg.createSVGPoint?.() || { x: 0, y: 0, matrixTransform: () => ({ x: 0, y: 0 }) };
+    if ('createSVGPoint' in svg) {
+      pt.x = evt.clientX;
+      pt.y = evt.clientY;
+      const ctm = svg.getScreenCTM?.();
+      const p = ctm ? pt.matrixTransform(ctm.inverse()) : { x: evt.offsetX, y: evt.offsetY };
+      this.mouse.set({ x: p.x, y: p.y });
+    } else {
+      this.mouse.set({ x: evt.offsetX, y: evt.offsetY });
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  cancelPending() {
+    this.pending.set(null);
+    this.mouse.set(null);
+  }
+
+  selectEdge(edgeId: string, e?: MouseEvent) {
+    e?.stopPropagation();
+    this.selectedEdgeId.set(edgeId);
+  }
+
+  isEdgeSelected(edgeId: string) {
+    return this.selectedEdgeId() === edgeId;
+  }
+
+  deleteSelectedEdge() {
+    const id = this.selectedEdgeId();
+    if (!id) return;
+    this.edges = this.edges.filter((e) => e.id !== id);
+    this.selectedEdgeId.set(null);
+    this.recomputeGraph();
+    this.emitChange();
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKeyDown(ev: KeyboardEvent) {
+    if (ev.key === 'Delete' || ev.key === 'Backspace') {
+      if (this.selectedEdgeId()) {
+        ev.preventDefault();
+        this.deleteSelectedEdge();
+      }
+    }
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -178,6 +234,9 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
       this.recomputeGraph();
       this.emitChange();
       this.nudgeGraph();
+
+      // disable autoCenter after first stable frame to avoid jump on subsequent updates
+      setTimeout(() => this.autoCenter.set(false));
     });
   }
 
@@ -185,17 +244,15 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     this.ro?.disconnect();
   }
 
-  // ---------- DnD palette -> canvas (copy semantics) ----------
-
   allowPaletteDrop = () => !this.disabled();
 
-  onDrop(ev: any) {
+  onDrop(ev: CdkDragDrop<{}, any, any>) {
     if (this.disabled()) return;
     const action = ev.item?.data as ActionDefinition | undefined;
     if (!action) return;
 
     const type = action.type as AiActionType;
-    const spec = ACTION_FORMS[type as any];
+    const spec = ACTION_FORMS[type];
     const defaults = spec?.defaults ?? {};
 
     const node: WorkflowNode = {
@@ -242,17 +299,16 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     if (from && (from.nodeId !== nodeId || from.portId !== portId)) {
       if (!this.arePortsCompatible(from.nodeId, from.portId, nodeId, portId)) {
         this.pending.set(null);
+        this.mouse.set(null);
         return;
       }
       const id = this.makeEdgeId(from.nodeId, from.portId, nodeId, portId);
-
-      // prevent duplicates irrespective of id formatting
       const exists = this.edges.some(
         (e) =>
           e.source === from.nodeId &&
           e.target === nodeId &&
-          (e as any).sourcePort === from.portId &&
-          (e as any).targetPort === portId,
+          e.sourcePort === from.portId &&
+          e.targetPort === portId,
       );
       if (!exists) {
         this.edges = [
@@ -265,13 +321,14 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
             sourcePort: from.portId,
             targetPort: portId,
             style: { marker: 'solid' },
-          } as any,
+          },
         ];
         this.recomputeGraph();
         this.emitChange();
       }
     }
     this.pending.set(null);
+    this.mouse.set(null);
   }
 
   onNodeSelected(e: any) {
@@ -281,24 +338,50 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
     this.selectedNode.set(n);
 
-    // Build config from registry
-    const aiType = (n.data as any)?.aiType as string | undefined;
-    const spec = (aiType && ACTION_FORMS[aiType]) || null;
-    this.inspectorConfig = spec ? spec.make(this.fields) : makeFallback(this.fields);
+    // If it's an action node, load the action-specific form; otherwise fallback (e.g., just label)
+    if (this.isActionNode(n)) {
+      const aiType = n.data.aiType; // strongly typed now
+      const spec = ACTION_FORMS[aiType] ?? null;
 
-    // Init form & patch defaults + current params
-    this.inspectorForm = this.fb.group({});
-    setTimeout(() => {
-      const current = (n.data as any)?.params ?? {};
-      const defaults = spec?.defaults ?? {};
-      const toPatch = { ...defaults, ...current };
-      if (Object.keys(toPatch).length) {
-        this.inspectorForm.patchValue(toPatch, { emitEvent: false });
-      }
-    });
+      this.inspectorConfig = spec ? spec.make(this.fields) : makeFallback(this.fields);
+
+      this.inspectorForm = this.fb.group({});
+      setTimeout(() => {
+        const current = n.data.params; // typed
+        const defaults = spec?.defaults ?? {};
+        const toPatch = { ...defaults, ...current };
+        if (Object.keys(toPatch).length) {
+          this.inspectorForm.patchValue(toPatch, { emitEvent: false });
+        }
+      });
+    } else {
+      // input/result nodes: no aiType/params — provide a simple fallback config (e.g., label only)
+      this.inspectorConfig = makeFallback(this.fields);
+      this.inspectorForm = this.fb.group({});
+      setTimeout(() => {
+        // Example: patch only a label if your fallback has it; otherwise omit.
+        const label = n.data?.label ?? '';
+        if (label) this.inspectorForm.patchValue({ label }, { emitEvent: false });
+      });
+    }
   }
 
-  onEdgeSelected(_: any) {}
+  onEdgeSelected(e: any) {
+    // ngx-graph sends the edge object; we only need the id
+    const id: string | undefined = e?.id;
+    if (!id) return;
+
+    // toggle selection if clicking the same edge again
+    const currentlySelected = this.selectedEdgeId?.() ?? null;
+    if (currentlySelected === id) {
+      this.selectedEdgeId.set(null);
+    } else {
+      this.selectedEdgeId.set(id);
+    }
+
+    // ask ngx-graph to redraw so the selected style applies immediately
+    this.nudgeGraph();
+  }
 
   // ---------- Inspector ----------
 
@@ -306,23 +389,81 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
     const node = this.selectedNode();
     if (!node) return;
 
-    const params = this.inspectorForm.getRawValue();
-    const aiType = (node.data as any)?.aiType as string | undefined;
-
-    // Minimal guards
-    if (aiType === 'chat-basic' && !params?.prompt) return;
-    if (aiType === 'chat-on-file' && (!params?.files || !params.files.length)) return;
-    if (aiType === 'compare' && (!params?.leftFile || !params?.rightFile)) return;
-    if (aiType === 'summarize' && !params?.file) return;
-    if (aiType === 'extract' && !params?.entities) return;
-
     const idx = this.nodes.findIndex((n) => n.id === node.id);
-    const updated: WorkflowNode = {
-      ...(this.nodes[idx] as any),
-      data: { ...(this.nodes[idx].data || {}), params },
-    };
+    if (idx < 0) return;
 
-    this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
+    // Only action nodes have params to apply
+    if (!this.isActionNode(node)) {
+      // For input/result nodes you might update only 'label' etc. If not needed, just return.
+      this.closeInspector();
+      return;
+    }
+
+    // Narrow by aiType and cast the form value to the *correct* params shape.
+    // NOTE: getRawValue() is untyped; we narrow by switch for safety.
+    switch (node.data.aiType) {
+      case 'chat-basic': {
+        const params = this.inspectorForm.getRawValue() as ChatBasicNodeData['params'];
+        if (!params.prompt) return;
+        const updated: WorkflowNode = {
+          ...node,
+          data: { ...node.data, params } satisfies ChatBasicNodeData,
+        };
+        this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
+        break;
+      }
+
+      case 'chat-on-file': {
+        const params = this.inspectorForm.getRawValue() as ChatOnFileNodeData['params'];
+        if (!params.prompt || !params.files || params.files.length === 0) return;
+        const updated: WorkflowNode = {
+          ...node,
+          data: { ...node.data, params } satisfies ChatOnFileNodeData,
+        };
+        this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
+        break;
+      }
+
+      case 'compare': {
+        const params = this.inspectorForm.getRawValue() as CompareNodeData['params'];
+        if (!params.leftFile || !params.rightFile) return;
+        const updated: WorkflowNode = {
+          ...node,
+          data: { ...node.data, params } satisfies CompareNodeData,
+        };
+        this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
+        break;
+      }
+
+      case 'summarize': {
+        const params = this.inspectorForm.getRawValue() as SummarizeNodeData['params'];
+        if (!params.file) return;
+        const updated: WorkflowNode = {
+          ...node,
+          data: { ...node.data, params } satisfies SummarizeNodeData,
+        };
+        this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
+        break;
+      }
+
+      case 'extract': {
+        const params = this.inspectorForm.getRawValue() as ExtractNodeData['params'];
+        if (!params.entities || params.entities.trim().length === 0) return;
+        const updated: WorkflowNode = {
+          ...node,
+          data: { ...node.data, params } satisfies ExtractNodeData,
+        };
+        this.nodes = [...this.nodes.slice(0, idx), updated, ...this.nodes.slice(idx + 1)];
+        break;
+      }
+
+      default: {
+        // Exhaustiveness guard — if a new aiType is added and not handled here, TS will error.
+        const _never: never = node.data;
+        return _never;
+      }
+    }
+
     this.recomputeGraph();
     this.emitChange();
     this.closeInspector();
@@ -409,8 +550,8 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
       id: e.id,
       source: e.source,
       target: e.target,
-      label: (e as any).label || '',
-      data: { style: (e as any).style },
+      label: e.label || '',
+      data: { style: e.style },
     }));
 
     this._nodes.set(nodes);
@@ -501,7 +642,7 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
   nodeFill(type?: string) {
     if (type === 'input') return '#e3f2fd';
     if (type === 'result') return '#e8f5e9';
-    return '#ffffff';
+    return '#e7e4eb';
   }
 
   titleize(s: string) {
@@ -510,5 +651,13 @@ export class WorkflowCanvasComponent implements OnInit, AfterViewInit, OnDestroy
 
   private uid(): string {
     return crypto?.randomUUID?.() ?? 'id-' + Math.random().toString(36).slice(2, 9);
+  }
+
+  isActionNodeData(data: WorkflowNodeData): data is ActionNodeData {
+    return (data as any)?.aiType !== undefined; // discriminant present only on action nodes
+  }
+
+  isActionNode(n: WorkflowNode): n is WorkflowNode & { data: ActionNodeData } {
+    return this.isActionNodeData(n.data);
   }
 }
