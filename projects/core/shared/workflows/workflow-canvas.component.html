@@ -21,11 +21,9 @@
           >
             {{ a.type }}
 
-            <!-- nice floating preview -->
             <ng-template cdkDragPreview>
               <div class="pxs-wf-pill preview">{{ a.type }}</div>
             </ng-template>
-            <!-- keep layout stable -->
             <ng-template cdkDragPlaceholder>
               <div class="pxs-wf-pill placeholder"></div>
             </ng-template>
@@ -52,14 +50,14 @@
         [view]="[canvasW(), canvasH()]"
         [nodes]="gNodes()"
         [links]="gLinks()"
-        [autoCenter]="autoCenter()"
+        [layout]="frozenLayout"
+        [autoCenter]="false"
         [autoZoom]="false"
         [draggingEnabled]="!disabled()"
         [zoomSpeed]="0.075"
         [update$]="update$"
-        layout="dagre"
-        (nodeSelected)="onNodeSelected($event)"
-        (edgeSelected)="onEdgeSelected($event)"
+        (nodeSelected)="onNodeSelected($any($event))"
+        (edgeSelected)="onEdgeSelected($any($event))"
       >
         <!-- defs (arrow heads) -->
         <ng-template #defsTemplate>
@@ -133,7 +131,7 @@
                     (node?.data?.ports?.outputs?.length || 0)) *
                     4
               "
-              [attr.fill]="nodeFill(node?.data?.type)"
+              [style.fill]="nodeFill(node?.data?.type)"
             />
             <!-- label -->
             <svg:text
@@ -141,7 +139,7 @@
               [attr.x]="12"
               [attr.y]="12"
               font-weight="600"
-              [attr.color]="'#fff'"
+              [attr.fill]="'#000'"
             >
               {{ node.label }}
             </svg:text>
@@ -232,12 +230,13 @@
           </svg:g>
         </ng-template>
       </ngx-graph>
-      <!-- Ghost "rubber-band" preview: straight line from pending source port center to cursor -->
+
+      <!-- Ghost "rubber-band" preview -->
       @if (pending() && mouse(); as p) {
         <svg class="wf-overlay" [attr.width]="canvasW()" [attr.height]="canvasH()">
           <line
-            [attr.x1]="0"
-            [attr.y1]="0"
+            [attr.x1]="ghostStart().x"
+            [attr.y1]="ghostStart().y"
             [attr.x2]="mouse()!.x"
             [attr.y2]="mouse()!.y"
             class="wf-ghost-line"
@@ -247,42 +246,39 @@
     }
   </div>
 
-  <!-- INSPECTOR -->
-  @if (selectedNode(); as sel) {
-    <div class="pxs-wf-inspector">
-      <div class="header">
-        <div class="title">{{ sel?.data?.label }}</div>
-        <button (click)="closeInspector()">×</button>
-      </div>
+  <!-- INSPECTOR (dialog-driven) -->
+  <ng-template #inspectorTpl let-form="form" let-title="title">
+    <h3 class="mb-2">{{ title }}</h3>
+    <app-dynamic-form [config]="inspectorConfig" [form]="form"></app-dynamic-form>
+  </ng-template>
 
-      <app-dynamic-form [config]="inspectorConfig" [form]="inspectorForm"></app-dynamic-form>
-
-      <div class="actions">
-        <button
-          mat-raised-button
-          color="primary"
-          (click)="applyInspector()"
-          [disabled]="inspectorForm.invalid"
-        >
-          Apply
-        </button>
-      </div>
-    </div>
-  }
+  <ng-template #inspectorActionsTpl let-form="form">
+    <button mat-button type="button" (click)="dialogCancel()">{{ 'cancel' | translate }}</button>
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      [disabled]="form.invalid"
+      (click)="dialogConfirm()"
+    >
+      {{ 'apply' | translate }}
+    </button>
+  </ng-template>
 
   @if (!disabled()) {
     <div class="pxs-help">
-      <span>Tip:</span> Drag from the palette. Click a node’s right port (source) then another
-      node’s left port (target) to connect. Right-click nodes/links for options.
+      <span>{{ 'tip' | translate }}</span> {{ 'workflow_help' | translate }}
     </div>
   }
 
   <!-- CONTEXT MENU -->
   @if (contextMenu(); as m) {
     <div class="pxs-menu" [style.left.px]="m.x" [style.top.px]="m.y">
-      <button (click)="onConfigure()" [disabled]="m.type !== 'node'">Configure</button>
-      <button (click)="onDelete()">Delete</button>
-      <button (click)="closeContextMenu()">Close</button>
+      <button mat-button (click)="onConfigure()" [disabled]="m.type !== 'node'">
+        {{ 'configure' | translate }}
+      </button>
+      <button mat-button (click)="onDelete()">{{ 'delete' | translate }}</button>
+      <button mat-button (click)="closeContextMenu()">{{ 'close' | translate }}</button>
     </div>
   }
 </div>
