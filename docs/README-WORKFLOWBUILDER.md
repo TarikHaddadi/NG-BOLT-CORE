@@ -1,6 +1,6 @@
 # Workflow Builder & Canvas — Usage & Integration Guide
 
-_Last updated: 2025-10-02_
+_Last updated: 2025-10-03_
 
 Angular 19+ • Standalone components • Signals • `@swimlane/ngx-graph` • CDK Drag&Drop • Dynamic Form (PXS‑NG‑CORE)
 
@@ -8,14 +8,25 @@ This guide adds **light implementation details** on top of the “How to Use” 
 
 ---
 
+## 0) What’s new (compared to earlier drafts)
+
+- **Frozen layout**: replaces Dagre auto-layout with a custom `FrozenLayout` so **nodes never jump** when you add/remove links or drop new nodes.
+- **Manual placement**: nodes are placed **exactly** where you drop them; positions are persisted in a local `nodePos` map (and in `WorkflowNode.x/y` if you choose).
+- **Port-anchored edges**: links are computed from **port centers** (not node boxes), so arrows **stick to the ports**.
+- **Drag-to-connect**: click an output port and drag; a **rubber‑band** ghost line previews the connection.
+- **Inspector in dialog**: selection opens a reusable **ConfirmDialog** that hosts the dynamic form; no more absolute overlay.
+- **Safe IDs**: edge IDs are CSS‑safe to avoid `querySelector` errors.
+
+---
+
 ## 1) What’s in the box
 
 - **Palette → Canvas**: drag any action from the palette to create a node (infinite palette; items don’t disappear).
-- **Ports & Links**: click **right port** (output) then **left port** (input) to connect.
+- **Ports & Links**: click **right port** (output) then **left port** (input) to connect; or click‑drag from output to input.
 - **Context Menu**: right‑click node/link → `Configure | Delete | Close`.
-- **Inspector**: per‑action form (Dynamic Form) appears on select/configure.
-- **Validation**: canvas emits a boolean when the graph satisfies wiring rules.
-- **Stable sizing**: fixed canvas height (e.g., 640px) to avoid infinite layout growth.
+- **Inspector**: per‑action form (Dynamic Form) appears in a dialog.
+- **Validation**: emits a boolean when the graph satisfies wiring rules.
+- **Stable layout**: positions do **not** change after drops/links/deletions.
 
 ---
 
@@ -28,7 +39,7 @@ Minimal wrapper to host the canvas and save workflows:
   standalone: true,
   selector: 'app-workflow-builder',
   imports: [CommonModule, ReactiveFormsModule, WorkflowCanvasComponent, DynamicFormComponent],
-  template: `
+  template: \`
     <app-dynamic-form [config]="headerConfig" [form]="headerForm"></app-dynamic-form>
 
     <app-workflow-canvas
@@ -49,7 +60,7 @@ Minimal wrapper to host the canvas and save workflows:
     >
       Save
     </button>
-  `,
+  \`,
 })
 export class WorkflowBuilderComponent {
   headerForm = new FormGroup({ name: new FormControl('', { nonNullable: true }) });
@@ -86,7 +97,7 @@ export class WorkflowBuilderComponent {
 
 ---
 
-## 3) Inputs / Outputs (Component contract)
+## 3) Component inputs / outputs
 
 **Inputs**
 
@@ -104,8 +115,6 @@ export class WorkflowBuilderComponent {
 
 ## 4) Data shapes (lightweight)
 
-Keep your own typings, but the canvas expects these properties:
-
 ```ts
 type WorkflowNodeType = 'input' | 'action' | 'result';
 
@@ -118,16 +127,18 @@ interface Port {
 interface WorkflowNode {
   id: string;
   type: WorkflowNodeType;
+  x?: number; // optional but recommended if you also persist
+  y?: number;
   data: { label: string; aiType?: string; params?: any };
   ports?: { inputs?: Port[]; outputs?: Port[] };
 }
 
 interface WorkflowEdge {
-  id: string; // recommended: "src:port -> tgt:port"
+  id: string;
   source: string; // node id
   target: string; // node id
-  sourcePort?: string;
-  targetPort?: string;
+  sourcePort?: string; // port id on source
+  targetPort?: string; // port id on target
   label?: string;
   style?: Record<string, any>; // stroke, dasharray, marker, etc.
 }
@@ -145,70 +156,64 @@ interface ActionDefinition {
 
 ---
 
-## 5) Actions & the Inspector (how it decides which fields to show)
+## 5) Actions & the Inspector
 
-- The canvas looks at `node.data.aiType` (for action nodes) and builds the Inspector form from an internal **action registry** (maps action type → field list and defaults).
-- Default actions provided:
-  - `chat-basic` — textarea `prompt`; optional `temperature` select.
-  - `chat-on-file` — textarea `prompt` + **files[]** (multi).
-  - `compare` — **leftFile** + **rightFile**.
-  - `summarize` — **file** + summary `length` select.
-  - `extract` — `entities` + optional `text`.
+- The canvas looks at `node.data.aiType` (for action nodes) and builds the Inspector form from an **action registry** (maps action type → field list and defaults).
+- Defaults supported (examples):
+  - `chat-basic` — `prompt` (textarea).
+  - `chat-on-file` — `prompt` + `files[]`.
+  - `compare` — `leftFile` + `rightFile`.
+  - `summarize` — `file`.
+  - `extract` — `entities` (+ optional `text`).
 
-**To add a new action** (example):
+**Adding a new action**
 
-1. Define it in your palette `availableActions` with a `type` and optional `params` defaults.
-2. Add its field list in the action registry (one place).
-3. The Inspector will render it automatically when that node is selected.
-
-> Files: upload on save, then store **file references** (IDs/URLs) inside `node.data.params` for persistence.
+1. Palette: add `{ type: 'translate-text', params: { targetLang: 'en', text: '' } }`.
+2. Registry: define `fields` + `defaults` for that `aiType`.
+3. Backend: implement execution using the saved `params`.
 
 ---
 
 ## 6) Drag & Drop semantics
 
-- Dragging an item from the **Palette** creates a **new** node (copy behavior).
-- The palette button remains in place (you can drag it **infinitely**).
-- If the drop is canceled/outside, the button **returns** to the palette.
-- The canvas drop is gated by `disabled()` to prevent edits when needed.
+- Dragging an item from the **Palette** creates a **new** node (copy).
+- Palette buttons remain (infinite palette).
+- If drop is canceled/outside, the button returns to the palette.
+- The canvas drop is gated by `disabled()` to prevent edits.
 
 ---
 
-## 7) Ports, links & validity (the rules)
+## 7) Ports, links & validity
 
 **Connecting**
 
-- Click **source** node’s **right** port → click **target** node’s **left** port.
-- Edge IDs usually include port ids: `A:out -> B:in` (recommended for uniqueness).
+- Click/drag from **output** → release on **input** to connect.
+- Edge IDs should include port ids for uniqueness (e.g., `e-src__out--tgt__in`).
 
 **Compatibility**
 
-- If both ports specify `type` (e.g., `"json"`), they must match; otherwise, connection is ignored.
+- If both ports specify a `type` (e.g., `"json"`), they must match; otherwise, the connection is ignored.
 
-**Validity (emitted via `validityChange`)**
+**Validity (`validityChange`)**
 
 - **Input** must have **≥1 outgoing** edge.
 - **Result** must have **≥1 incoming** edge.
 - Every **Action** must have **≥1 incoming** **and** **≥1 outgoing** edge.
 
-Your host page can disable the Save button until `validityChange === true`.
-
 ---
 
-## 8) Sizing & layout (important for stability)
+## 8) Layout & stability (frozen)
 
-- The canvas uses a fixed **height** (e.g., 640px) so the SVG **won’t grow the page**.
-- Width follows the parent container via a `ResizeObserver`.
-- Graph updates are throttled with `requestAnimationFrame` and pushed via `update$`.
-- `autoCenter` is enabled; `autoZoom` is conservative to avoid layout thrash.
+- Uses a custom **`FrozenLayout`** that **never** repositions nodes.
+- Node positions are stored in a `Map<string, {x,y}>` and can be mirrored into each `WorkflowNode.x/y` for persistence.
+- Width is responsive; height is fixed (e.g., 640px) for predictable SVG behavior.
+- Graph redraws are batched via `requestAnimationFrame` and `update$`.
 
-**Tip**: Place the canvas in a container that has a definite width and a fixed (or predictable) height.
+**Tip**: Persist `x/y` per node so reloading a workflow fully restores its layout.
 
 ---
 
 ## 9) Styling & theming
-
-- Nodes get light fills by type (Input = blue tint, Result = green tint); override in your global/theme SCSS:
 
 ```scss
 .node.input rect {
@@ -223,11 +228,6 @@ Your host page can disable the Save button until `validityChange === true`.
 .wf-handle {
   cursor: pointer;
 }
-```
-
-- The canvas clamps height and hides overflow; adjust to fit your layout:
-
-```scss
 .pxs-wf-canvas {
   height: 640px;
   overflow: hidden;
@@ -236,9 +236,7 @@ Your host page can disable the Save button until `validityChange === true`.
 
 ---
 
-## 10) Persistence format (recommendation)
-
-Store and reload **verbatim**:
+## 10) Persistence format (example)
 
 ```json
 {
@@ -247,12 +245,16 @@ Store and reload **verbatim**:
     {
       "id": "input-node",
       "type": "input",
+      "x": 60,
+      "y": 60,
       "data": { "label": "Input" },
       "ports": { "outputs": [{ "id": "out", "label": "out", "type": "json" }] }
     },
     {
       "id": "action-1",
       "type": "action",
+      "x": 200,
+      "y": 160,
       "data": { "label": "Summarize", "aiType": "summarize", "params": { "file": "file-123" } },
       "ports": {
         "inputs": [{ "id": "in", "label": "in", "type": "json" }],
@@ -262,20 +264,22 @@ Store and reload **verbatim**:
     {
       "id": "result-node",
       "type": "result",
+      "x": 460,
+      "y": 60,
       "data": { "label": "Result" },
       "ports": { "inputs": [{ "id": "in", "label": "in", "type": "json" }] }
     }
   ],
   "edges": [
     {
-      "id": "input-node:out -> action-1:in",
+      "id": "e-input-node__out--action-1__in",
       "source": "input-node",
       "target": "action-1",
       "sourcePort": "out",
       "targetPort": "in"
     },
     {
-      "id": "action-1:out -> result-node:in",
+      "id": "e-action-1__out--result-node__in",
       "source": "action-1",
       "target": "result-node",
       "sourcePort": "out",
@@ -285,14 +289,12 @@ Store and reload **verbatim**:
 }
 ```
 
-> If files are local during editing, convert them to **references** before saving.
-
 ---
 
 ## 11) i18n (labels & errors)
 
-- Node labels are plain strings (e.g., `"Summarize"`). You can pass translated values when creating nodes.
-- File‑field errors—recommended keys (English/French examples):
+- Node labels can be plain strings (already translated) or keys you translate in the host.
+- Suggested file‑field error keys:
 
 ```json
 "file": {
@@ -316,42 +318,7 @@ Store and reload **verbatim**:
 
 ---
 
-## 12) Extending the system (new actions)
-
-To add `translate-text` as a new action:
-
-1. **Palette**: add `{ type: 'translate-text', params: { targetLang: 'en', text: '' } }`.
-2. **Registry**: define an Inspector form (fields: `text`, `targetLang`).
-3. **Backend**: teach your executor how to run it using the saved `params`.
-4. **(Optional)**: enforce port `type` if needed (e.g., `"text"`).
-
-No other changes are needed in the canvas; it will render ports, allow wiring, and persist `params`.
-
----
-
-## 13) Troubleshooting quick table
-
-| Symptom                   | Cause                              | Fix                                                       |
-| ------------------------- | ---------------------------------- | --------------------------------------------------------- |
-| Canvas keeps growing      | SVG measured itself                | Fix container height (e.g., 640px)                        |
-| Items vanish from palette | Move instead of copy               | Ensure palette drag **copies** and resets item            |
-| Can’t connect nodes       | Click order wrong or type mismatch | Click **output → input**; align port `type` values        |
-| Save disabled             | Graph invalid                      | Wire Input → … → Result; ensure every Action has in & out |
-| Touch scroll lag          | Non‑passive listeners              | Add `touch-action: none` to interactive areas             |
-
----
-
-## 14) Versioning & assumptions
-
-- Tested with Angular 16–19; `@swimlane/ngx-graph` Dagre layout.
-- Uses Signals and standalone components.
-- Depends on your Dynamic Form adapters (`FieldConfigService`, `DynamicFormComponent`).
-
----
-
-**That’s it** — with the above you can embed the builder, configure the palette, validate graphs, and persist workflows without diving into implementation internals.
-
 ## 🧑‍💻 Author
 
 **Angular Product Skeleton**  
-Built by **Tarik Haddadi** using Angular 19+and modern best practices (2025).
+Built by **Tarik Haddadi** using Angular 19+ and modern best practices (2025).
