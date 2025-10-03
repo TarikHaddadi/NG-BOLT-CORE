@@ -58,6 +58,7 @@
         [update$]="update$"
         (nodeSelected)="onNodeSelected($any($event))"
         (edgeSelected)="onEdgeSelected($any($event))"
+        [curve]="curve"
       >
         <!-- defs (arrow heads) -->
         <ng-template #defsTemplate>
