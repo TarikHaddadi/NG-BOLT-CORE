@@ -12,7 +12,7 @@
       <div class="pxs-wf-palette-items" #paletteHost>
         @for (a of availableActions(); track a.type) {
           <button
-            mat-raised-button
+            mat-stroked-button
             class="pxs-wf-pill"
             cdkDrag
             [cdkDragData]="a"
@@ -42,8 +42,8 @@
     #canvasList="cdkDropList"
     [cdkDropListData]="{}"
     [cdkDropListEnterPredicate]="allowPaletteDrop"
-    [cdkDropListConnectedTo]="[]"
     (cdkDropListDropped)="onDrop($event)"
+    (mousemove)="onCanvasMouseMove($event)"
     (contextmenu)="openCanvasContextMenu($event)"
   >
     @if (ready() && canvasW() > 0 && canvasH() > 0) {
@@ -52,7 +52,7 @@
         [view]="[canvasW(), canvasH()]"
         [nodes]="gNodes()"
         [links]="gLinks()"
-        [autoCenter]="true"
+        [autoCenter]="autoCenter()"
         [autoZoom]="false"
         [draggingEnabled]="!disabled()"
         [zoomSpeed]="0.075"
@@ -136,7 +136,13 @@
               [attr.fill]="nodeFill(node?.data?.type)"
             />
             <!-- label -->
-            <svg:text alignment-baseline="hanging" [attr.x]="12" [attr.y]="12" font-weight="600">
+            <svg:text
+              alignment-baseline="hanging"
+              [attr.x]="12"
+              [attr.y]="12"
+              font-weight="600"
+              [attr.color]="'#fff'"
+            >
               {{ node.label }}
             </svg:text>
 
@@ -195,22 +201,29 @@
         <ng-template #linkTemplate let-link>
           <svg:g
             class="edge"
+            [class.selected]="isEdgeSelected(link.id)"
             [attr.data-link-id]="link.id"
+            (click)="selectEdge(link.id, $event)"
             (contextmenu)="openLinkContextMenu(link.id, $event)"
           >
             <svg:path
               [attr.id]="link.id"
               class="line"
               [attr.stroke]="link?.data?.style?.stroke || '#607d8b'"
-              [attr.stroke-width]="link?.data?.style?.strokeWidth || 2"
+              [attr.stroke-width]="
+                isEdgeSelected(link.id)
+                  ? (link?.data?.style?.strokeWidth || 2) + 1.5
+                  : link?.data?.style?.strokeWidth || 2
+              "
               [attr.stroke-dasharray]="link?.data?.style?.dasharray || null"
               [attr.marker-end]="'url(#arrow-' + (link?.data?.style?.marker || 'solid') + ')'"
-            ></svg:path>
-
+            />
             <svg:text
               class="edge-label"
               text-anchor="middle"
-              [attr.fill]="link?.data?.style?.labelColor || '#333'"
+              [attr.fill]="
+                isEdgeSelected(link.id) ? '#000' : link?.data?.style?.labelColor || '#333'
+              "
             >
               <svg:textPath class="text-path" [attr.href]="'#' + link.id" startOffset="50%">
                 {{ link.label }}
@@ -219,6 +232,18 @@
           </svg:g>
         </ng-template>
       </ngx-graph>
+      <!-- Ghost "rubber-band" preview: straight line from pending source port center to cursor -->
+      @if (pending() && mouse(); as p) {
+        <svg class="wf-overlay" [attr.width]="canvasW()" [attr.height]="canvasH()">
+          <line
+            [attr.x1]="0"
+            [attr.y1]="0"
+            [attr.x2]="mouse()!.x"
+            [attr.y2]="mouse()!.y"
+            class="wf-ghost-line"
+          />
+        </svg>
+      }
     }
   </div>
 

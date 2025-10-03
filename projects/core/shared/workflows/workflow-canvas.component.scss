@@ -1,19 +1,10 @@
 .pxs-wf-root {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 12px;
+  display: flex;
   align-items: start;
 }
 
 .pxs-wf-palette {
-  position: sticky;
-  top: 0;
-  max-height: 100vh;
   overflow: auto;
-  padding: 8px;
-  border: 1px solid var(--mat-divider-color, #e0e0e0);
-  border-radius: 8px;
-  background: #fafafa;
 
   .pxs-wf-palette-title {
     font-weight: 600;
@@ -132,4 +123,23 @@
   button {
     text-align: left;
   }
+}
+
+.wf-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.wf-ghost-line {
+  stroke: #90caf9;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+
+.edge.selected .line {
+  filter: drop-shadow(0 0 2px rgba(25, 118, 210, 0.6));
+}
+.edge:hover .line {
+  stroke-width: 0.5px; /* subtle hover nudge; combined with attr stroke-width above */
 }

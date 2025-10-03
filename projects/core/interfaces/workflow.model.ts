@@ -1,25 +1,5 @@
 export type WorkflowNodeType = 'input' | 'action' | 'result';
 
-export type WorkflowNodeData = InputNodeData | ResultNodeData | ActionNodeData;
-
-/** Simple “special” nodes */
-export interface InputNodeData {
-  label: string; // display label
-  kind?: 'input'; // optional; node.type already carries 'input'
-}
-export interface ResultNodeData {
-  label: string;
-  kind?: 'result';
-}
-
-/** All “action” nodes are discriminated by aiType */
-export type ActionNodeData =
-  | ChatBasicNodeData
-  | ChatOnFileNodeData
-  | CompareNodeData
-  | SummarizeNodeData
-  | ExtractNodeData;
-
 export interface WorkflowEdge {
   id: string;
   source: string;
@@ -81,16 +61,18 @@ export type AiActionParams =
   | { type: 'extract'; text?: string; entities: string }; // entities = "person,location,..."
 
 // ---- Action-specific node data + params ----
-export interface ChatBasicNodeData {
-  label: string; // e.g., "Chat (basic)"
+export interface NodeData {
+  label: string; // display label
+}
+
+export interface ChatBasicNodeData extends NodeData {
   aiType: 'chat-basic';
   params: {
     prompt: string;
   };
 }
 
-export interface ChatOnFileNodeData {
-  label: string; // e.g., "Chat on file(s)"
+export interface ChatOnFileNodeData extends NodeData {
   aiType: 'chat-on-file';
   params: {
     prompt: string;
@@ -99,8 +81,7 @@ export interface ChatOnFileNodeData {
   };
 }
 
-export interface CompareNodeData {
-  label: string; // "Compare two files"
+export interface CompareNodeData extends NodeData {
   aiType: 'compare';
   params: {
     leftFile: PersistableFile | null;
@@ -108,16 +89,14 @@ export interface CompareNodeData {
   };
 }
 
-export interface SummarizeNodeData {
-  label: string; // "Summarize file"
+export interface SummarizeNodeData extends NodeData {
   aiType: 'summarize';
   params: {
     file: PersistableFile | null;
   };
 }
 
-export interface ExtractNodeData {
-  label: string; // "Extract entities"
+export interface ExtractNodeData extends NodeData {
   aiType: 'extract';
   params: {
     /** optional free text to analyze (can also come from upstream node via ports) */
@@ -126,6 +105,16 @@ export interface ExtractNodeData {
     entities: string;
   };
 }
+
+export type WorkflowNodeData = NodeData | ActionNodeData;
+
+/** All “action” nodes are discriminated by aiType */
+export type ActionNodeData =
+  | ChatBasicNodeData
+  | ChatOnFileNodeData
+  | CompareNodeData
+  | SummarizeNodeData
+  | ExtractNodeData;
 
 // -------------------------------
 // Helpful label map (UI sugar)
