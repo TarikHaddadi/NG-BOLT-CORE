@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
-import { DfInputComponent, DfOutputComponent,DrawFlowBaseNode } from '@ng-draw-flow/core';
+import { DfInputComponent, DfOutputComponent, DrawFlowBaseNode } from '@ng-draw-flow/core';
 
-import { NodeModelShape, WorkflowNodeType,WorkflowPorts } from '@cadai/pxs-ng-core/interfaces';
+import { NodeModelShape, WorkflowNodeType, WorkflowPorts } from '@cadai/pxs-ng-core/interfaces';
 
 function isNodeModelShape(x: unknown): x is NodeModelShape {
   if (typeof x !== 'object' || x === null) return false;

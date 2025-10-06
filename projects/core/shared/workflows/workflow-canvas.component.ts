@@ -68,12 +68,17 @@ export class WorkflowCanvasDfComponent {
   }
 
   // palette inputs/state
-  @Input() disabled = signal<boolean>(false);
-  @Input() availableActions = signal<ActionDefinitionLite[]>([]);
+  disabledSig = signal<boolean>(false);
+  availableActionsSig = signal<ActionDefinitionLite[]>([]);
   isPaletteDragging = signal<boolean>(false);
 
   @Output() change = new EventEmitter<{ nodes: WorkflowNode[]; edges: WorkflowEdge[] }>();
-
+  @Input() set disabled(value: boolean) {
+    this.disabledSig.set(!!value);
+  }
+  @Input() set availableActions(value: ActionDefinitionLite[]) {
+    this.availableActionsSig.set(value ?? []);
+  }
   private _nodes = signal<WorkflowNode[]>([]);
   private _edges = signal<WorkflowEdge[]>([]);
   private zoom = signal<number>(1);
@@ -97,7 +102,7 @@ export class WorkflowCanvasDfComponent {
   }
 
   onDrop(ev: CdkDragDrop<{}, any, any>): void {
-    if (this.disabled()) return;
+    if (this.disabledSig()) return;
     const action = ev.item?.data as ActionDefinitionLite | undefined;
     if (!action) return;
 
