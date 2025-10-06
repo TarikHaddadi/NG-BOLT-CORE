@@ -6,6 +6,7 @@ import {
   computed,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   signal,
@@ -23,6 +24,7 @@ import {
   NgDrawFlowComponent,
   provideNgDrawFlowConfigs,
 } from '@ng-draw-flow/core';
+import { TranslateModule } from '@ngx-translate/core';
 
 import {
   ActionDefinitionLite,
@@ -54,6 +56,7 @@ import { DRAW_FLOW_PROVIDER } from './workflow-config';
     MatDialogModule,
     NgDrawFlowComponent,
     DynamicFormComponent,
+    TranslateModule,
   ],
   providers: [
     DRAW_FLOW_PROVIDER,
@@ -105,6 +108,15 @@ export class WorkflowCanvasDfComponent {
   // Inspector
   inspectorForm!: FormGroup;
   inspectorConfig: FieldConfig[] = [];
+
+  selectedNodeId = signal<string | null>(null);
+  contextMenu = signal<{ id: string; x: number; y: number } | null>(null);
+
+  // Close menu on ESC
+  @HostListener('document:keydown.escape')
+  onEsc(): void {
+    this.closeContextMenu();
+  }
 
   constructor(
     private readonly dialog: MatDialog,
@@ -244,6 +256,10 @@ export class WorkflowCanvasDfComponent {
     this._nodes.set(nextNodes);
     this._edges.set(nextEdges);
     this.change.emit({ nodes: nextNodes, edges: nextEdges });
+
+    // Re-apply selection outline if needed
+    const current = this.selectedNodeId();
+    if (current) this.setSelectedNode(current);
   };
 
   // ===== Public helpers =====
@@ -269,7 +285,9 @@ export class WorkflowCanvasDfComponent {
 
   // ===== Selection → open inspector dialog =====
   onNodeSelected(e: unknown): void {
-    const nodeId = (e as { id?: string; nodeId?: string }).id ?? (e as { nodeId?: string }).nodeId;
+    const nodeId =
+      (e as { id?: string; nodeId?: string }).id ?? (e as { nodeId?: string }).nodeId ?? null;
+    this.setSelectedNode(nodeId);
     if (!nodeId) return;
     this.openInspectorFor(nodeId);
   }
@@ -332,4 +350,65 @@ export class WorkflowCanvasDfComponent {
   onConnectionCreated(_evt: unknown): void {}
   onConnectionDeleted(_evt: unknown): void {}
   onConnectionSelected(_evt: unknown): void {}
+
+  onCanvasContextMenu(ev: MouseEvent): void {
+    ev.preventDefault();
+    const el = (ev.target as HTMLElement)?.closest('[data-node-id]');
+    if (!el) {
+      this.closeContextMenu();
+      return;
+    }
+    const id = el.getAttribute('data-node-id');
+    if (!id) {
+      this.closeContextMenu();
+      return;
+    }
+    this.contextMenu.set({ id, x: ev.clientX, y: ev.clientY });
+    this.setSelectedNode(id);
+  }
+
+  // Click-out closes menu
+  closeContextMenu(): void {
+    this.contextMenu.set(null);
+  }
+
+  // Selection: add outline via CSS class on the node element
+  private setSelectedNode(id: string | null): void {
+    const host = this.flowElementRef?.nativeElement;
+    if (!host) {
+      this.selectedNodeId.set(id);
+      return;
+    }
+
+    // remove previous
+    const prev = this.selectedNodeId();
+    if (prev) {
+      const prevEl = host.querySelector(`[data-node-id="${prev}"]`) as HTMLElement | null;
+      prevEl?.classList.remove('is-selected');
+    }
+
+    // set new
+    this.selectedNodeId.set(id);
+    if (id) {
+      const el = host.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
+      el?.classList.add('is-selected');
+    }
+  }
+
+  // Menu actions
+  onConfigureNode(id: string): void {
+    this.closeContextMenu();
+    this.openInspectorFor(id);
+  }
+  onDeleteNode(id: string): void {
+    this.closeContextMenu();
+    // remove node and its edges
+    const nodes = this._nodes().filter((n) => n.id !== id);
+    const edges = this._edges().filter((e) => e.source !== id && e.target !== id);
+    this._nodes.set(nodes);
+    this._edges.set(edges);
+    // clear selection if deleted
+    if (this.selectedNodeId() === id) this.setSelectedNode(null);
+    this.change.emit({ nodes, edges });
+  }
 }

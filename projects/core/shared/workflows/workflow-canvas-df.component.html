@@ -7,7 +7,7 @@
     [cdkDropListConnectedTo]="[canvasList]"
     [cdkDropListData]="availableActionsSig()"
   >
-    <div class="pxs-wf-palette-title">Actions:</div>
+    <div class="pxs-wf-palette-title">{{ 'actions' | translate }}:</div>
 
     <div class="pxs-wf-palette-items" #paletteHost>
       @for (a of availableActionsSig(); track a.type) {
@@ -22,7 +22,7 @@
           (cdkDragStarted)="isPaletteDragging.set(true)"
           (cdkDragEnded)="isPaletteDragging.set(false)"
         >
-          {{ a.type }}
+          {{ a.type | translate }}
           <ng-template cdkDragPreview>
             <div class="pxs-wf-pill preview">{{ a.type }}</div>
           </ng-template>
@@ -42,6 +42,8 @@
   #canvasList="cdkDropList"
   [cdkDropListDisabled]="!isPaletteDragging()"
   [cdkDropListData]="{}"
+  (contextmenu)="onCanvasContextMenu($event)"
+  (click)="closeContextMenu()"
   (cdkDropListDropped)="onDrop($event)"
 >
   <ng-draw-flow
@@ -59,10 +61,27 @@
     (pan)="onPan($any($event))"
   >
   </ng-draw-flow>
+  <!-- Context menu -->
+  @if (contextMenu(); as m) {
+    <div
+      class="pxs-wf-menu"
+      [style.left.px]="m.x"
+      [style.top.px]="m.y"
+      (click)="$event.stopPropagation()"
+    >
+      <button mat-flat-button class="warn" (click)="onConfigureNode(m.id)">
+        {{ 'config' | translate }}
+      </button>
+      <button mat-flat-button class="accent" (click)="onDeleteNode(m.id)">
+        {{ 'delete' | translate }}
+      </button>
+      <button mat-flat-button (click)="closeContextMenu()">{{ 'close' | translate }}</button>
+    </div>
+  }
 </div>
 
 <!-- Action Inspector (projected into ConfirmDialogComponent) -->
 <ng-template #actionInspectorTpl let-form="form" let-title="title">
-  <h3 class="mb-2">{{ title }}</h3>
+  <h3 class="mb-2">{{ title | translate }}</h3>
   <app-dynamic-form [form]="inspectorForm" [config]="inspectorConfig"></app-dynamic-form>
 </ng-template>

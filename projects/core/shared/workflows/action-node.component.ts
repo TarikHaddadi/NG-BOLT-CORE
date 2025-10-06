@@ -39,6 +39,7 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
   template: `
     <div
       class="wf-node"
+      [attr.data-node-id]="nodeId"
       [class.input]="visualType() === 'input'"
       [class.result]="visualType() === 'result'"
       [class.action]="visualType() === 'action'"
@@ -110,6 +111,32 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
       .output {
         position: relative;
         z-index: 1;
+      }
+      .wf-node.is-selected {
+        outline: 2px solid #42a5f5;
+        outline-offset: 2px;
+      }
+
+      /* Make ports visually obvious */
+      .input,
+      .output {
+        position: relative;
+        width: 12px;
+        height: 12px;
+      }
+      .input::before,
+      .output::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.25);
+        border: 2px solid #fff;
+        box-sizing: border-box;
+        pointer-events: none;
       }
     `,
   ],
