@@ -3,8 +3,6 @@ export interface ActionDefinition {
   params?: Record<string, any>;
 }
 
-export type AiActionType = 'chat-basic' | 'chat-on-file' | 'compare' | 'summarize' | 'extract';
-
 export type FileRef = string; // e.g. blob URL, storage key, API id
 export type RuntimeFile = File | Blob;
 export type PersistableFile = FileRef | RuntimeFile;
@@ -26,11 +24,19 @@ export interface WorkflowPorts {
   inputs: WorkflowPort[];
   outputs: WorkflowPort[];
 }
+export type WorkflowNodeType = 'action' | 'input' | 'result';
 
-export type WorkflowNodeType = 'input' | 'action' | 'result';
+export type InspectorActionType =
+  | 'chat-basic'
+  | 'chat-on-file'
+  | 'compare'
+  | 'summarize'
+  | 'extract';
+
+export type PaletteType = 'input' | 'result' | InspectorActionType;
 
 export interface ActionDefinitionLite {
-  type: 'input' | 'action' | 'result' | string;
+  type: PaletteType;
   params?: Record<string, unknown>;
 }
 
@@ -41,9 +47,9 @@ export interface WorkflowNodeDataBase {
 
 export interface WorkflowNode {
   id: string;
-  type: WorkflowNodeType;
-  x: number; // top-left, canvas-local
-  y: number; // top-left, canvas-local
+  type: WorkflowNodeType; // visual kind persisted in your domain
+  x: number;
+  y: number;
   data: WorkflowNodeDataBase;
   ports: WorkflowPorts;
 }
@@ -67,7 +73,9 @@ export interface WorkflowEdge {
   style?: WorkflowEdgeStyle;
 }
 
+/** 🔧 Node view model: accepts PALETTE types (may be inspector strings) */
 export type NodeModelShape = WorkflowNodeDataBase & {
-  type: WorkflowNodeType;
+  type: PaletteType; // <-- was WorkflowNodeType (wrong)
+  aiType?: InspectorActionType; // keep inspector type here for forms
   ports?: WorkflowPorts;
 };

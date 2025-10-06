@@ -6,13 +6,14 @@ import {
   computed,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   signal,
   TemplateRef,
   ViewChild,
 } from '@angular/core';
-import { FormBuilder, FormGroup, FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import {
@@ -21,11 +22,15 @@ import {
   DfDataModel,
   DfDataNode,
   NgDrawFlowComponent,
+  provideNgDrawFlowConfigs,
 } from '@ng-draw-flow/core';
+import { TranslateModule } from '@ngx-translate/core';
 
 import {
   ActionDefinitionLite,
   FieldConfig,
+  InspectorActionType,
+  PaletteType,
   WorkflowEdge,
   WorkflowNode,
   WorkflowNodeDataBase,
@@ -35,21 +40,34 @@ import { FieldConfigService } from '@cadai/pxs-ng-core/services';
 
 import { ConfirmDialogComponent } from '../dialog/dialog.component';
 import { DynamicFormComponent } from '../forms/dynamic-form.component';
-import { ACTION_FORMS, makeFallback } from './action-forms.component';
+import { ACTION_FORMS, makeFallback } from './action-forms';
+import { WfNodeComponent } from './action-node.component';
 import { DRAW_FLOW_PROVIDER } from './workflow-config';
+
 @Component({
   selector: 'app-workflow-canvas-df',
   standalone: true,
   imports: [
     CommonModule,
-    DynamicFormComponent,
+    FormsModule,
+    ReactiveFormsModule,
     DragDropModule,
     MatButtonModule,
-    NgDrawFlowComponent,
     MatDialogModule,
-    FormsModule,
+    NgDrawFlowComponent,
+    DynamicFormComponent,
+    TranslateModule,
   ],
-  providers: [DRAW_FLOW_PROVIDER],
+  providers: [
+    DRAW_FLOW_PROVIDER,
+    provideNgDrawFlowConfigs({
+      nodes: {
+        input: WfNodeComponent,
+        action: WfNodeComponent,
+        result: WfNodeComponent,
+      },
+    }),
+  ],
   templateUrl: './workflow-canvas-df.component.html',
   styleUrls: ['./workflow-canvas-df.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,39 +79,73 @@ export class WorkflowCanvasDfComponent {
   @ViewChild('actionInspectorTpl', { static: true })
   private actionInspectorTpl!: TemplateRef<unknown>;
 
+  // Inputs from parent: accept plain values, keep internal signals
   @Input({ required: true }) set nodes(value: WorkflowNode[]) {
     this._nodes.set(value);
   }
   @Input({ required: true }) set edges(value: WorkflowEdge[]) {
     this._edges.set(value);
   }
-
-  // palette inputs/state
-  disabledSig = signal<boolean>(false);
-  availableActionsSig = signal<ActionDefinitionLite[]>([]);
-  isPaletteDragging = signal<boolean>(false);
-
-  @Output() change = new EventEmitter<{ nodes: WorkflowNode[]; edges: WorkflowEdge[] }>();
   @Input() set disabled(value: boolean) {
     this.disabledSig.set(!!value);
   }
   @Input() set availableActions(value: ActionDefinitionLite[]) {
     this.availableActionsSig.set(value ?? []);
   }
+
+  @Output() change = new EventEmitter<{ nodes: WorkflowNode[]; edges: WorkflowEdge[] }>();
+
+  // Internal state (signals)
+  disabledSig = signal<boolean>(false);
+  availableActionsSig = signal<ActionDefinitionLite[]>([]);
+  isPaletteDragging = signal<boolean>(false);
+
   private _nodes = signal<WorkflowNode[]>([]);
   private _edges = signal<WorkflowEdge[]>([]);
   private zoom = signal<number>(1);
   private lastClient = { x: 0, y: 0 };
 
+  // Inspector
   inspectorForm!: FormGroup;
   inspectorConfig: FieldConfig[] = [];
+
+  selectedNodeId = signal<string | null>(null);
+  contextMenu = signal<{ id: string; x: number; y: number } | null>(null);
+
+  // Close menu on ESC
+  @HostListener('document:keydown.escape')
+  onEsc(): void {
+    this.closeContextMenu();
+  }
 
   constructor(
     private readonly dialog: MatDialog,
     private readonly fb: FormBuilder,
     private readonly fields: FieldConfigService,
   ) {}
-  // capture pointer while dragging (for browsers that don’t include dropPoint)
+
+  private pan = signal<{ x: number; y: number }>({ x: 0, y: 0 });
+  onPan(ev: unknown): void {
+    const p = ev as Partial<{ x: number; y: number }>;
+    if (typeof p?.x === 'number' && typeof p?.y === 'number') {
+      this.pan.set({ x: p.x, y: p.y });
+    }
+    // else: ignore unexpected payloads gracefully
+  }
+
+  private humanLabelFor(t: PaletteType): string {
+    if (t === 'input' || t === 'result') return t.charAt(0).toUpperCase() + t.slice(1);
+    const pretty: Record<InspectorActionType, string> = {
+      'chat-basic': 'Chat',
+      'chat-on-file': 'Chat on File',
+      compare: 'Compare',
+      summarize: 'Summarize',
+      extract: 'Extract',
+    };
+    return pretty[t] ?? 'Action';
+  }
+
+  // ===== Palette → canvas drop =====
   onPaletteDragMoved(e: CdkDragMove<unknown>): void {
     this.lastClient = { x: e.pointerPosition.x, y: e.pointerPosition.y };
   }
@@ -102,7 +154,7 @@ export class WorkflowCanvasDfComponent {
     this.zoom.set(z);
   }
 
-  onDrop(ev: CdkDragDrop<{}, any, any>): void {
+  onDrop(ev: CdkDragDrop<{}, unknown, unknown>): void {
     if (this.disabledSig()) return;
     const action = ev.item?.data as ActionDefinitionLite | undefined;
     if (!action) return;
@@ -111,19 +163,36 @@ export class WorkflowCanvasDfComponent {
       (ev as unknown as { dropPoint?: { x: number; y: number } }).dropPoint ?? this.lastClient;
     const rect = this.flowElementRef.nativeElement.getBoundingClientRect();
     const scale = this.zoom() || 1;
+    const pan = this.pan();
 
-    const x = (client.x - rect.left) / scale;
-    const y = (client.y - rect.top) / scale;
+    // client → canvas space (account for pan & scale)
+    const x = (client.x - rect.left - pan.x) / scale;
+    const y = (client.y - rect.top - pan.y) / scale;
 
-    const nodeType: WorkflowNodeType =
-      action.type === 'input' || action.type === 'result' || action.type === 'action'
-        ? action.type
-        : 'action';
+    const t: PaletteType = action.type;
+    const visualType: WorkflowNodeType = t === 'input' || t === 'result' ? t : 'action';
 
-    this.addNodeAt(nodeType, { x, y }, action.type);
+    const id = crypto?.randomUUID?.() ?? 'node-' + Math.random().toString(36).slice(2, 9);
+    const node: WorkflowNode = {
+      id,
+      type: visualType,
+      x,
+      y,
+      data: {
+        label: this.humanLabelFor(t),
+        ...(visualType === 'action' ? { aiType: t as InspectorActionType } : {}),
+        params: action.params ?? {},
+      },
+      ports: {
+        inputs: visualType === 'input' ? [] : [{ id: 'in', label: 'in', type: 'json' }],
+        outputs: visualType === 'result' ? [] : [{ id: 'out', label: 'out', type: 'json' }],
+      },
+    };
+
+    this._nodes.set([...this._nodes(), node]);
   }
 
-  // ===== Map to DrawFlow model (top-left positions) =====
+  // ===== Map domain -> DrawFlow =====
   dfModel = computed<DfDataModel>(() => {
     const nodesArr: DfDataNode[] = this._nodes().map((n) => ({
       id: n.id,
@@ -136,12 +205,12 @@ export class WorkflowCanvasDfComponent {
     const conns: DfDataConnection[] = this._edges().map((e) => ({
       source: {
         nodeId: e.source,
-        connectorType: DfConnectionPoint.Output, // ✅ enum, not string
+        connectorType: DfConnectionPoint.Output,
         connectorId: e.sourcePort,
       },
       target: {
         nodeId: e.target,
-        connectorType: DfConnectionPoint.Input, // ✅ enum, not string
+        connectorType: DfConnectionPoint.Input,
         connectorId: e.targetPort,
       },
     }));
@@ -149,14 +218,12 @@ export class WorkflowCanvasDfComponent {
     return { nodes: nodesArr, connections: conns } satisfies DfDataModel;
   });
 
-  // Write-back when DrawFlow changes (CVA change)
+  // ===== Write-back (CVA change) =====
   onModelChange = (m: DfDataModel): void => {
     const nextNodes: WorkflowNode[] = [];
 
     for (const node of m.nodes) {
       const prev = this._nodes().find((x) => x.id === node.id);
-
-      // node.data always exists, but we only read .position if it’s a DfDataNode
       const type = (node.data as { type: WorkflowNodeType }).type;
       const ports = (node.data as { ports?: WorkflowNode['ports'] }).ports ??
         prev?.ports ?? { inputs: [], outputs: [] };
@@ -164,7 +231,7 @@ export class WorkflowCanvasDfComponent {
       const { x, y } =
         'position' in node && node.position
           ? { x: node.position.x, y: node.position.y }
-          : { x: prev?.x ?? 0, y: prev?.y ?? 0 }; // fallback for DfDataInitialNode
+          : { x: prev?.x ?? 0, y: prev?.y ?? 0 };
 
       nextNodes.push({
         id: node.id,
@@ -189,31 +256,38 @@ export class WorkflowCanvasDfComponent {
     this._nodes.set(nextNodes);
     this._edges.set(nextEdges);
     this.change.emit({ nodes: nextNodes, edges: nextEdges });
+
+    // Re-apply selection outline if needed
+    const current = this.selectedNodeId();
+    if (current) this.setSelectedNode(current);
   };
 
   // ===== Public helpers =====
-
-  addNodeAt(type: WorkflowNodeType, client: { x: number; y: number }, label?: string): void {
+  private addNodeAt(t: PaletteType, client: { x: number; y: number }): void {
+    const visualType: WorkflowNodeType = t === 'input' || t === 'result' ? t : 'action';
     const id = crypto?.randomUUID?.() ?? 'node-' + Math.random().toString(36).slice(2, 9);
     const node: WorkflowNode = {
       id,
-      type,
+      type: visualType,
       x: client.x,
       y: client.y,
-      data: { label: label ?? type.charAt(0).toUpperCase() + type.slice(1) },
+      data: {
+        label: this.humanLabelFor(t),
+        ...(visualType === 'action' ? { aiType: t as InspectorActionType } : {}),
+      },
       ports: {
-        inputs: type === 'input' ? [] : [{ id: 'in', label: 'in', type: 'json' }],
-        outputs: type === 'result' ? [] : [{ id: 'out', label: 'out', type: 'json' }],
+        inputs: visualType === 'input' ? [] : [{ id: 'in', label: 'in', type: 'json' }],
+        outputs: visualType === 'result' ? [] : [{ id: 'out', label: 'out', type: 'json' }],
       },
     };
     this._nodes.set([...this._nodes(), node]);
-    // NgModel (dfModel) recomputes and updates <ng-draw-flow> automatically
   }
 
-  // Optional: selection / scale / connection hooks (already available as outputs)
+  // ===== Selection → open inspector dialog =====
   onNodeSelected(e: unknown): void {
-    // Adjust key if your event payload differs (some builds use { id }, others { nodeId })
-    const nodeId = (e as { id?: string; nodeId?: string }).id ?? (e as { nodeId?: string }).nodeId;
+    const nodeId =
+      (e as { id?: string; nodeId?: string }).id ?? (e as { nodeId?: string }).nodeId ?? null;
+    this.setSelectedNode(nodeId);
     if (!nodeId) return;
     this.openInspectorFor(nodeId);
   }
@@ -222,16 +296,12 @@ export class WorkflowCanvasDfComponent {
     const n = this._nodes().find((x) => x.id === nodeId);
     if (!n) return;
 
-    // Read aiType from your node data
     const aiType = (n.data as WorkflowNodeDataBase & { aiType?: string }).aiType ?? 'action';
     const spec = ACTION_FORMS[aiType];
 
     this.inspectorConfig = spec ? spec.make(this.fields) : makeFallback(this.fields);
-
-    // Create the form; DynamicFormComponent will register controls on init
     this.inspectorForm = this.fb.group({});
 
-    // Patch defaults + current values on the next microtask so controls exist
     queueMicrotask(() => {
       const defaults = spec?.defaults ?? {};
       const current = (n.data as { params?: Record<string, unknown> }).params ?? {};
@@ -243,13 +313,11 @@ export class WorkflowCanvasDfComponent {
 
     const title = (n.data as { label?: string }).label ?? 'Configure';
 
-    // Open your existing ConfirmDialogComponent using the template + getResult
     const ref = this.dialog.open<
       ConfirmDialogComponent,
       {
         title: string;
         contentTpl: TemplateRef<unknown>;
-        // If your ConfirmDialog expects context, include it:
         context?: { form: FormGroup; title: string };
         getResult: () => Record<string, unknown> | null;
       },
@@ -262,34 +330,85 @@ export class WorkflowCanvasDfComponent {
       data: {
         title,
         contentTpl: this.actionInspectorTpl,
-        context: { form: this.inspectorForm, title }, // include if your dialog projects it
+        context: { form: this.inspectorForm, title },
         getResult: () => (this.inspectorForm.valid ? this.inspectorForm.getRawValue() : null),
       },
     });
 
     ref.afterClosed().subscribe((result) => {
       if (!result) return;
-
-      // Persist params back into the node’s data
       const updatedNodes = this._nodes().map((node) =>
         node.id === n.id ? { ...node, data: { ...node.data, params: result } } : node,
       );
-
       this._nodes.set(updatedNodes);
       this.change.emit({ nodes: updatedNodes, edges: this._edges() });
     });
   }
 
-  onNodeMoved(_evt: unknown): void {
-    /* already reflected in ngModel */
+  // Optional hooks
+  onNodeMoved(_evt: unknown): void {}
+  onConnectionCreated(_evt: unknown): void {}
+  onConnectionDeleted(_evt: unknown): void {}
+  onConnectionSelected(_evt: unknown): void {}
+
+  onCanvasContextMenu(ev: MouseEvent): void {
+    ev.preventDefault();
+    const el = (ev.target as HTMLElement)?.closest('[data-node-id]');
+    if (!el) {
+      this.closeContextMenu();
+      return;
+    }
+    const id = el.getAttribute('data-node-id');
+    if (!id) {
+      this.closeContextMenu();
+      return;
+    }
+    this.contextMenu.set({ id, x: ev.clientX, y: ev.clientY });
+    this.setSelectedNode(id);
   }
-  onConnectionCreated(_evt: unknown): void {
-    /* optional validation */
+
+  // Click-out closes menu
+  closeContextMenu(): void {
+    this.contextMenu.set(null);
   }
-  onConnectionDeleted(_evt: unknown): void {
-    /* … */
+
+  // Selection: add outline via CSS class on the node element
+  private setSelectedNode(id: string | null): void {
+    const host = this.flowElementRef?.nativeElement;
+    if (!host) {
+      this.selectedNodeId.set(id);
+      return;
+    }
+
+    // remove previous
+    const prev = this.selectedNodeId();
+    if (prev) {
+      const prevEl = host.querySelector(`[data-node-id="${prev}"]`) as HTMLElement | null;
+      prevEl?.classList.remove('is-selected');
+    }
+
+    // set new
+    this.selectedNodeId.set(id);
+    if (id) {
+      const el = host.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
+      el?.classList.add('is-selected');
+    }
   }
-  onConnectionSelected(_evt: unknown): void {
-    /* context menu */
+
+  // Menu actions
+  onConfigureNode(id: string): void {
+    this.closeContextMenu();
+    this.openInspectorFor(id);
+  }
+  onDeleteNode(id: string): void {
+    this.closeContextMenu();
+    // remove node and its edges
+    const nodes = this._nodes().filter((n) => n.id !== id);
+    const edges = this._edges().filter((e) => e.source !== id && e.target !== id);
+    this._nodes.set(nodes);
+    this._edges.set(edges);
+    // clear selection if deleted
+    if (this.selectedNodeId() === id) this.setSelectedNode(null);
+    this.change.emit({ nodes, edges });
   }
 }
