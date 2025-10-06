@@ -7,12 +7,10 @@ export type ActionFormFactory = (f: FieldConfigService) => FieldConfig[];
 
 export interface ActionFormSpec {
   make: ActionFormFactory;
-  defaults?: Record<string, any>;
+  defaults?: Record<string, unknown>;
 }
-/**
- * Registry mapping AiActionType -> inspector form fields and defaults.
- * Add/adjust entries to fit your action set.
- */
+
+/** Registry mapping AiActionType -> inspector form fields and defaults. */
 export const ACTION_FORMS: Record<string, ActionFormSpec> = {
   'chat-basic': {
     make: (F) => [
@@ -32,7 +30,7 @@ export const ACTION_FORMS: Record<string, ActionFormSpec> = {
           { label: '0.7', value: 0.7 },
           { label: '1.0 – Creative', value: 1 },
         ],
-      }),
+      })!,
     ],
     defaults: { temperature: 0.3 },
   },

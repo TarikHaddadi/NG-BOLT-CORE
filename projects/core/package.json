@@ -1,6 +1,6 @@
 {
   "name": "@cadai/pxs-ng-core",
-  "version": "1.9.10",
+  "version": "1.9.11",
   "publishConfig": {
     "registry": "https://pkgs.dev.azure.com/cadai/Socle/_packaging/PXS-NG-CORE/npm/registry/"
   },
@@ -23,11 +23,7 @@
     "chartjs-adapter-luxon": "^1.0.0",
     "chart.js": "^4.5.0",
     "luxon": "^3.7.1",
-    "@swimlane/ngx-graph": "^11.0.0",
-    "uuid": "^13.0.0",
-    "@dagrejs/dagre": "^1.1.5",
-    "@dagrejs/graphlib": "^2.2.4",
-    "d3-shape": "^3.2.0"
+    "@ng-draw-flow/core": "^0.17.0"
   },
   "peerDependenciesMeta": {
     "@swimlane/ngx-graph": {
