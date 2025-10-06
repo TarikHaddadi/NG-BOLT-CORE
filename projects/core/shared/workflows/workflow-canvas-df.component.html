@@ -1,22 +1,22 @@
 <!-- Palette (unchanged, just connected to canvasList) -->
-@if (availableActions().length) {
+@if (availableActionsSig().length) {
   <div
     class="pxs-wf-palette"
     cdkDropList
     [cdkDropListSortingDisabled]="true"
     [cdkDropListConnectedTo]="[canvasList]"
-    [cdkDropListData]="availableActions()"
+    [cdkDropListData]="availableActionsSig()"
   >
     <div class="pxs-wf-palette-title">Actions:</div>
 
     <div class="pxs-wf-palette-items" #paletteHost>
-      @for (a of availableActions(); track a.type) {
+      @for (a of availableActionsSig(); track a.type) {
         <button
           mat-flat-button
           class="pxs-wf-pill"
           cdkDrag
           [cdkDragData]="a"
-          [disabled]="disabled()"
+          [disabled]="disabledSig()"
           cdkDragRootElement=".pxs-wf-pill"
           (cdkDragMoved)="onPaletteDragMoved($event)"
           (cdkDragStarted)="isPaletteDragging.set(true)"
