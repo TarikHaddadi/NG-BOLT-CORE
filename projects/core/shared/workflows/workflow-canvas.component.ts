@@ -112,6 +112,15 @@ export class WorkflowCanvasDfComponent {
     private readonly fields: FieldConfigService,
   ) {}
 
+  private pan = signal<{ x: number; y: number }>({ x: 0, y: 0 });
+  onPan(ev: unknown): void {
+    const p = ev as Partial<{ x: number; y: number }>;
+    if (typeof p?.x === 'number' && typeof p?.y === 'number') {
+      this.pan.set({ x: p.x, y: p.y });
+    }
+    // else: ignore unexpected payloads gracefully
+  }
+
   private humanLabelFor(t: PaletteType): string {
     if (t === 'input' || t === 'result') return t.charAt(0).toUpperCase() + t.slice(1);
     const pretty: Record<InspectorActionType, string> = {
@@ -121,7 +130,7 @@ export class WorkflowCanvasDfComponent {
       summarize: 'Summarize',
       extract: 'Extract',
     };
-    return pretty[t as InspectorActionType] ?? 'Action';
+    return pretty[t] ?? 'Action';
   }
 
   // ===== Palette → canvas drop =====
@@ -142,12 +151,33 @@ export class WorkflowCanvasDfComponent {
       (ev as unknown as { dropPoint?: { x: number; y: number } }).dropPoint ?? this.lastClient;
     const rect = this.flowElementRef.nativeElement.getBoundingClientRect();
     const scale = this.zoom() || 1;
+    const pan = this.pan();
 
-    const x = (client.x - rect.left) / scale;
-    const y = (client.y - rect.top) / scale;
+    // client → canvas space (account for pan & scale)
+    const x = (client.x - rect.left - pan.x) / scale;
+    const y = (client.y - rect.top - pan.y) / scale;
 
     const t: PaletteType = action.type;
-    this.addNodeAt(t, { x, y });
+    const visualType: WorkflowNodeType = t === 'input' || t === 'result' ? t : 'action';
+
+    const id = crypto?.randomUUID?.() ?? 'node-' + Math.random().toString(36).slice(2, 9);
+    const node: WorkflowNode = {
+      id,
+      type: visualType,
+      x,
+      y,
+      data: {
+        label: this.humanLabelFor(t),
+        ...(visualType === 'action' ? { aiType: t as InspectorActionType } : {}),
+        params: action.params ?? {},
+      },
+      ports: {
+        inputs: visualType === 'input' ? [] : [{ id: 'in', label: 'in', type: 'json' }],
+        outputs: visualType === 'result' ? [] : [{ id: 'out', label: 'out', type: 'json' }],
+      },
+    };
+
+    this._nodes.set([...this._nodes(), node]);
   }
 
   // ===== Map domain -> DrawFlow =====
