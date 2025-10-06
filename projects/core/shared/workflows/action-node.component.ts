@@ -22,7 +22,6 @@ function isNodeModelShape(x: unknown): x is NodeModelShape {
     'extract',
   ];
   if (!allowed.includes(t as PaletteType)) return false;
-
   const ports = (x as { ports?: unknown }).ports;
   if (ports === undefined) return true;
   if (typeof ports !== 'object' || ports === null) return false;
@@ -30,12 +29,8 @@ function isNodeModelShape(x: unknown): x is NodeModelShape {
   const outs = (ports as { outputs?: unknown }).outputs;
   return (ins === undefined || Array.isArray(ins)) && (outs === undefined || Array.isArray(outs));
 }
-
-function normalizeVisualType(t: PaletteType): WorkflowNodeType {
-  if (t === 'input') return 'input';
-  if (t === 'result') return 'result';
-  return 'action';
-}
+const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
+  t === 'input' ? 'input' : t === 'result' ? 'result' : 'action';
 
 @Component({
   selector: 'wf-node',
@@ -44,30 +39,31 @@ function normalizeVisualType(t: PaletteType): WorkflowNodeType {
   template: `
     <div
       class="wf-node"
+      [attr.data-node-id]="nodeId"
       [class.input]="visualType() === 'input'"
       [class.result]="visualType() === 'result'"
       [class.action]="visualType() === 'action'"
     >
-      <div class="title">{{ label() }}</div>
+      <div class="title">{{ displayLabel() }}</div>
 
-      <!-- Left side inputs -->
       <div class="ports left">
-        <df-input
-          *ngFor="let p of inPorts(); trackBy: trackPort"
-          class="input"
-          [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: true }"
-        >
-        </df-input>
+        @for (p of inPorts(); track p.id) {
+          <df-input
+            class="input"
+            [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: true }"
+          >
+          </df-input>
+        }
       </div>
 
-      <!-- Right side outputs -->
       <div class="ports right">
-        <df-output
-          *ngFor="let p of outPorts(); trackBy: trackPort"
-          class="output"
-          [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: false }"
-        >
-        </df-output>
+        @for (p of outPorts(); track p.id) {
+          <df-output
+            class="output"
+            [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: false }"
+          >
+          </df-output>
+        }
       </div>
     </div>
   `,
@@ -116,39 +112,54 @@ function normalizeVisualType(t: PaletteType): WorkflowNodeType {
         position: relative;
         z-index: 1;
       }
+      .wf-node.is-selected {
+        outline: 2px solid #42a5f5;
+        outline-offset: 2px;
+      }
+
+      /* Make ports visually obvious */
+      .input,
+      .output {
+        position: relative;
+        width: 12px;
+        height: 12px;
+      }
+      .input::before,
+      .output::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.25);
+        border: 2px solid #fff;
+        box-sizing: border-box;
+        pointer-events: none;
+      }
     `,
   ],
 })
 export class WfNodeComponent extends DrawFlowBaseNode {
-  /** Safe view of the incoming model (do not override `model` itself). */
   private get safeModel(): NodeModelShape {
     const m = this.model;
     if (isNodeModelShape(m)) return m;
-
-    // ✅ Fallback must use a valid PaletteType (not 'action' literal)
-    const fallback: NodeModelShape = {
-      type: 'chat-basic', // pick any default inspector type
-      aiType: 'chat-basic', // keep it explicit if you use aiType elsewhere
+    return {
+      type: 'chat-basic',
+      aiType: 'chat-basic',
       label: 'Action',
       ports: { inputs: [], outputs: [] },
     };
-    return fallback;
   }
-
-  /** Visual class/type the component uses for styling/layout. */
   visualType(): WorkflowNodeType {
     return normalizeVisualType(this.safeModel.type);
   }
-
-  /** Title: prefer explicit label, else a readable label from type/aiType. */
   displayLabel(): string {
     const explicit = (this.safeModel as { label?: unknown }).label;
     if (typeof explicit === 'string' && explicit.trim()) return explicit;
-
     const t = this.safeModel.type;
     if (t === 'input' || t === 'result') return t.charAt(0).toUpperCase() + t.slice(1);
-
-    // inspector types → nicer defaults
     const nice: Record<InspectorActionType, string> = {
       'chat-basic': 'Chat',
       'chat-on-file': 'Chat on File',
@@ -158,19 +169,10 @@ export class WfNodeComponent extends DrawFlowBaseNode {
     };
     return nice[t] ?? 'Action';
   }
-
   inPorts(): WorkflowPorts['inputs'] {
     return this.safeModel.ports?.inputs ?? [];
   }
   outPorts(): WorkflowPorts['outputs'] {
     return this.safeModel.ports?.outputs ?? [];
-  }
-  trackPort(_: number, p: { id: string }): string {
-    return p.id;
-  }
-
-  label(): string {
-    const l = (this.safeModel as { label?: unknown }).label;
-    return typeof l === 'string' && l.trim().length ? l : this.safeModel.type;
   }
 }
