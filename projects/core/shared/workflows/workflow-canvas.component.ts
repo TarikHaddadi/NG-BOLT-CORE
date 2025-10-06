@@ -33,7 +33,8 @@ import {
 } from '@cadai/pxs-ng-core/interfaces';
 import { FieldConfigService } from '@cadai/pxs-ng-core/services';
 
-import { ConfirmDialogComponent, DynamicFormComponent } from '../public-api';
+import { ConfirmDialogComponent } from '../dialog/dialog.component';
+import { DynamicFormComponent } from '../forms/dynamic-form.component';
 import { ACTION_FORMS, makeFallback } from './action-forms.component';
 import { DRAW_FLOW_PROVIDER } from './workflow-config';
 @Component({
