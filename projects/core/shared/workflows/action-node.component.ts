@@ -1,5 +1,10 @@
 import { Component } from '@angular/core';
-import { DfInputComponent, DfOutputComponent, DrawFlowBaseNode } from '@ng-draw-flow/core';
+import {
+  DfConnectorPosition,
+  DfInputComponent,
+  DfOutputComponent,
+  DrawFlowBaseNode,
+} from '@ng-draw-flow/core';
 
 import {
   InspectorActionType,
@@ -50,6 +55,7 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
         @for (p of inPorts(); track p.id) {
           <df-input
             class="input"
+            [position]="positions.Left"
             [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: true }"
           >
           </df-input>
@@ -60,6 +66,7 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
         @for (p of outPorts(); track p.id) {
           <df-output
             class="output"
+            [position]="positions.Right"
             [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: false }"
           >
           </df-output>
@@ -70,6 +77,10 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
   styles: [
     `
       .wf-node {
+        /* connector colors (docs: --df-connector-color / hover) */
+        --df-connector-color: #ffffff;
+        --df-connector-color-hover: #ffe066;
+
         min-width: 220px;
         border-radius: 8px;
         padding: 8px 12px;
@@ -86,12 +97,18 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
       .wf-node.action {
         background: var(--mat-primary, #1976d2);
       }
+
+      .wf-node.is-selected {
+        outline: 2px solid #42a5f5;
+        outline-offset: 2px;
+      }
+
       .title {
         font-weight: 600;
         margin-bottom: 4px;
       }
 
-      /* Connector placement is CSS-based */
+      /* Connector rails */
       .ports.left,
       .ports.right {
         position: absolute;
@@ -99,7 +116,7 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
         bottom: 10px;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
       }
       .ports.left {
         left: -8px;
@@ -107,41 +124,11 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
       .ports.right {
         right: -8px;
       }
-      .input,
-      .output {
-        position: relative;
-        z-index: 1;
-      }
-      .wf-node.is-selected {
-        outline: 2px solid #42a5f5;
-        outline-offset: 2px;
-      }
-
-      /* Make ports visually obvious */
-      .input,
-      .output {
-        position: relative;
-        width: 12px;
-        height: 12px;
-      }
-      .input::before,
-      .output::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        margin: auto;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.25);
-        border: 2px solid #fff;
-        box-sizing: border-box;
-        pointer-events: none;
-      }
     `,
   ],
 })
 export class WfNodeComponent extends DrawFlowBaseNode {
+  positions = DfConnectorPosition;
   private get safeModel(): NodeModelShape {
     const m = this.model;
     if (isNodeModelShape(m)) return m;
@@ -152,6 +139,7 @@ export class WfNodeComponent extends DrawFlowBaseNode {
       ports: { inputs: [], outputs: [] },
     };
   }
+
   visualType(): WorkflowNodeType {
     return normalizeVisualType(this.safeModel.type);
   }

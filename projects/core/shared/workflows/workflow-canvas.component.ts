@@ -116,6 +116,7 @@ export class WorkflowCanvasDfComponent {
   @HostListener('document:keydown.escape')
   onEsc(): void {
     this.closeContextMenu();
+    this.setSelectedNode(null);
   }
 
   constructor(
@@ -173,6 +174,18 @@ export class WorkflowCanvasDfComponent {
     const visualType: WorkflowNodeType = t === 'input' || t === 'result' ? t : 'action';
 
     const id = crypto?.randomUUID?.() ?? 'node-' + Math.random().toString(36).slice(2, 9);
+
+    const makePorts = (visualType: WorkflowNodeType) => ({
+      inputs:
+        visualType === 'input'
+          ? [{ id: 'in', label: 'in', type: 'json' }]
+          : [{ id: 'in', label: 'in', type: 'json' }],
+      outputs:
+        visualType === 'result'
+          ? [{ id: 'out', label: 'out', type: 'json' }]
+          : [{ id: 'out', label: 'out', type: 'json' }],
+    });
+
     const node: WorkflowNode = {
       id,
       type: visualType,
@@ -183,10 +196,7 @@ export class WorkflowCanvasDfComponent {
         ...(visualType === 'action' ? { aiType: t as InspectorActionType } : {}),
         params: action.params ?? {},
       },
-      ports: {
-        inputs: visualType === 'input' ? [] : [{ id: 'in', label: 'in', type: 'json' }],
-        outputs: visualType === 'result' ? [] : [{ id: 'out', label: 'out', type: 'json' }],
-      },
+      ports: makePorts(visualType),
     };
 
     this._nodes.set([...this._nodes(), node]);
@@ -262,34 +272,11 @@ export class WorkflowCanvasDfComponent {
     if (current) this.setSelectedNode(current);
   };
 
-  // ===== Public helpers =====
-  private addNodeAt(t: PaletteType, client: { x: number; y: number }): void {
-    const visualType: WorkflowNodeType = t === 'input' || t === 'result' ? t : 'action';
-    const id = crypto?.randomUUID?.() ?? 'node-' + Math.random().toString(36).slice(2, 9);
-    const node: WorkflowNode = {
-      id,
-      type: visualType,
-      x: client.x,
-      y: client.y,
-      data: {
-        label: this.humanLabelFor(t),
-        ...(visualType === 'action' ? { aiType: t as InspectorActionType } : {}),
-      },
-      ports: {
-        inputs: visualType === 'input' ? [] : [{ id: 'in', label: 'in', type: 'json' }],
-        outputs: visualType === 'result' ? [] : [{ id: 'out', label: 'out', type: 'json' }],
-      },
-    };
-    this._nodes.set([...this._nodes(), node]);
-  }
-
   // ===== Selection → open inspector dialog =====
   onNodeSelected(e: unknown): void {
     const nodeId =
       (e as { id?: string; nodeId?: string }).id ?? (e as { nodeId?: string }).nodeId ?? null;
     this.setSelectedNode(nodeId);
-    if (!nodeId) return;
-    this.openInspectorFor(nodeId);
   }
 
   private openInspectorFor(nodeId: string): void {
@@ -353,6 +340,10 @@ export class WorkflowCanvasDfComponent {
 
   onCanvasContextMenu(ev: MouseEvent): void {
     ev.preventDefault();
+    const host = this.flowElementRef.nativeElement.closest('.pxs-wf-canvas-wrap') as HTMLElement;
+    const rect = host.getBoundingClientRect();
+
+    // find the node element clicked
     const el = (ev.target as HTMLElement)?.closest('[data-node-id]');
     if (!el) {
       this.closeContextMenu();
@@ -363,7 +354,12 @@ export class WorkflowCanvasDfComponent {
       this.closeContextMenu();
       return;
     }
-    this.contextMenu.set({ id, x: ev.clientX, y: ev.clientY });
+
+    // position relative to wrapper
+    const x = ev.clientX - rect.left;
+    const y = ev.clientY - rect.top;
+
+    this.contextMenu.set({ id, x, y });
     this.setSelectedNode(id);
   }
 
