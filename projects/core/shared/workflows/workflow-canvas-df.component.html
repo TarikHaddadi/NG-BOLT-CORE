@@ -57,10 +57,6 @@
     (connectionSelected)="onConnectionSelected($event)"
     (scale)="onScale($event)"
   >
-    <!-- Register node component per type via a class property -->
-    <ng-template ngdfNode="input" [ngdfComponent]="nodeCmp"></ng-template>
-    <ng-template ngdfNode="action" [ngdfComponent]="nodeCmp"></ng-template>
-    <ng-template ngdfNode="result" [ngdfComponent]="nodeCmp"></ng-template>
   </ng-draw-flow>
 </div>
 
