@@ -12,5 +12,4 @@ export const DRAW_FLOW_PROVIDER: FactoryProvider = provideNgDrawFlowConfigs({
     arrowhead: { type: DfArrowhead.Arrow },
     curvature: 0.25,
   },
-  nodes: {},
 } as Partial<DfOptions>);

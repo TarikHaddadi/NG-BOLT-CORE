@@ -1,18 +1,40 @@
 import { Component } from '@angular/core';
 import { DfInputComponent, DfOutputComponent, DrawFlowBaseNode } from '@ng-draw-flow/core';
 
-import { NodeModelShape, WorkflowNodeType, WorkflowPorts } from '@cadai/pxs-ng-core/interfaces';
+import {
+  InspectorActionType,
+  NodeModelShape,
+  PaletteType,
+  WorkflowNodeType,
+  WorkflowPorts,
+} from '@cadai/pxs-ng-core/interfaces';
 
 function isNodeModelShape(x: unknown): x is NodeModelShape {
   if (typeof x !== 'object' || x === null) return false;
   const t = (x as { type?: unknown }).type;
-  if (t !== 'input' && t !== 'action' && t !== 'result') return false;
+  const allowed: ReadonlyArray<PaletteType> = [
+    'input',
+    'result',
+    'chat-basic',
+    'chat-on-file',
+    'compare',
+    'summarize',
+    'extract',
+  ];
+  if (!allowed.includes(t as PaletteType)) return false;
+
   const ports = (x as { ports?: unknown }).ports;
   if (ports === undefined) return true;
   if (typeof ports !== 'object' || ports === null) return false;
-  const inp = (ports as { inputs?: unknown }).inputs;
-  const out = (ports as { outputs?: unknown }).outputs;
-  return (inp === undefined || Array.isArray(inp)) && (out === undefined || Array.isArray(out));
+  const ins = (ports as { inputs?: unknown }).inputs;
+  const outs = (ports as { outputs?: unknown }).outputs;
+  return (ins === undefined || Array.isArray(ins)) && (outs === undefined || Array.isArray(outs));
+}
+
+function normalizeVisualType(t: PaletteType): WorkflowNodeType {
+  if (t === 'input') return 'input';
+  if (t === 'result') return 'result';
+  return 'action';
 }
 
 @Component({
@@ -22,9 +44,9 @@ function isNodeModelShape(x: unknown): x is NodeModelShape {
   template: `
     <div
       class="wf-node"
-      [class.input]="type() === 'input'"
-      [class.result]="type() === 'result'"
-      [class.action]="type() === 'action'"
+      [class.input]="visualType() === 'input'"
+      [class.result]="visualType() === 'result'"
+      [class.action]="visualType() === 'action'"
     >
       <div class="title">{{ label() }}</div>
 
@@ -98,32 +120,57 @@ function isNodeModelShape(x: unknown): x is NodeModelShape {
   ],
 })
 export class WfNodeComponent extends DrawFlowBaseNode {
-  /** Safely view the incoming model (provided by DrawFlowBaseNode) with strict typing. */
+  /** Safe view of the incoming model (do not override `model` itself). */
   private get safeModel(): NodeModelShape {
-    const m = this.model; // inherited — do not redeclare/override
+    const m = this.model;
     if (isNodeModelShape(m)) return m;
-    return { type: 'action', label: 'Action', ports: { inputs: [], outputs: [] } };
+
+    // ✅ Fallback must use a valid PaletteType (not 'action' literal)
+    const fallback: NodeModelShape = {
+      type: 'chat-basic', // pick any default inspector type
+      aiType: 'chat-basic', // keep it explicit if you use aiType elsewhere
+      label: 'Action',
+      ports: { inputs: [], outputs: [] },
+    };
+    return fallback;
   }
 
-  // Helpers used by the template
-  type(): WorkflowNodeType {
-    return this.safeModel.type;
+  /** Visual class/type the component uses for styling/layout. */
+  visualType(): WorkflowNodeType {
+    return normalizeVisualType(this.safeModel.type);
   }
 
-  label(): string {
-    const l = (this.safeModel as { label?: unknown }).label;
-    return typeof l === 'string' && l.trim().length ? l : this.safeModel.type;
+  /** Title: prefer explicit label, else a readable label from type/aiType. */
+  displayLabel(): string {
+    const explicit = (this.safeModel as { label?: unknown }).label;
+    if (typeof explicit === 'string' && explicit.trim()) return explicit;
+
+    const t = this.safeModel.type;
+    if (t === 'input' || t === 'result') return t.charAt(0).toUpperCase() + t.slice(1);
+
+    // inspector types → nicer defaults
+    const nice: Record<InspectorActionType, string> = {
+      'chat-basic': 'Chat',
+      'chat-on-file': 'Chat on File',
+      compare: 'Compare',
+      summarize: 'Summarize',
+      extract: 'Extract',
+    };
+    return nice[t] ?? 'Action';
   }
 
   inPorts(): WorkflowPorts['inputs'] {
     return this.safeModel.ports?.inputs ?? [];
   }
-
   outPorts(): WorkflowPorts['outputs'] {
     return this.safeModel.ports?.outputs ?? [];
   }
-
   trackPort(_: number, p: { id: string }): string {
     return p.id;
+  }
+
+  label(): string {
+    const l = (this.safeModel as { label?: unknown }).label;
+    return typeof l === 'string' && l.trim().length ? l : this.safeModel.type;
   }
 }
