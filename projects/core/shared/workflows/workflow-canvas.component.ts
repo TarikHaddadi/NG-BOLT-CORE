@@ -35,7 +35,6 @@ import { FieldConfigService } from '@cadai/pxs-ng-core/services';
 
 import { ConfirmDialogComponent, DynamicFormComponent } from '../public-api';
 import { ACTION_FORMS, makeFallback } from './action-forms.component';
-import { WfNodeComponent } from './action-node.component';
 import { DRAW_FLOW_PROVIDER } from './workflow-config';
 @Component({
   selector: 'app-workflow-canvas-df',
@@ -58,7 +57,6 @@ export class WorkflowCanvasDfComponent {
   @ViewChild('flow', { static: true }) flow!: NgDrawFlowComponent;
   @ViewChild('flowEl', { static: true, read: ElementRef })
   private flowElementRef!: ElementRef<HTMLElement>;
-  nodeCmp = WfNodeComponent;
   @ViewChild('actionInspectorTpl', { static: true })
   private actionInspectorTpl!: TemplateRef<unknown>;
 
