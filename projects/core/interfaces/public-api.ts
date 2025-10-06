@@ -34,10 +34,11 @@ export { type CreateUserDto, type UpdateUserDto, type User, type UserState } fro
 export {
   type ActionDefinition,
   type ActionDefinitionLite,
-  type AiActionType,
   type FileRef,
+  type InspectorActionType,
   type NodeData,
   type NodeModelShape,
+  type PaletteType,
   type PersistableFile,
   type PortType,
   type RuntimeFile,

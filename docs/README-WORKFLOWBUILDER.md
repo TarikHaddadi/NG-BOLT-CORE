@@ -71,13 +71,23 @@ type NodeModelShape = WorkflowNodeDataBase & {
 function isNodeModelShape(x: unknown): x is NodeModelShape {
   if (typeof x !== 'object' || x === null) return false;
   const t = (x as { type?: unknown }).type;
-  if (t !== 'input' && t !== 'action' && t !== 'result') return false;
+  const allowed: ReadonlyArray<PaletteType> = [
+    'input',
+    'result',
+    'chat-basic',
+    'chat-on-file',
+    'compare',
+    'summarize',
+    'extract',
+  ];
+  if (!allowed.includes(t as PaletteType)) return false;
+
   const ports = (x as { ports?: unknown }).ports;
   if (ports === undefined) return true;
   if (typeof ports !== 'object' || ports === null) return false;
-  const inp = (ports as { inputs?: unknown }).inputs;
-  const out = (ports as { outputs?: unknown }).outputs;
-  return (inp === undefined || Array.isArray(inp)) && (out === undefined || Array.isArray(out));
+  const ins = (ports as { inputs?: unknown }).inputs;
+  const outs = (ports as { outputs?: unknown }).outputs;
+  return (ins === undefined || Array.isArray(ins)) && (outs === undefined || Array.isArray(outs));
 }
 
 @Component({
