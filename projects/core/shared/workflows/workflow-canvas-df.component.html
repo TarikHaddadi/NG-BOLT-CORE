@@ -1,0 +1,71 @@
+<!-- Palette (unchanged, just connected to canvasList) -->
+@if (availableActions().length) {
+  <div
+    class="pxs-wf-palette"
+    cdkDropList
+    [cdkDropListSortingDisabled]="true"
+    [cdkDropListConnectedTo]="[canvasList]"
+    [cdkDropListData]="availableActions()"
+  >
+    <div class="pxs-wf-palette-title">Actions:</div>
+
+    <div class="pxs-wf-palette-items" #paletteHost>
+      @for (a of availableActions(); track a.type) {
+        <button
+          mat-flat-button
+          class="pxs-wf-pill"
+          cdkDrag
+          [cdkDragData]="a"
+          [disabled]="disabled()"
+          cdkDragRootElement=".pxs-wf-pill"
+          (cdkDragMoved)="onPaletteDragMoved($event)"
+          (cdkDragStarted)="isPaletteDragging.set(true)"
+          (cdkDragEnded)="isPaletteDragging.set(false)"
+        >
+          {{ a.type }}
+          <ng-template cdkDragPreview>
+            <div class="pxs-wf-pill preview">{{ a.type }}</div>
+          </ng-template>
+          <ng-template cdkDragPlaceholder>
+            <div class="pxs-wf-pill placeholder"></div>
+          </ng-template>
+        </button>
+      }
+    </div>
+  </div>
+}
+
+<!-- Canvas wrapper is the drop target -->
+<div
+  class="pxs-wf-canvas-wrap"
+  cdkDropList
+  #canvasList="cdkDropList"
+  [cdkDropListDisabled]="!isPaletteDragging()"
+  [cdkDropListData]="{}"
+  (cdkDropListDropped)="onDrop($event)"
+>
+  <ng-draw-flow
+    #flowEl
+    #flow
+    class="pxs-wf-canvas"
+    [ngModel]="dfModel()"
+    (ngModelChange)="onModelChange($event)"
+    (nodeSelected)="onNodeSelected($event)"
+    (nodeMoved)="onNodeMoved($event)"
+    (connectionCreated)="onConnectionCreated($event)"
+    (connectionDeleted)="onConnectionDeleted($event)"
+    (connectionSelected)="onConnectionSelected($event)"
+    (scale)="onScale($event)"
+  >
+    <!-- Register node component per type via a class property -->
+    <ng-template ngdfNode="input" [ngdfComponent]="nodeCmp"></ng-template>
+    <ng-template ngdfNode="action" [ngdfComponent]="nodeCmp"></ng-template>
+    <ng-template ngdfNode="result" [ngdfComponent]="nodeCmp"></ng-template>
+  </ng-draw-flow>
+</div>
+
+<!-- Action Inspector (projected into ConfirmDialogComponent) -->
+<ng-template #actionInspectorTpl let-form="form" let-title="title">
+  <h3 class="mb-2">{{ title }}</h3>
+  <app-dynamic-form [form]="inspectorForm" [config]="inspectorConfig"></app-dynamic-form>
+</ng-template>
