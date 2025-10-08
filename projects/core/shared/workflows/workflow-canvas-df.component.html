@@ -69,19 +69,31 @@
       [style.top.px]="m.y"
       (click)="$event.stopPropagation()"
     >
-      <button mat-flat-button class="warn" (click)="onConfigureNode(m.id)">
-        {{ 'config' | translate }}
+      <button
+        mat-flat-button
+        class="warn"
+        (click)="onConfigureNode(m.id)"
+        [disabled]="isTerminal(m.id)"
+      >
+        {{ 'configure' | translate }}
       </button>
-      <button mat-flat-button class="accent" (click)="onDeleteNode(m.id)">
+      <button
+        mat-flat-button
+        class="accent"
+        (click)="onDeleteNode(m.id)"
+        [disabled]="isTerminal(m.id)"
+      >
         {{ 'delete' | translate }}
       </button>
       <button mat-flat-button (click)="closeContextMenu()">{{ 'close' | translate }}</button>
     </div>
   }
+  <p>{{ 'workflow_help' | translate }}</p>
 </div>
 
 <!-- Action Inspector (projected into ConfirmDialogComponent) -->
 <ng-template #actionInspectorTpl let-form="form" let-title="title">
-  <h3 class="mb-2">{{ title | translate }}</h3>
-  <app-dynamic-form [form]="inspectorForm" [config]="inspectorConfig"></app-dynamic-form>
+  <div class="form">
+    <app-dynamic-form [form]="inspectorForm" [config]="inspectorConfig"></app-dynamic-form>
+  </div>
 </ng-template>

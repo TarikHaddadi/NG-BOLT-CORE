@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, Input, ViewChild } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import {
   AbstractControl,
   FormControl,
@@ -10,6 +10,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
 
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
 import { isFile, isString } from '@cadai/pxs-ng-core/utils';
@@ -106,7 +107,7 @@ type FileControlValue = File | File[] | string[] | null;
   `,
   styleUrls: ['./file.component.scss'],
 })
-export class InputFileComponent {
+export class InputFileComponent implements OnInit, OnDestroy {
   @Input({ required: true }) field!: FieldConfig & {
     accept?: string; // e.g. "image/*,.pdf"
     multiple?: boolean; // default false
@@ -121,8 +122,29 @@ export class InputFileComponent {
 
   emptyParams: Record<string, never> = {};
   private lastRejectedByAccept = 0; // track how many were dropped by accept
+  private sub?: Subscription;
 
   constructor(private t: TranslateService) {}
+
+  ngOnInit(): void {
+    // Evaluate current state once (handles initial required, defaults, etc.)
+    const cur = this.currentFiles();
+    this.applyFileErrors(cur);
+
+    // If parent code sets/clears the value programmatically, keep errors in sync
+    this.sub = this.fc.valueChanges.subscribe((v) => {
+      const files = Array.isArray(v)
+        ? (v.filter((x) => x instanceof File) as File[])
+        : v instanceof File
+          ? [v]
+          : [];
+      this.applyFileErrors(files);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+  }
 
   // ---------- Config helpers ----------
   get multiple(): boolean {
@@ -157,8 +179,8 @@ export class InputFileComponent {
   // ---------- UI actions ----------
   openPicker() {
     this.fc.markAsTouched();
-    // We don't want to blow away programmatic errors here.
     this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+    this.applyFileErrors(this.currentFiles());
     this.fileInputRef?.nativeElement?.click();
   }
 
@@ -168,7 +190,9 @@ export class InputFileComponent {
     if (!list) {
       // dialog canceled
       this.fc.markAsTouched();
-      this.fc.updateValueAndValidity({ onlySelf: true });
+      this.fc.markAsDirty();
+      this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+      this.applyFileErrors([]);
       return;
     }
 

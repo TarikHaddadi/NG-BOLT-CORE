@@ -16,6 +16,66 @@ import { buildValidators } from '@cadai/pxs-ng-core/utils';
 import { FieldHostComponent } from './field-host/field-host.component';
 
 type SelValue = string | number;
+type Option = { label: string; value: SelValue };
+
+// loose equality for typical primitive option values
+function eq(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  // handle number vs string numerics: '1' == 1
+  if (
+    (typeof a === 'string' || typeof a === 'number') &&
+    (typeof b === 'string' || typeof b === 'number')
+  ) {
+    return Number(a) == Number(b);
+  }
+  // shallow object compare on {id} or {value}
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const av = (a as any).value ?? (a as any).id ?? a;
+    const bv = (b as any).value ?? (b as any).id ?? b;
+    return av === bv;
+  }
+  return false;
+}
+
+function asArray<T>(v: unknown): T[] {
+  if (v == null) return [];
+  if (Array.isArray(v)) return v as T[];
+  if (v instanceof Set) return Array.from(v) as T[];
+  if (typeof v === 'string') {
+    // accept comma-separated strings for convenience
+    return v.split(',').map((s) => s.trim()) as unknown as T[];
+  }
+  return [v as T];
+}
+
+function findOptionByValue(opts: Option[] | undefined, raw: unknown): SelValue | undefined {
+  if (!opts?.length) return raw as SelValue;
+  const hit = opts.find((o) => eq(o.value, raw) || eq(o.label, raw));
+  return hit ? hit.value : (raw as SelValue);
+}
+
+/** Normalize default for select-like fields (chips/dropdown) */
+function normalizeSelectDefault(field: FieldConfig): {
+  single: SelValue | null;
+  multi: SelValue[];
+} {
+  const multiple = field.multiple === true;
+  const opts = field.options as Option[] | undefined;
+
+  if (multiple) {
+    const raws = asArray<unknown>(field.defaultValue);
+    if (!raws.length) return { single: null, multi: [] };
+    const values = raws
+      .map((r) => findOptionByValue(opts, r))
+      .filter((v) => v != null) as SelValue[];
+    return { single: null, multi: values };
+  } else {
+    const raw = field.defaultValue;
+    if (raw == null || raw === '') return { single: null, multi: [] };
+    const value = findOptionByValue(opts, raw);
+    return { single: (value ?? null) as SelValue | null, multi: [] };
+  }
+}
 
 @Component({
   selector: 'app-dynamic-form',
@@ -102,15 +162,18 @@ export class DynamicFormComponent implements OnInit, OnChanges {
       case 'chips':
       case 'dropdown': {
         const multiple = field.multiple === true;
+        const { single, multi } = normalizeSelectDefault(field);
+
         if (multiple) {
           return new FormControl<SelValue[]>(
-            { value: [], disabled: !!field.disabled },
+            { value: multi, disabled: !!field.disabled },
             { validators },
           );
         }
+
         // single-select starts at null so "required" works
         return new FormControl<SelValue | null>(
-          { value: null, disabled: !!field.disabled },
+          { value: single, disabled: !!field.disabled },
           { validators },
         );
       }
