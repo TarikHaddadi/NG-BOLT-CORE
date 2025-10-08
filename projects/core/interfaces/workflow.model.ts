@@ -24,14 +24,14 @@ export interface WorkflowPorts {
   inputs: WorkflowPort[];
   outputs: WorkflowPort[];
 }
-export type WorkflowNodeType = 'action' | 'input' | 'result';
 
 export type InspectorActionType =
   | 'chat-basic'
   | 'chat-on-file'
   | 'compare'
   | 'summarize'
-  | 'extract';
+  | 'extract'
+  | 'jira';
 
 export type PaletteType = 'input' | 'result' | InspectorActionType;
 
@@ -47,7 +47,7 @@ export interface WorkflowNodeDataBase {
 
 export interface WorkflowNode {
   id: string;
-  type: WorkflowNodeType; // visual kind persisted in your domain
+  type: PaletteType;
   x: number;
   y: number;
   data: WorkflowNodeDataBase;
@@ -75,7 +75,7 @@ export interface WorkflowEdge {
 
 /** 🔧 Node view model: accepts PALETTE types (may be inspector strings) */
 export type NodeModelShape = WorkflowNodeDataBase & {
-  type: PaletteType; // <-- was WorkflowNodeType (wrong)
+  type: PaletteType;
   aiType?: InspectorActionType; // keep inspector type here for forms
   ports?: WorkflowPorts;
 };

@@ -1,13 +1,22 @@
-import { Component } from '@angular/core';
-import { DfInputComponent, DfOutputComponent, DrawFlowBaseNode } from '@ng-draw-flow/core';
+import { Component, ElementRef, inject } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import {
+  DfConnectorPosition,
+  DfInputComponent,
+  DfOutputComponent,
+  DrawFlowBaseNode,
+} from '@ng-draw-flow/core';
+import { TranslateModule } from '@ngx-translate/core';
 
 import {
   InspectorActionType,
   NodeModelShape,
   PaletteType,
-  WorkflowNodeType,
   WorkflowPorts,
 } from '@cadai/pxs-ng-core/interfaces';
+
+import { WfCanvasBus } from './wf-canvas-bus';
 
 function isNodeModelShape(x: unknown): x is NodeModelShape {
   if (typeof x !== 'object' || x === null) return false;
@@ -20,6 +29,7 @@ function isNodeModelShape(x: unknown): x is NodeModelShape {
     'compare',
     'summarize',
     'extract',
+    'jira',
   ];
   if (!allowed.includes(t as PaletteType)) return false;
   const ports = (x as { ports?: unknown }).ports;
@@ -29,47 +39,86 @@ function isNodeModelShape(x: unknown): x is NodeModelShape {
   const outs = (ports as { outputs?: unknown }).outputs;
   return (ins === undefined || Array.isArray(ins)) && (outs === undefined || Array.isArray(outs));
 }
-const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
-  t === 'input' ? 'input' : t === 'result' ? 'result' : 'action';
 
 @Component({
   selector: 'wf-node',
   standalone: true,
-  imports: [DfInputComponent, DfOutputComponent],
+  imports: [DfInputComponent, DfOutputComponent, MatButtonModule, MatIconModule, TranslateModule],
   template: `
     <div
       class="wf-node"
       [attr.data-node-id]="nodeId"
       [class.input]="visualType() === 'input'"
       [class.result]="visualType() === 'result'"
-      [class.action]="visualType() === 'action'"
+      [class.action]="visualType() !== 'input' && visualType() !== 'result'"
     >
-      <div class="title">{{ displayLabel() }}</div>
-
+      @if (visualType() === 'input') {
+        <button
+          mat-mini-fab
+          class="primary"
+          color="neutral"
+          aria-label="start"
+          matTooltip="play workflow"
+          (click)="(null)"
+        >
+          <mat-icon>play_arrow</mat-icon>
+        </button>
+      } @else if (visualType() === 'result') {
+        <button
+          mat-mini-fab
+          class="primary"
+          color="neutral"
+          aria-label="start"
+          matTooltip="Go to results"
+          (click)="(null)"
+        >
+          <mat-icon>forward</mat-icon>
+        </button>
+      } @else {
+        <div class="title">{{ displayLabel() | translate }}</div>
+      }
+      <!-- Inputs (left) -->
       <div class="ports left">
         @for (p of inPorts(); track p.id) {
           <df-input
-            class="input"
-            [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: true }"
+            [position]="positions.Left"
+            [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: false }"
           >
           </df-input>
         }
       </div>
 
+      <!-- Outputs (right) -->
       <div class="ports right">
         @for (p of outPorts(); track p.id) {
           <df-output
-            class="output"
+            [position]="positions.Right"
             [connectorData]="{ nodeId: nodeId, connectorId: p.id, single: false }"
           >
           </df-output>
         }
       </div>
+
+      @if (visualType() !== 'result' && visualType() !== 'input') {
+        <button
+          mat-mini-fab
+          color="neutral"
+          class="neutral"
+          aria-label="configure"
+          (click)="onMenuClick($event)"
+        >
+          <mat-icon>menu</mat-icon>
+        </button>
+      }
     </div>
   `,
   styles: [
     `
       .wf-node {
+        /* connector colors (docs: --df-connector-color / hover) */
+        --df-connector-color: var(--mat-accent);
+        --df-connector-color-hover: #ffe066;
+        min-height: 36px;
         min-width: 220px;
         border-radius: 8px;
         padding: 8px 12px;
@@ -79,27 +128,46 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
       }
       .wf-node.input {
         background: var(--mat-success, #2e7d32);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 40px;
       }
       .wf-node.result {
         background: var(--mat-accent, #7b1fa2);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 40px;
       }
       .wf-node.action {
         background: var(--mat-primary, #1976d2);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
       }
+
+      .wf-node.is-selected {
+        outline: 2px solid #42a5f5;
+        outline-offset: 2px;
+      }
+
       .title {
         font-weight: 600;
         margin-bottom: 4px;
+        color: var(--mdc-filled-button-label-text-color, #fff);
       }
 
-      /* Connector placement is CSS-based */
+      /* Connector rails */
       .ports.left,
       .ports.right {
         position: absolute;
-        top: 10px;
+        top: 17px;
         bottom: 10px;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
+        height: 15px;
       }
       .ports.left {
         left: -8px;
@@ -107,72 +175,47 @@ const normalizeVisualType = (t: PaletteType): WorkflowNodeType =>
       .ports.right {
         right: -8px;
       }
-      .input,
-      .output {
-        position: relative;
-        z-index: 1;
-      }
-      .wf-node.is-selected {
-        outline: 2px solid #42a5f5;
-        outline-offset: 2px;
-      }
-
-      /* Make ports visually obvious */
-      .input,
-      .output {
-        position: relative;
-        width: 12px;
-        height: 12px;
-      }
-      .input::before,
-      .output::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        margin: auto;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.25);
-        border: 2px solid #fff;
-        box-sizing: border-box;
-        pointer-events: none;
-      }
     `,
   ],
 })
 export class WfNodeComponent extends DrawFlowBaseNode {
+  private bus = inject(WfCanvasBus);
+  private host = inject(ElementRef<HTMLElement>);
+  positions = DfConnectorPosition;
   private get safeModel(): NodeModelShape {
-    const m = this.model;
-    if (isNodeModelShape(m)) return m;
-    return {
-      type: 'chat-basic',
-      aiType: 'chat-basic',
-      label: 'Action',
-      ports: { inputs: [], outputs: [] },
-    };
+    return this.model && isNodeModelShape(this.model) ? this.model : { type: 'input' };
   }
-  visualType(): WorkflowNodeType {
-    return normalizeVisualType(this.safeModel.type);
+
+  visualType(): PaletteType {
+    const t = this.safeModel.type as PaletteType;
+    return t;
   }
+
   displayLabel(): string {
-    const explicit = (this.safeModel as { label?: unknown }).label;
-    if (typeof explicit === 'string' && explicit.trim()) return explicit;
-    const t = this.safeModel.type;
+    const t = this.safeModel.type?.toLowerCase();
     if (t === 'input' || t === 'result') return t.charAt(0).toUpperCase() + t.slice(1);
     const nice: Record<InspectorActionType, string> = {
-      'chat-basic': 'Chat',
-      'chat-on-file': 'Chat on File',
-      compare: 'Compare',
-      summarize: 'Summarize',
-      extract: 'Extract',
+      'chat-basic': 'chat-basic',
+      'chat-on-file': 'chat-on-file',
+      compare: 'compare',
+      summarize: 'summarize',
+      extract: 'extract',
+      jira: 'jira',
     };
-    return nice[t] ?? 'Action';
+    return nice[t as InspectorActionType];
   }
   inPorts(): WorkflowPorts['inputs'] {
     return this.safeModel.ports?.inputs ?? [];
   }
   outPorts(): WorkflowPorts['outputs'] {
     return this.safeModel.ports?.outputs ?? [];
+  }
+  onMenuClick(ev: MouseEvent): void {
+    ev.stopPropagation(); // don’t toggle selection
+    this.bus.openMenu$.next({
+      nodeId: this.nodeId,
+      clientX: ev.clientX,
+      clientY: ev.clientY,
+    });
   }
 }
