@@ -46,7 +46,6 @@ export {
   type WorkflowEdgeStyle,
   type WorkflowNode,
   type WorkflowNodeDataBase,
-  type WorkflowNodeType,
   type WorkflowPort,
   type WorkflowPorts,
 } from './workflow.model';

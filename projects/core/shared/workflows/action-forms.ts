@@ -30,9 +30,9 @@ export const ACTION_FORMS: Record<string, ActionFormSpec> = {
           { label: '0.7', value: 0.7 },
           { label: '1.0 – Creative', value: 1 },
         ],
+        defaultValue: 0.3,
       })!,
     ],
-    defaults: { temperature: 0.3 },
   },
 
   'chat-on-file': {
@@ -99,9 +99,9 @@ export const ACTION_FORMS: Record<string, ActionFormSpec> = {
           { label: 'Short (1–2 paragraphs)', value: 'short' },
           { label: 'Detailed (4–6 paragraphs)', value: 'detailed' },
         ],
+        defaultValue: 'bullets',
       }),
     ],
-    defaults: { length: 'bullets' },
   },
 
   extract: {
@@ -125,9 +125,96 @@ export const ACTION_FORMS: Record<string, ActionFormSpec> = {
           { label: 'JSON', value: 'json' },
           { label: 'CSV', value: 'csv' },
         ],
+        defaultValue: 'json',
       }),
     ],
-    defaults: { format: 'json' },
+  },
+  jira: {
+    make: (F) => [
+      F.getTextField({
+        name: 'site',
+        label: 'Jira site (cloud)',
+        placeholder: 'your-domain.atlassian.net',
+        validators: [Validators.required],
+        errorMessages: { required: 'Enter your Jira site' },
+        helperText: 'Cloud domain without protocol.',
+      }),
+      F.getTextField({
+        name: 'email',
+        label: 'Account email',
+        placeholder: 'you@example.com',
+        validators: [Validators.required, Validators.email],
+        errorMessages: { required: 'Email required', email: 'Invalid email' },
+      }),
+      F.getPasswordField?.({
+        name: 'apiToken',
+        label: 'API token',
+        placeholder: '************************',
+        validators: [Validators.required],
+        errorMessages: { required: 'API token required' },
+        helperText: 'Create a token in https://id.atlassian.com/manage-profile/security/api-tokens',
+      })!,
+
+      F.getTextField({
+        name: 'projectKey',
+        label: 'Project key',
+        placeholder: 'ABC',
+        validators: [Validators.required],
+        errorMessages: { required: 'Project key required' },
+      }),
+      F.getDropdownField({
+        name: 'issueType',
+        label: 'Issue type',
+        options: [
+          { label: 'Task', value: 'Task' },
+          { label: 'Bug', value: 'Bug' },
+          { label: 'Story', value: 'Story' },
+          { label: 'Epic', value: 'Epic' },
+        ],
+        required: true,
+        validators: [Validators.required],
+        errorMessages: { required: 'Choose an issue type' },
+        defaultValue: 'Task',
+      }),
+      F.getTextField({
+        name: 'summary',
+        label: 'Summary',
+        placeholder: 'Short title…',
+        validators: [Validators.required, Validators.maxLength(255)],
+        errorMessages: { required: 'Summary required', maxLength: 'Max 255 chars' },
+      }),
+      F.getTextAreaField({
+        name: 'description',
+        label: 'Description',
+        placeholder: 'Describe the issue…',
+        rows: 6,
+      }),
+      F.getTextField({
+        name: 'assignee',
+        label: 'Assignee (accountId or email)',
+        placeholder: 'user@example.com',
+        helperText: 'Use email',
+        validators: [Validators.required, Validators.email],
+        errorMessages: { required: 'Email required', email: 'Invalid email' },
+      }),
+      F.getDropdownField({
+        name: 'priority',
+        label: 'Priority',
+        options: [
+          { label: 'Highest', value: 'Highest' },
+          { label: 'High', value: 'High' },
+          { label: 'Medium', value: 'Medium' },
+          { label: 'Low', value: 'Low' },
+          { label: 'Lowest', value: 'Lowest' },
+        ],
+        helperText: 'Choose the priority that you want',
+        defaultValue: 'Medium',
+      }),
+    ],
+    defaults: {
+      issueType: 'Task',
+      priority: 'Medium',
+    },
   },
 };
 

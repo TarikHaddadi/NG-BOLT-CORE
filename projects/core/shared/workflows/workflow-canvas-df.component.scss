@@ -6,12 +6,16 @@
 .pxs-wf-palette {
   border-right: 1px solid #e0e0e0;
   padding-right: 12px;
+}
+.pxs-wf-palette-items {
   margin: 10px;
 }
 .pxs-wf-canvas {
   width: 100%;
   height: 640px;
   display: block;
+  border-radius: 30px;
+  border: 2px solid #d1d1d1;
 }
 .pxs-wf-canvas-wrap {
   position: relative;
@@ -30,4 +34,17 @@
 }
 .pxs-wf-pill {
   margin: 0 10px;
+
+  &.preview {
+    background-color: var(--mat-primary);
+    color: var(--mdc-filled-button-label-text-color, #fff);
+    padding: 15px;
+    border-radius: 25px;
+    min-width: 80px;
+    text-align: center;
+  }
+}
+
+.form {
+  padding: 10px;
 }
