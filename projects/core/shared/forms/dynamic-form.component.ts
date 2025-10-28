@@ -147,7 +147,10 @@ export class DynamicFormComponent implements OnInit, OnChanges {
       case 'range':
         return new FormControl<number | null>(
           {
-            value: field.defaultValue != null ? Number(field.defaultValue) : (field.min ?? 0),
+            value:
+              field.defaultValue && field.defaultValue != null
+                ? Number(field.defaultValue)
+                : (field.min ?? 0),
             disabled: !!field.disabled,
           },
           { validators },

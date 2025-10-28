@@ -221,17 +221,40 @@ export class InputFileComponent implements OnInit, OnDestroy {
     input.value = '';
   }
 
+  private rawArray(): Array<File | string> {
+    const v = this.fc.value as any;
+    if (v == null) return [];
+    return Array.isArray(v) ? v.slice() : [v];
+  }
+
   removeAt(i: number) {
-    const cur = this.currentFiles();
-    cur.splice(i, 1);
-    const next = this.multiple ? cur : (cur[0] ?? null);
+    const raw = this.rawArray();
+    if (i < 0 || i >= raw.length) return;
+
+    raw.splice(i, 1);
+
+    // Decide what to set back based on `multiple` and remaining content
+    let next: FileControlValue;
+    if (this.multiple) {
+      // If remaining items are all Files -> File[], if all strings -> string[], if mixed keep as-is (parent can accept array)
+      const onlyFiles = raw.every((x) => x instanceof File);
+      const onlyStrings = raw.every((x) => typeof x === 'string');
+      if (onlyFiles) next = raw as File[];
+      else if (onlyStrings) next = raw as string[];
+      else next = raw as unknown as File[]; // tolerate mixed arrays if your parent accepts it
+    } else {
+      next = raw.length ? (raw[0] as any) : null;
+      // If you want strict typing for single-value mode, you can coerce string->string[] upstream.
+    }
 
     this.fc.setValue(next);
     this.fc.markAsTouched();
     this.fc.markAsDirty();
     this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
 
-    this.applyFileErrors(this.multiple ? (next as File[]) : next ? [next as File] : []);
+    // Apply errors based on Files only (for size checks), but compute emptiness on the *raw* value (see below)
+    const filesOnly = raw.filter((x) => x instanceof File) as File[];
+    this.applyFileErrors(filesOnly);
   }
 
   clear() {
@@ -330,50 +353,34 @@ export class InputFileComponent implements OnInit, OnDestroy {
     const maxOne = this.field?.maxFileSize as number | undefined;
     const maxFiles = this.field?.maxFiles as number | undefined;
 
-    // Start with validator-produced errors (if any) to avoid nuking them.
     const errs: ValidationErrors = { ...(this.fc.errors ?? {}) };
 
-    // accept: if any were rejected, show error
-    if (this.lastRejectedByAccept > 0) {
-      errs['accept'] = true;
-    } else {
-      delete errs['accept'];
-    }
+    if (this.lastRejectedByAccept > 0) errs['accept'] = true;
+    else delete errs['accept'];
 
-    // max single file size
-    if (maxOne && files.some((f) => f.size > maxOne)) {
-      errs['maxFileSize'] = { max: maxOne };
-    } else {
-      delete errs['maxFileSize'];
-    }
+    if (maxOne && files.some((f) => f.size > maxOne)) errs['maxFileSize'] = { max: maxOne };
+    else delete errs['maxFileSize'];
 
-    // max total size
+    // total size
     if (maxTotal) {
       const total = files.reduce((s, f) => s + f.size, 0);
-      if (total > maxTotal) {
-        errs['maxTotalSize'] = { max: maxTotal, total };
-      } else {
-        delete errs['maxTotalSize'];
-      }
-    } else {
-      delete errs['maxTotalSize'];
-    }
+      if (total > maxTotal) errs['maxTotalSize'] = { max: maxTotal, total };
+      else delete errs['maxTotalSize'];
+    } else delete errs['maxTotalSize'];
 
-    // max files count
-    if (maxFiles && files.length > maxFiles) {
-      errs['maxFiles'] = { max: maxFiles };
-    } else {
-      delete errs['maxFiles'];
-    }
+    const rawLen = this.rawArray().length;
+    if (maxFiles && rawLen > maxFiles) errs['maxFiles'] = { max: maxFiles };
+    else delete errs['maxFiles'];
 
-    // ensure required shows when empty if field.required = true
-    const isEmpty = files.length === 0;
     if (this.field?.required) {
-      if (isEmpty) errs['required'] = true;
+      if (rawLen === 0) errs['required'] = true;
       else delete errs['required'];
     }
 
     this.fc.setErrors(Object.keys(errs).length ? errs : null);
+
+    // Ensure `invalid` is recomputed for your `showError` binding
+    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
   }
 
   // ---------- Error/i18n ----------
