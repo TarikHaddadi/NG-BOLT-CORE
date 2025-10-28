@@ -38,17 +38,17 @@ type FileControlValue = File | File[] | string[] | null;
     >
       <mat-label>{{ field.label | translate }}</mat-label>
 
-      <!-- Display-only control showing a summary -->
       <input
         matInput
         [id]="field.name"
         [value]="displayValue"
         [readonly]="true"
+        [required]="field.required"
         [placeholder]="field.placeholder || '' | translate"
         (blur)="fc.markAsTouched()"
         [attr.aria-label]="field.label | translate"
         [attr.aria-describedby]="ariaDescribedBy"
-        [attr.aria-invalid]="fc.invalid || null"
+        [attr.aria-invalid]="fc.invalid ? 'true' : null"
         [attr.aria-required]="field.required || null"
       />
 
@@ -56,7 +56,6 @@ type FileControlValue = File | File[] | string[] | null;
         {{ 'form.actions.browse' | translate: emptyParams }}
       </button>
 
-      <!-- Hidden native file input -->
       <input
         #fileInput
         type="file"
@@ -82,15 +81,17 @@ type FileControlValue = File | File[] | string[] | null;
     <!-- File list + actions -->
     @if (filesCount > 0) {
       <div class="pxs-file-list">
-        <div class="pxs-file-row" *ngFor="let f of filesView; let i = index">
-          <div class="pxs-file-name" [title]="f.name">{{ f.name }}</div>
-          <div class="pxs-file-meta">
-            <span *ngIf="f.size !== undefined">{{ humanSize(f.size) }}</span>
+        @for (f of filesView; track $index; let i = $index) {
+          <div class="pxs-file-row">
+            <div class="pxs-file-name" [title]="f.name">{{ f.name }}</div>
+            @if (f.size !== undefined) {
+              <span class="pxs-file-meta">{{ humanSize(f.size) }}</span>
+            }
+            <button mat-button type="button" (click)="removeAt(i)">
+              {{ 'form.actions.remove' | translate: emptyParams }}
+            </button>
           </div>
-          <button mat-button type="button" (click)="removeAt(i)">
-            {{ 'form.actions.remove' | translate: emptyParams }}
-          </button>
-        </div>
+        }
         <div class="pxs-file-actions">
           <button mat-stroked-button type="button" (click)="openPicker()">
             {{
@@ -132,11 +133,11 @@ export class InputFileComponent implements OnInit, OnDestroy {
       this.fc.addValidators(this.hasFilesValidator);
     }
 
-    const cur = this.currentFiles();
-    this.applyFileErrors(cur);
+    // Evaluate once for initial state
+    this.applyFileErrors(this.currentFiles());
 
+    // Keep custom file-size/count errors in sync
     this.sub = this.fc.valueChanges.subscribe(() => {
-      // keep custom file-size/count errors in sync with Files actually present
       this.applyFileErrors(this.currentFiles());
     });
   }
@@ -159,7 +160,7 @@ export class InputFileComponent implements OnInit, OnDestroy {
   }
 
   get showError(): boolean {
-    return !!((this.fc?.touched || this.fc?.dirty) && this.fc?.invalid);
+    return !!(this.fc?.touched && this.fc?.invalid);
   }
 
   get hintId() {
@@ -388,12 +389,20 @@ export class InputFileComponent implements OnInit, OnDestroy {
     const errs = this.fc.errors ?? {};
     if (!errs || !Object.keys(errs).length) return '';
 
+    // Priority similar to your text input
     const order = ['required', 'maxFiles', 'maxFileSize', 'maxTotalSize', 'accept'];
     const key = order.find((k) => k in errs) || Object.keys(errs)[0];
 
+    // 1) per-field override from config
     const overrideKey = this.field.errorMessages?.[key];
-    const fallbackKey = `form.errors.file.${key}`;
-    const i18nKey = overrideKey ?? fallbackKey;
+
+    // 2) per-field fallback (like text input)
+    const perFieldFallback = `form.errors.${this.field.name}.${key}`;
+
+    // 3) generic file fallback
+    const genericFallback = `form.errors.file.${key}`;
+
+    const i18nKey = overrideKey ?? perFieldFallback ?? genericFallback;
 
     const params = this.paramsFor(key, (errs as any)[key]);
     return this.t.instant(i18nKey, params);
@@ -402,34 +411,21 @@ export class InputFileComponent implements OnInit, OnDestroy {
   private paramsFor(key: string, val: any): Record<string, any> {
     switch (key) {
       case 'accept': {
-        const raw = (this.field?.accept ?? '').trim();
-        const tokens = raw
-          ? raw
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [];
-        const requiredTypes = tokens.length ? tokens.join(', ') : '*';
-        return { requiredTypes };
+        const tokens = (this.field?.accept ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        return { requiredTypes: tokens.length ? tokens.join(', ') : '*' };
       }
-
-      case 'maxFiles': {
-        const requiredLength = val?.max ?? this.field?.maxFiles ?? 0;
-        const actualLength = this.filesCount;
-        return { requiredLength, actualLength };
-      }
-
-      case 'maxFileSize': {
-        const requiredLength = this.humanSize(val?.max ?? this.field?.maxFileSize);
-        return { requiredLength };
-      }
-
-      case 'maxTotalSize': {
-        const requiredLength = this.humanSize(val?.max ?? this.field?.maxTotalSize);
-        return { requiredLength };
-      }
-
-      case 'required':
+      case 'maxFiles':
+        return {
+          requiredLength: val?.max ?? this.field?.maxFiles ?? 0,
+          actualLength: this.filesCount,
+        };
+      case 'maxFileSize':
+        return { requiredLength: this.humanSize(val?.max ?? this.field?.maxFileSize) };
+      case 'maxTotalSize':
+        return { requiredLength: this.humanSize(val?.max ?? this.field?.maxTotalSize) };
       default:
         return {};
     }
