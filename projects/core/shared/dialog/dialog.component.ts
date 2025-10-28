@@ -37,7 +37,7 @@ import { ConfirmDialogData } from '@cadai/pxs-ng-core/interfaces';
           {{ data.cancelText || 'cancel' | translate }}
         </button>
         <button
-          mat-raised-button
+          mat-flat-button
           color="primary"
           [color]="'primary'"
           class="primary"

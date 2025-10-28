@@ -39,7 +39,6 @@ function normalize(opts: CoreOptions): Required<CoreOptions> {
       prefix: opts.i18n?.prefix ?? '/assets/i18n/',
       suffix: opts.i18n?.suffix ?? '.json',
       fallbackLang: opts.i18n?.fallbackLang ?? 'en',
-      // (no 'lang' here on purpose; we’ll resolve later)
     },
     interceptors: opts.interceptors ?? [],
     animations: opts.animations ?? true,

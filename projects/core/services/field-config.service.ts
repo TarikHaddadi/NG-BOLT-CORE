@@ -18,7 +18,6 @@ import {
 
 type ErrMap = FieldConfig['errorMessages'];
 
-/** Merge helper: scalar spread, errorMessages shallow-merge, arrays replaced only if provided. */
 function mergeField<T extends FieldConfig>(base: T, over?: Partial<T>): T {
   if (!over) return base;
 
@@ -27,13 +26,10 @@ function mergeField<T extends FieldConfig>(base: T, over?: Partial<T>): T {
     ...over,
   } as T;
 
-  // errorMessages: merge map
   const baseErr = (base.errorMessages ?? {}) as ErrMap;
   const overErr = (over.errorMessages ?? {}) as ErrMap;
   merged.errorMessages = { ...baseErr, ...overErr };
 
-  // Arrays: only replace if explicitly provided, otherwise keep defaults
-  // (so you can clear by passing [])
   const maybeReplace = (key: keyof T) => {
     if (key in over) {
       (merged as any)[key] = (over as any)[key];
