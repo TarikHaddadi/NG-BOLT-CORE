@@ -5,6 +5,7 @@ import {
   FormControl,
   ReactiveFormsModule,
   ValidationErrors,
+  ValidatorFn,
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -13,7 +14,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
-import { isFile, isString } from '@cadai/pxs-ng-core/utils';
+import { isFile, isFiles, isString, isStrings } from '@cadai/pxs-ng-core/utils';
 
 type FileControlValue = File | File[] | string[] | null;
 
@@ -127,18 +128,16 @@ export class InputFileComponent implements OnInit, OnDestroy {
   constructor(private t: TranslateService) {}
 
   ngOnInit(): void {
-    // Evaluate current state once (handles initial required, defaults, etc.)
+    if (this.field?.required) {
+      this.fc.addValidators(this.hasFilesValidator);
+    }
+
     const cur = this.currentFiles();
     this.applyFileErrors(cur);
 
-    // If parent code sets/clears the value programmatically, keep errors in sync
-    this.sub = this.fc.valueChanges.subscribe((v) => {
-      const files = Array.isArray(v)
-        ? (v.filter((x) => x instanceof File) as File[])
-        : v instanceof File
-          ? [v]
-          : [];
-      this.applyFileErrors(files);
+    this.sub = this.fc.valueChanges.subscribe(() => {
+      // keep custom file-size/count errors in sync with Files actually present
+      this.applyFileErrors(this.currentFiles());
     });
   }
 
@@ -188,36 +187,34 @@ export class InputFileComponent implements OnInit, OnDestroy {
     const input = ev.target as HTMLInputElement;
     const list = input.files;
     if (!list) {
-      // dialog canceled
       this.fc.markAsTouched();
       this.fc.markAsDirty();
-      this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+      this.fc.updateValueAndValidity({ onlySelf: true });
       this.applyFileErrors([]);
       return;
     }
 
     const selected = Array.from(list);
-    const cur = this.currentFiles();
-    const merged = this.multiple ? [...cur, ...selected] : selected.slice(0, 1);
+    const curRaw = this.rawArray();
+
+    const merged = this.multiple
+      ? curRaw.some((x) => typeof x === 'string')
+        ? selected
+        : [...(curRaw as File[]), ...selected]
+      : selected.slice(0, 1);
 
     const { accepted, rejectedCount } = this.filterByAccept(merged);
     this.lastRejectedByAccept = rejectedCount;
 
     const limited = this.enforceCounts(accepted);
-    const final = limited; // sizes & other errors handled in applyFileErrors
+    const final = limited;
 
-    // 1) set the value
     this.fc.setValue(this.multiple ? final : (final[0] ?? null));
     this.fc.markAsTouched();
     this.fc.markAsDirty();
-
-    // 2) run built-ins (required, etc.) first
-    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
-
-    // 3) now apply custom file errors (this will STICK)
+    this.fc.updateValueAndValidity({ onlySelf: true });
     this.applyFileErrors(final);
 
-    // reset native input value so same file can be re-picked
     input.value = '';
   }
 
@@ -226,34 +223,37 @@ export class InputFileComponent implements OnInit, OnDestroy {
     if (v == null) return [];
     return Array.isArray(v) ? v.slice() : [v];
   }
-
   removeAt(i: number) {
     const raw = this.rawArray();
     if (i < 0 || i >= raw.length) return;
 
     raw.splice(i, 1);
 
-    // Decide what to set back based on `multiple` and remaining content
     let next: FileControlValue;
     if (this.multiple) {
-      // If remaining items are all Files -> File[], if all strings -> string[], if mixed keep as-is (parent can accept array)
-      const onlyFiles = raw.every((x) => x instanceof File);
-      const onlyStrings = raw.every((x) => typeof x === 'string');
-      if (onlyFiles) next = raw as File[];
-      else if (onlyStrings) next = raw as string[];
-      else next = raw as unknown as File[]; // tolerate mixed arrays if your parent accepts it
+      if (isFiles(raw)) {
+        next = [...raw]; // File[]
+      } else if (isStrings(raw)) {
+        next = [...raw]; // string[]
+      } else {
+        // mixed: choose a side (here, keep Files and drop strings)
+        const filesOnly = raw.filter((x) => x instanceof File) as File[];
+        next = [...filesOnly]; // File[]
+      }
     } else {
-      next = raw.length ? (raw[0] as any) : null;
-      // If you want strict typing for single-value mode, you can coerce string->string[] upstream.
+      next = raw.length && raw[0] instanceof File ? (raw[0] as File) : null;
     }
 
     this.fc.setValue(next);
     this.fc.markAsTouched();
     this.fc.markAsDirty();
-    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+    this.fc.updateValueAndValidity({ onlySelf: true });
 
-    // Apply errors based on Files only (for size checks), but compute emptiness on the *raw* value (see below)
-    const filesOnly = raw.filter((x) => x instanceof File) as File[];
+    const filesOnly = Array.isArray(next)
+      ? (next.filter((x) => x instanceof File) as File[])
+      : next instanceof File
+        ? [next]
+        : [];
     this.applyFileErrors(filesOnly);
   }
 
@@ -434,4 +434,10 @@ export class InputFileComponent implements OnInit, OnDestroy {
         return {};
     }
   }
+
+  hasFilesValidator: ValidatorFn = (c) => {
+    const v = c.value;
+    const len = Array.isArray(v) ? v.length : v ? 1 : 0;
+    return len > 0 ? null : { required: true };
+  };
 }
