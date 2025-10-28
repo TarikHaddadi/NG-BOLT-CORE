@@ -14,7 +14,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 
 import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
-import { isFile, isFiles, isString, isStrings } from '@cadai/pxs-ng-core/utils';
+import { isFiles, isStrings } from '@cadai/pxs-ng-core/utils';
 
 type FileControlValue = File | File[] | string[] | null;
 
@@ -35,6 +35,7 @@ type FileControlValue = File | File[] | string[] | null;
       [class]="field.layoutClass?.concat(' w-full') || 'w-full'"
       floatLabel="always"
       [color]="field.color || 'primary'"
+      [hideRequiredMarker]="false"
     >
       <mat-label>{{ field.label | translate }}</mat-label>
 
@@ -42,13 +43,13 @@ type FileControlValue = File | File[] | string[] | null;
         matInput
         [id]="field.name"
         [value]="displayValue"
+        [formControl]="fc"
         [readonly]="true"
-        [required]="field.required"
         [placeholder]="field.placeholder || '' | translate"
         (blur)="fc.markAsTouched()"
         [attr.aria-label]="field.label | translate"
         [attr.aria-describedby]="ariaDescribedBy"
-        [attr.aria-invalid]="fc.invalid ? 'true' : null"
+        [attr.aria-invalid]="fc.invalid || null"
         [attr.aria-required]="field.required || null"
       />
 
@@ -78,16 +79,15 @@ type FileControlValue = File | File[] | string[] | null;
       }
     </mat-form-field>
 
-    <!-- File list + actions -->
     @if (filesCount > 0) {
       <div class="pxs-file-list">
-        @for (f of filesView; track $index; let i = $index) {
+        @for (f of filesView; track f.key) {
           <div class="pxs-file-row">
             <div class="pxs-file-name" [title]="f.name">{{ f.name }}</div>
             @if (f.size !== undefined) {
               <span class="pxs-file-meta">{{ humanSize(f.size) }}</span>
             }
-            <button mat-button type="button" (click)="removeAt(i)">
+            <button mat-button type="button" (click)="removeByKey(f.key)">
               {{ 'form.actions.remove' | translate: emptyParams }}
             </button>
           </div>
@@ -224,25 +224,56 @@ export class InputFileComponent implements OnInit, OnDestroy {
     if (v == null) return [];
     return Array.isArray(v) ? v.slice() : [v];
   }
-  removeAt(i: number) {
+
+  clear() {
+    this.fc.setValue(this.multiple ? [] : null);
+    this.fc.markAsTouched();
+    this.fc.markAsDirty();
+    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+    this.applyFileErrors([]);
+    if (this.fileInputRef?.nativeElement) this.fileInputRef.nativeElement.value = '';
+  }
+
+  // ---------- View / display ----------
+  get filesView(): Array<{ key: string; name: string; size?: number }> {
+    const v = this.fc.value as File | string | Array<File | string> | null;
+    if (!v) return [];
+
+    const toVm = (x: File | string, idx: number) => {
+      if (typeof x === 'string') return { key: `str:${idx}:${x}`, name: x };
+      // include size + lastModified to disambiguate same-named files
+      const lm = (x as any).lastModified ?? 0;
+      return { key: `file:${idx}:${x.name}:${x.size}:${lm}`, name: x.name, size: x.size };
+    };
+
+    if (Array.isArray(v)) return v.map(toVm);
+    if (typeof v === 'string') return [toVm(v, 0)];
+    if (v instanceof File) return [toVm(v, 0)];
+    return [];
+  }
+
+  removeByKey(key: string) {
     const raw = this.rawArray();
-    if (i < 0 || i >= raw.length) return;
+    const idx = this.filesView.findIndex((f) => f.key === key);
+    if (idx < 0) return;
 
-    raw.splice(i, 1);
+    // remove same index in raw (filesView mirrors order of rawArray)
+    raw.splice(idx, 1);
 
+    // normalize and always set a NEW array in multi-mode
     let next: FileControlValue;
+
     if (this.multiple) {
       if (isFiles(raw)) {
-        next = [...raw]; // File[]
+        next = [...raw];
       } else if (isStrings(raw)) {
-        next = [...raw]; // string[]
+        next = [...raw];
       } else {
-        // mixed: choose a side (here, keep Files and drop strings)
         const filesOnly = raw.filter((x) => x instanceof File) as File[];
-        next = [...filesOnly]; // File[]
+        next = [...filesOnly];
       }
     } else {
-      next = raw.length && raw[0] instanceof File ? (raw[0] as File) : null;
+      next = raw.length ? (raw[0] as any) : null;
     }
 
     this.fc.setValue(next);
@@ -257,35 +288,6 @@ export class InputFileComponent implements OnInit, OnDestroy {
         : [];
     this.applyFileErrors(filesOnly);
   }
-
-  clear() {
-    this.fc.setValue(this.multiple ? [] : null);
-    this.fc.markAsTouched();
-    this.fc.markAsDirty();
-    this.fc.updateValueAndValidity({ onlySelf: true, emitEvent: false });
-    this.applyFileErrors([]);
-    if (this.fileInputRef?.nativeElement) this.fileInputRef.nativeElement.value = '';
-  }
-
-  // ---------- View / display ----------
-  get filesView(): Array<{ name: string; size?: number }> {
-    const v = this.fc.value as File | string | Array<File | string> | null;
-    if (!v) return [];
-
-    if (Array.isArray(v)) {
-      return v.map((x) => {
-        if (isString(x)) return { name: x };
-        if (isFile(x)) return { name: x.name, size: x.size };
-        return { name: String(x) };
-      });
-    }
-
-    if (isString(v)) return [{ name: v }];
-    if (isFile(v)) return [{ name: v.name, size: v.size }];
-
-    return [];
-  }
-
   get filesCount(): number {
     return this.filesView.length;
   }

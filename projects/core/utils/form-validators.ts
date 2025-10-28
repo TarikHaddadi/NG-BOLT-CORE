@@ -172,10 +172,3 @@ export const maxTotalSizeValidator = (max?: number): ValidatorFn =>
         const total = files.reduce((s, f) => s + f.size, 0);
         return total <= max ? null : { maxTotalSize: { max, total } };
       };
-
-export function isFile(val: unknown): val is File {
-  return typeof File !== 'undefined' && val instanceof File;
-}
-export function isString(val: unknown): val is string {
-  return typeof val === 'string';
-}
