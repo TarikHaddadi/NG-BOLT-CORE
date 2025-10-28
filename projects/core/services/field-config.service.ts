@@ -409,7 +409,6 @@ export class FieldConfigService {
   }
 
   getAllFields(overrides: Partial<FieldConfig>[] = []): FieldConfig[] {
-    // Optional: pass an array of overrides aligned by index/type if you want
     return [
       this.getTextField(overrides[0]),
       this.getEmailField(overrides[1]),
@@ -422,6 +421,7 @@ export class FieldConfigService {
       this.getChipsField(overrides[8]),
       this.getAutocompleteField(overrides[9]),
       this.getTextAreaField(overrides[10]),
+      this.getFileField(overrides[11]),
     ];
   }
 }
