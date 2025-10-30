@@ -87,6 +87,7 @@ export class FieldConfigService {
     const maxFileSize = overrides.maxFileSize; // bytes
     const maxTotalSize = overrides.maxTotalSize; // bytes
     const required = overrides.required ?? true;
+    const fileVariant = overrides.fileVariant ?? 'input';
 
     const defaults: FieldConfig = {
       type: 'file',
@@ -101,7 +102,7 @@ export class FieldConfigService {
       maxFiles,
       maxFileSize,
       maxTotalSize,
-
+      fileVariant,
       // Validators: compose requirements based on provided constraints
       validators: [
         ...(required ? [Validators.required] : []),

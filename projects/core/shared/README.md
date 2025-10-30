@@ -142,6 +142,35 @@ export class MyFeatureComponent {
         maxTotalSize: 'form.errors.file.maxTotalSize',
       },
     }),
+
+    // -------- Other variants
+    this.fields.getFileField({
+      name: 'files',
+      label: 'form.labels.files',
+      fileVariant: 'input',   // default; can omit
+      multiple: true,
+      accept: '.pdf,.docx,image/*',
+      required: true,
+      validators: [Validators.required],
+    });
+
+    // Pure dropzone
+    this.fields.getFileField({
+      name: 'files',
+      label: 'Upload documents',
+      fileVariant: 'dropzone',
+      multiple: true,
+      accept: '.pdf,.docx',
+    });
+
+    // Both (dropzone + browse button in form-field)
+    this.fields.getFileField({
+      name: 'files',
+      label: 'Supporting evidence',
+      fileVariant: 'both',
+      multiple: true,
+      maxFiles: 5,
+    });
   ];
 }
 ```
@@ -514,10 +543,12 @@ form.errors.file.required
 - **Show/Hide**: toggle `field.hidden = true/false` and re-render.
 - **Disable/Enable**: `form.get(field.name)?.disable()` or model `field.disabled = true` before build.
 - **Update options** (dropdown/autocomplete):
+
   ```ts
   const f = fieldConfig.find(x => x.name === 'role')!;
   f.options = [{ label: 'Owner', value: 'owner' }, ...];
   ```
+
 - **Set values**: `form.patchValue({ email: 'a@b.com' })`.
 - **Listen to changes**: `form.get('email')?.valueChanges.subscribe(...)`.
 
@@ -525,9 +556,11 @@ form.errors.file.required
 
 1. **Create a field component** with inputs: `field: FieldConfig` and `control: FormControl`.
 2. **Register it** in `FieldHostComponent` map:
+
    ```ts
    const MAP = { ..., myNewType: MyNewFieldComponent };
    ```
+
 3. **Extend** `FieldConfigService` with a `getMyNewField(...)` factory.
 4. **Use** it in `fieldConfig` as `type: 'myNewType'`.
 
