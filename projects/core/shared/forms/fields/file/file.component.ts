@@ -39,6 +39,7 @@ type FileControlValue = File | File[] | string[] | null;
     >
       <mat-label>{{ field.label | translate }}</mat-label>
 
+      <!-- Display-only control; you said it's working as-is -->
       <input
         matInput
         [id]="field.name"
@@ -53,10 +54,14 @@ type FileControlValue = File | File[] | string[] | null;
         [attr.aria-required]="field.required || null"
       />
 
-      <button mat-button matSuffix type="button" (click)="openPicker()">
-        {{ 'form.actions.browse' | translate: emptyParams }}
-      </button>
+      <!-- Keep the button suffix for 'input' and 'both' -->
+      @if (variant !== 'dropzone') {
+        <button mat-button matSuffix type="button" (click)="openPicker()">
+          {{ 'form.actions.browse' | translate: emptyParams }}
+        </button>
+      }
 
+      <!-- Hidden native picker (used by all variants) -->
       <input
         #fileInput
         type="file"
@@ -79,6 +84,39 @@ type FileControlValue = File | File[] | string[] | null;
       }
     </mat-form-field>
 
+    <!-- Dropzone block for 'dropzone' and 'both' -->
+    @if (variant !== 'input') {
+      <div
+        class="pxs-dropzone"
+        [class.pxs-dropzone--active]="dragActive"
+        tabindex="0"
+        role="button"
+        (click)="openPicker()"
+        (keydown.enter)="openPicker()"
+        (keydown.space)="openPicker()"
+        (dragover)="onDragOver($event)"
+        (dragenter)="onDragEnter($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        [attr.aria-label]="'form.actions.dropHere' | translate: emptyParams"
+      >
+        <div class="pxs-dropzone__icon">⬆</div>
+        <div class="pxs-dropzone__text">
+          {{ 'form.actions.dropFilesHere' | translate: emptyParams }}
+          <span class="pxs-dropzone__or">{{ 'form.actions.or' | translate: emptyParams }}</span>
+          <button mat-stroked-button type="button">
+            {{ 'form.actions.browse' | translate: emptyParams }}
+          </button>
+        </div>
+        @if (acceptAttr) {
+          <div class="pxs-dropzone__accept">
+            {{ 'form.hints.dropAccepted' | translate: { types: acceptAttr } }}
+          </div>
+        }
+      </div>
+    }
+
+    <!-- File list + actions (unchanged) -->
     @if (filesCount > 0) {
       <div class="pxs-file-list">
         @for (f of filesView; track f.key) {
@@ -93,13 +131,15 @@ type FileControlValue = File | File[] | string[] | null;
           </div>
         }
         <div class="pxs-file-actions">
-          <button mat-stroked-button type="button" (click)="openPicker()">
-            {{
-              multiple
-                ? ('form.actions.addFiles' | translate: emptyParams)
-                : ('form.actions.replaceFile' | translate: emptyParams)
-            }}
-          </button>
+          @if (variant !== 'dropzone') {
+            <button mat-stroked-button type="button" (click)="openPicker()">
+              {{
+                multiple
+                  ? ('form.actions.addFiles' | translate: emptyParams)
+                  : ('form.actions.replaceFile' | translate: emptyParams)
+              }}
+            </button>
+          }
           <button mat-button type="button" color="warn" (click)="clear()">
             {{ 'form.actions.clear' | translate: emptyParams }}
           </button>
@@ -125,6 +165,7 @@ export class InputFileComponent implements OnInit, OnDestroy {
   emptyParams: Record<string, never> = {};
   private lastRejectedByAccept = 0; // track how many were dropped by accept
   private sub?: Subscription;
+  dragActive = false;
 
   constructor(private t: TranslateService) {}
 
@@ -144,6 +185,11 @@ export class InputFileComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
+  }
+
+  get variant(): 'input' | 'dropzone' | 'both' {
+    const v = this.field?.fileVariant ?? 'input';
+    return v === 'dropzone' || v === 'both' ? v : 'input';
   }
 
   // ---------- Config helpers ----------
@@ -194,28 +240,7 @@ export class InputFileComponent implements OnInit, OnDestroy {
       this.applyFileErrors([]);
       return;
     }
-
-    const selected = Array.from(list);
-    const curRaw = this.rawArray();
-
-    const merged = this.multiple
-      ? curRaw.some((x) => typeof x === 'string')
-        ? selected
-        : [...(curRaw as File[]), ...selected]
-      : selected.slice(0, 1);
-
-    const { accepted, rejectedCount } = this.filterByAccept(merged);
-    this.lastRejectedByAccept = rejectedCount;
-
-    const limited = this.enforceCounts(accepted);
-    const final = limited;
-
-    this.fc.setValue(this.multiple ? final : (final[0] ?? null));
-    this.fc.markAsTouched();
-    this.fc.markAsDirty();
-    this.fc.updateValueAndValidity({ onlySelf: true });
-    this.applyFileErrors(final);
-
+    this.addFiles(Array.from(list));
     input.value = '';
   }
 
@@ -438,4 +463,57 @@ export class InputFileComponent implements OnInit, OnDestroy {
     const len = Array.isArray(v) ? v.length : v ? 1 : 0;
     return len > 0 ? null : { required: true };
   };
+
+  private addFiles(selected: File[]) {
+    const curRaw = this.rawArray();
+
+    const merged = this.multiple
+      ? curRaw.some((x) => typeof x === 'string')
+        ? selected
+        : [...(curRaw as File[]), ...selected]
+      : selected.slice(0, 1);
+
+    const { accepted, rejectedCount } = this.filterByAccept(merged);
+    this.lastRejectedByAccept = rejectedCount;
+
+    const final = this.enforceCounts(accepted);
+
+    this.fc.setValue(this.multiple ? final : (final[0] ?? null));
+    this.fc.markAsTouched();
+    this.fc.markAsDirty();
+    this.fc.updateValueAndValidity({ onlySelf: true });
+    this.applyFileErrors(final);
+  }
+
+  onDragOver(e: DragEvent) {
+    e.preventDefault(); // allow drop
+    e.stopPropagation();
+    this.dragActive = true;
+  }
+
+  onDragEnter(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.dragActive = true;
+  }
+
+  onDragLeave(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.dragActive = false;
+  }
+
+  onDrop(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.dragActive = false;
+
+    const dt = e.dataTransfer;
+    if (!dt) return;
+
+    if (dt.files && dt.files.length) {
+      this.addFiles(Array.from(dt.files));
+      return;
+    }
+  }
 }

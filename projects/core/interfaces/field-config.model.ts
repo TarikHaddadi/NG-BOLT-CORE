@@ -22,6 +22,8 @@ export interface FieldComponent<T = unknown> {
   control: import('@angular/forms').AbstractControl<T>;
 }
 
+export type FileVariant = 'input' | 'dropzone' | 'both';
+
 export interface FieldConfig {
   type: FieldType;
   name: string;
@@ -60,4 +62,5 @@ export interface FieldConfig {
   maxFiles?: number;
   maxFileSize?: number;
   maxTotalSize?: number;
+  fileVariant?: FileVariant;
 }
