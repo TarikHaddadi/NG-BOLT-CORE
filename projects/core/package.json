@@ -1,6 +1,6 @@
 {
   "name": "@cadai/pxs-ng-core",
-  "version": "1.9.24",
+  "version": "1.9.25",
   "publishConfig": {
     "registry": "https://pkgs.dev.azure.com/cadai/Socle/_packaging/PXS-NG-CORE/npm/registry/"
   },
