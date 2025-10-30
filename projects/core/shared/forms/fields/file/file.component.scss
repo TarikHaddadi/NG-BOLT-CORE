@@ -44,9 +44,15 @@
       font-size: 0.95rem;
       color: var(--mat-primary);
     }
+
     .pxs-file-meta {
       color: #666;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+
+    .pxs-file-icon {
+      opacity: 0.85;
     }
   }
 
@@ -74,19 +80,17 @@
   user-select: none;
   outline: none;
 
-  &__icon {
-    font-size: 1.5rem;
-    line-height: 1;
-  }
   &__text {
     display: flex;
     gap: 0.5rem;
     align-items: center;
     flex-wrap: wrap;
   }
+
   &__or {
     opacity: 0.7;
   }
+
   &__accept {
     font-size: 0.85rem;
     opacity: 0.7;
