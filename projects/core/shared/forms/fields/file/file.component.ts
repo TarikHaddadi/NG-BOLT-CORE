@@ -11,6 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 
@@ -30,6 +31,7 @@ type FileControlValue = File | File[] | string[] | null;
     MatButtonModule,
     TranslateModule,
     MatIconModule,
+    MatTooltipModule,
   ],
   template: `
     <mat-form-field
@@ -125,13 +127,18 @@ type FileControlValue = File | File[] | string[] | null;
       <div class="pxs-file-list">
         @for (f of filesView; track f.key) {
           <div class="pxs-file-row">
-            <mat-icon class="pxs-file-icon">{{ iconFor(f) }}</mat-icon>
+            <mat-icon class="pxs-file-icon primary">{{ iconFor(f) }}</mat-icon>
             <div class="pxs-file-name" [title]="f.name">{{ f.name }}</div>
             @if (f.size !== undefined) {
               <span class="pxs-file-meta">{{ humanSize(f.size) }}</span>
             }
-            <button mat-button type="button" (click)="removeByKey(f.key)">
-              {{ 'form.actions.remove' | translate: emptyParams }}
+            <button
+              mat-icon-button
+              type="button"
+              (click)="removeByKey(f.key)"
+              matTooltip="{{ 'form.actions.remove' | translate: emptyParams }}"
+            >
+              <mat-icon color="accent">delete</mat-icon>
             </button>
           </div>
         }
