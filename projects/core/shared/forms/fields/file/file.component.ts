@@ -9,11 +9,12 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 
-import { FieldConfig } from '@cadai/pxs-ng-core/interfaces';
+import { FieldConfig, FileVM } from '@cadai/pxs-ng-core/interfaces';
 import { isFiles, isStrings } from '@cadai/pxs-ng-core/utils';
 
 type FileControlValue = File | File[] | string[] | null;
@@ -28,6 +29,7 @@ type FileControlValue = File | File[] | string[] | null;
     MatInputModule,
     MatButtonModule,
     TranslateModule,
+    MatIconModule,
   ],
   template: `
     <mat-form-field
@@ -100,7 +102,9 @@ type FileControlValue = File | File[] | string[] | null;
         (drop)="onDrop($event)"
         [attr.aria-label]="'form.actions.dropHere' | translate: emptyParams"
       >
-        <div class="pxs-dropzone__icon">⬆</div>
+        <div class="pxs-dropzone__icon">
+          <mat-icon>cloud_upload</mat-icon>
+        </div>
         <div class="pxs-dropzone__text">
           {{ 'form.actions.dropFilesHere' | translate: emptyParams }}
           <span class="pxs-dropzone__or">{{ 'form.actions.or' | translate: emptyParams }}</span>
@@ -121,6 +125,7 @@ type FileControlValue = File | File[] | string[] | null;
       <div class="pxs-file-list">
         @for (f of filesView; track f.key) {
           <div class="pxs-file-row">
+            <mat-icon class="pxs-file-icon">{{ iconFor(f) }}</mat-icon>
             <div class="pxs-file-name" [title]="f.name">{{ f.name }}</div>
             @if (f.size !== undefined) {
               <span class="pxs-file-meta">{{ humanSize(f.size) }}</span>
@@ -260,21 +265,118 @@ export class InputFileComponent implements OnInit, OnDestroy {
   }
 
   // ---------- View / display ----------
-  get filesView(): Array<{ key: string; name: string; size?: number }> {
+  get filesView(): FileVM[] {
     const v = this.fc.value as File | string | Array<File | string> | null;
     if (!v) return [];
 
-    const toVm = (x: File | string, idx: number) => {
-      if (typeof x === 'string') return { key: `str:${idx}:${x}`, name: x };
-      // include size + lastModified to disambiguate same-named files
+    const extOf = (name: string) => {
+      const base = name.split(/[?#]/)[0]; // strip query/hash
+      const part = base.split('/').pop() ?? base; // last path segment
+      const dot = part.lastIndexOf('.');
+      return dot >= 0 ? part.slice(dot + 1).toLowerCase() : undefined;
+    };
+
+    const toVm = (x: File | string, idx: number): FileVM => {
+      if (typeof x === 'string') {
+        const ext = extOf(x);
+        return { key: `str:${idx}:${x}`, name: x, ext };
+      }
       const lm = (x as any).lastModified ?? 0;
-      return { key: `file:${idx}:${x.name}:${x.size}:${lm}`, name: x.name, size: x.size };
+      return {
+        key: `file:${idx}:${x.name}:${x.size}:${lm}`,
+        name: x.name,
+        size: x.size,
+        ext: extOf(x.name),
+        mime: x.type || undefined,
+      };
     };
 
     if (Array.isArray(v)) return v.map(toVm);
     if (typeof v === 'string') return [toVm(v, 0)];
     if (v instanceof File) return [toVm(v, 0)];
     return [];
+  }
+
+  iconFor(f: FileVM): string {
+    const mime = f.mime?.toLowerCase();
+    const ext = f.ext?.toLowerCase();
+
+    // MIME-first routing
+    if (mime) {
+      if (mime.startsWith('image/')) return 'image';
+      if (mime.startsWith('audio/')) return 'audio_file';
+      if (mime.startsWith('video/')) return 'movie';
+      if (mime === 'application/pdf') return 'picture_as_pdf';
+      if (mime.includes('presentation')) return 'slideshow';
+      if (mime.includes('spreadsheet') || mime.includes('excel')) return 'table';
+      if (mime.includes('wordprocessingml') || mime.includes('msword')) return 'description';
+      if (mime.includes('zip')) return 'folder_zip';
+      if (mime.includes('json')) return 'data_object';
+      if (mime.includes('text/')) return 'notes';
+    }
+
+    // Extension fallback
+    switch (ext) {
+      case 'pdf':
+        return 'picture_as_pdf';
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'gif':
+      case 'webp':
+      case 'svg':
+        return 'image';
+      case 'doc':
+      case 'docx':
+      case 'odt':
+        return 'description'; // (no "docs" icon)
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+      case 'ods':
+        return 'table';
+      case 'ppt':
+      case 'pptx':
+      case 'odp':
+        return 'slideshow';
+      case 'mp4':
+      case 'mkv':
+      case 'mov':
+      case 'avi':
+      case 'webm':
+        return 'movie';
+      case 'mp3':
+      case 'wav':
+      case 'flac':
+      case 'm4a':
+        return 'audio_file';
+      case 'zip':
+      case 'rar':
+      case '7z':
+      case 'gz':
+      case 'tar':
+        return 'folder_zip';
+      case 'txt':
+      case 'md':
+        return 'notes';
+      case 'json':
+        return 'data_object';
+      case 'html':
+      case 'xml':
+      case 'js':
+      case 'ts':
+      case 'css':
+      case 'scss':
+      case 'java':
+      case 'cs':
+      case 'py':
+      case 'go':
+      case 'rb':
+      case 'php':
+        return 'code';
+      default:
+        return 'insert_drive_file';
+    }
   }
 
   removeByKey(key: string) {

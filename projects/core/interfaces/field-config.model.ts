@@ -23,6 +23,13 @@ export interface FieldComponent<T = unknown> {
 }
 
 export type FileVariant = 'input' | 'dropzone' | 'both';
+export interface FileVM {
+  key: string;
+  name: string;
+  size?: number;
+  ext?: string;
+  mime?: string;
+}
 
 export interface FieldConfig {
   type: FieldType;
